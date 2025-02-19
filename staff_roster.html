@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced One-Hour Roster (Debug Mode)</title>
+  <title>Advanced Half-Hour Hybrid Roster (Debug Mode)</title>
   <style>
     body {
       font-family: Arial, sans-serif; 
@@ -56,7 +56,7 @@
 </head>
 <body>
 
-  <h2>Advanced One-Hour Roster (Debug Mode)</h2>
+  <h2>Advanced Half-Hour Hybrid Roster (Debug Mode)</h2>
 
   <!-- Date & Day Selection -->
   <div class="inline-block">
@@ -114,16 +114,17 @@
     /*******************************************************
      *            GLOBAL CONSTANTS & CONFIG
      *******************************************************/
-    const STORAGE_KEY = 'staffListData_OneHour_Debug';
+    const STORAGE_KEY = 'staffListData_Hybrid_Debug';
 
-    // One-hour time slots from 20:00 to 07:00, plus an extra slot at 07:30 for Tango Papa.
+    // Half-hour increments from 20:00 to 07:30
+    // so we can place Vertical Patrol at half hours (20:30, 01:30, etc.)
     const TIME_SLOTS = [
-      "20:00", "21:00", "22:00", "23:00",
-      "00:00", "01:00", "02:00", "03:00",
-      "04:00", "05:00", "06:00", "07:00", "07:30"
+      "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
+      "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
+      "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
 
-    // Locations in final display order
+    // Display order of locations
     const OUTPUT_ORDER = [
       "Vertical Patrol",
       "Lobby",
@@ -134,7 +135,9 @@
       "Tango Papa"
     ];
 
-    // Priority for assignment (Lobby first)
+    // Priority for assignment
+    // - Lobby & Pass Counter need 2 staff
+    // - Others need 1
     const PRIORITY = [
       { location: "Lobby",          needed: 2 },
       { location: "Pass Counter",   needed: 2 },
@@ -323,7 +326,7 @@
     }
 
     /*******************************************************
-     *          GENERATE ROSTER (ONE-HOUR)
+     *          GENERATE ROSTER (HALF-HOUR HYBRID)
      *******************************************************/
     function generateRoster() {
       // Save any new edits
@@ -345,7 +348,7 @@
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
 
-      // For each time slot, fill in priority order
+      // For each half-hour slot, fill in priority order
       for (let slot of TIME_SLOTS) {
         for (let p of PRIORITY) {
           let loc = p.location;
@@ -417,22 +420,29 @@
      *       LOCATION APPLICABILITY
      *******************************************************/
     function locationApplies(loc, slot, isWeekend) {
+      // 1. Vertical Patrol at 20:30, 23:00, 01:30, 06:30 only
       if (loc === "Vertical Patrol") {
-        // For one-hour intervals, only at these times
-        return ["20:00","23:00","01:00","06:00"].includes(slot);
+        return ["20:30","23:00","01:30","06:30"].includes(slot);
       }
+
+      // 2. Report Room only at 20:00 or 21:00 on weekdays
       if (loc === "Report Room") {
-        // Skip on weekends
         if (isWeekend) return false;
-        // Only at 20:00 or 21:00
         return (slot === "20:00" || slot === "21:00");
       }
+
+      // 3. Tango Papa only at 07:30
       if (loc === "Tango Papa") {
-        // Only at 07:30
         return (slot === "07:30");
       }
-      // Otherwise, location is valid for all time slots
-      return true;
+
+      // 4. All other locations (Lobby, Pass Counter, HHMD, Guard House)
+      //    only at top of the hour from 20:00 to 07:00
+      const topOfHourSlots = [
+        "20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00",
+        "04:00","05:00","06:00","07:00"
+      ];
+      return topOfHourSlots.includes(slot);
     }
 
     /*******************************************************
@@ -456,7 +466,7 @@
     }
 
     function isStaffEligible(st, slot, loc) {
-      // If locked & not already assigned for this slot, skip
+      // If locked & not assigned this slot, skip
       if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
 
       // Must be present
@@ -471,14 +481,13 @@
       // Must be HHMD-eligible if location=HHMD
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
 
-      // If you want to prevent immediate back-to-back in same location, keep this check:
+      // Optional: if you want to block back-to-back in the same location
       if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
 
       return true;
     }
 
-    // IMPORTANT: This now checks ANY location in the same slot
-    // so staff cannot appear in multiple places at once.
+    // Staff can't be assigned to two different locations in the same slot
     function alreadyAssignedSlot(st, slot) {
       return st.assigned.some(a => a.slot === slot);
     }
@@ -490,11 +499,11 @@
       let endM   = timeToMinutes(bEnd);
       let slotM  = timeToMinutes(slot);
 
-      // If break wraps after midnight in a complex way, we ignore it
+      // If break crosses midnight in a complex way, we treat as always available
       if (endM < startM) {
         return true;
       }
-      // If slot time is within break range, staff is unavailable
+      // If slot is within break range, staff is unavailable
       return !(slotM >= startM && slotM < endM);
     }
 
@@ -503,6 +512,7 @@
       return parseInt(H,10)*60 + parseInt(M,10);
     }
 
+    // Optional: no immediate back-to-back in same location
     function isBackToBack(st, slot, loc) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
@@ -510,7 +520,7 @@
       return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
     }
 
-    // For Lobby, skip staff who were in Lobby in the previous slot
+    // For Lobby, skip staff who were in Lobby in the previous slot (first pass only)
     function isLobbyRepeat(st, slot) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
@@ -576,7 +586,7 @@
         alert("Please generate the roster first.");
         return;
       }
-      let rosterText = "📋 *Staff Roster (One-Hour)*\n\n";
+      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour)*\n\n";
       const rows = table.querySelectorAll("tbody tr");
       rows.forEach(row => {
         const cells = row.querySelectorAll("td");
