@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</title>
+  <title>Refined Roster: HHMD at Top of Hour, No Consecutive Use, No Repeat Vertical Patrol</title>
   <style>
     body {
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
+      font-family: Arial, sans-serif;
+      padding: 20px;
       text-align: center;
     }
     /* Button styling: dark blue background, white text */
@@ -41,11 +41,11 @@
       display: inline-block;
       margin: 10px;
     }
-    .break-time-container { 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      gap: 5px; 
+    .break-time-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
       border: 1px solid #ccc;
       padding: 3px;
       background-color: #fafafa;
@@ -54,14 +54,15 @@
       cursor: move;
     }
     .shortfall-note {
-      color: red; 
+      color: red;
       font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</h2>
-  
+
+  <h2>Refined Roster (No Lock, Round-Robin, Strict Rules)</h2>
+
   <!-- Date & Day Selection -->
   <div class="inline-block">
     <label for="rosterDate">Date:</label>
@@ -79,7 +80,7 @@
       <option value="Sunday">Sunday</option>
     </select>
   </div>
-  
+
   <!-- Staff Table (No Lock Column) -->
   <table id="staffTable">
     <thead>
@@ -96,28 +97,28 @@
       <!-- Staff rows will be inserted here -->
     </tbody>
   </table>
-  
+
   <!-- Roster Buttons -->
   <button type="button" onclick="addStaff()">Add Staff</button>
   <button type="button" onclick="generateRoster()">Generate Roster</button>
   <button type="button" onclick="sendWhatsApp()">Send via WhatsApp</button>
-  
+
   <!-- Export / Import Buttons -->
   <button type="button" onclick="exportStaffData()">Export Staff Data</button>
   <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
   <button type="button" onclick="document.getElementById('importFile').click()">Import Staff Data</button>
-  
+
   <h3>Generated Staff Roster</h3>
   <div id="rosterContainer"></div>
-  
+
   <h4>Notes & Shortfalls</h4>
   <div id="notesContainer"></div>
-  
+
   <script>
     /*******************************************************
      * GLOBAL CONSTANTS & CONFIG
      *******************************************************/
-    const STORAGE_KEY = 'staffListData_NoLock_Debug';
+    const STORAGE_KEY = 'staffListData_StrictRules_Debug';
 
     // Full half-hour increments from 20:00 to 07:30 (for internal logic)
     const TIME_SLOTS = [
@@ -126,7 +127,7 @@
       "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
 
-    // Displayed slots (a trimmed version)
+    // Displayed slots (trimmed)
     const DISPLAY_SLOTS = [
       "20:00","20:30","21:00","22:00","23:00",
       "00:00","01:00","01:30","02:00","03:00",
@@ -145,14 +146,17 @@
     ];
 
     // Priority for assignment
+    //  - HHMD, Guard House first
+    //  - Then Lobby, Pass Counter
+    //  - Then Vertical Patrol, etc.
     const PRIORITY = [
-      { location: "HHMD",           needed: 1 },
-      { location: "Guard House",    needed: 1 },
-      { location: "Lobby",          needed: 2 },
-      { location: "Pass Counter",   needed: 2 },
-      { location: "Vertical Patrol",needed: 1 },
-      { location: "Report Room",    needed: 1 },
-      { location: "Tango Papa",     needed: 1 }
+      { location: "HHMD", needed: 1 },
+      { location: "Guard House", needed: 1 },
+      { location: "Lobby", needed: 2 },
+      { location: "Pass Counter", needed: 2 },
+      { location: "Vertical Patrol", needed: 1 },
+      { location: "Report Room", needed: 1 },
+      { location: "Tango Papa", needed: 1 }
     ];
 
     /*******************************************************
@@ -163,7 +167,7 @@
     };
 
     /*******************************************************
-     * LOAD / SAVE STAFF DATA
+     * LOAD / SAVE STAFF
      *******************************************************/
     function loadStaffList() {
       let stored = localStorage.getItem(STORAGE_KEY);
@@ -358,7 +362,6 @@
             chosen.assigned.push({ slot: slot, location: loc });
             assignedCount++;
           }
-          // If short, note it (including Vertical Patrol if no one was assigned)
           if (assignedCount < needed) {
             shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
           }
@@ -443,15 +446,15 @@
       if (st.attendance !== "Yes") return false;
       // Must not be on break
       if (!staffAvailableSlot(st, slot)) return false;
-      // Check double booking rules (including HHMD <-> Lobby special case)
+      // Check double booking rules (including HHMD <-> Lobby if ≤6 staff)
       if (alreadyAssignedSlot(st, slot, loc, totalStaffCount)) return false;
       // HHMD must have "Yes"
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
       // 1-hour gap for Guard House
       if (loc === "Guard House" && violatesOneHourGapForGuardHouse(st, slot)) return false;
-      // Avoid consecutive usage in the same location
+      // No consecutive usage in same location
       if (isBackToBack(st, slot, loc)) return false;
-      // **No repeat** for Vertical Patrol: if staff already did it, skip
+      // No repeat for Vertical Patrol
       if (loc === "Vertical Patrol" && alreadyDidVerticalPatrol(st)) return false;
 
       return true;
@@ -461,37 +464,32 @@
      * ALLOW HHMD <-> LOBBY DOUBLE BOOKING IF staffCount ≤ 6
      *******************************************************/
     function alreadyAssignedSlot(st, slot, newLoc, totalStaffCount) {
-      // Check if staff is assigned to the same half-hour for any location
       let existingAssignments = st.assigned.filter(a => a.slot === slot);
-      if (existingAssignments.length === 0) return false; // not assigned yet => no conflict
-      
+      if (existingAssignments.length === 0) return false;
+
       // If staff is already assigned to the same location => conflict
       if (existingAssignments.some(a => a.location === newLoc)) {
-        return true; 
+        return true;
       }
-      
-      // If staff is assigned to a different location, check if it's HHMD <-> Lobby
-      // and totalStaffCount ≤ 6
+      // If staff is assigned to a different location, check HHMD <-> Lobby
       for (let ea of existingAssignments) {
         let assignedLoc = ea.location;
-        // If we have > 6 staff => no double booking at all
         if (totalStaffCount > 6) {
-          return true; // staff is assigned => conflict
+          return true; // no double booking if > 6 staff
         }
-        // If we have ≤ 6 staff => allow double booking only if it's exactly HHMD + Lobby
+        // If ≤6 staff => allow only if it's HHMD + Lobby
         let validCombo = 
           (assignedLoc === "HHMD" && newLoc === "Lobby") ||
           (assignedLoc === "Lobby" && newLoc === "HHMD");
         if (!validCombo) {
-          return true; // not a valid combo => conflict
+          return true; 
         }
       }
-      // If we reached here, it's assigned to HHMD or Lobby, and newLoc is the complementary one, totalStaffCount ≤ 6 => allowed
-      return false;
+      return false; 
     }
 
     /*******************************************************
-     *  CHECK IF STAFF ALREADY DID VERTICAL PATROL
+     * NO REPEAT VERTICAL PATROL
      *******************************************************/
     function alreadyDidVerticalPatrol(st) {
       return st.assigned.some(a => a.location === "Vertical Patrol");
@@ -506,19 +504,19 @@
       let startM = timeToMinutes(bStart);
       let endM   = timeToMinutes(bEnd);
       let slotM  = timeToMinutes(slot);
-      // If break crosses midnight (e.g. 23:00-02:00)
+
+      // If break crosses midnight
       if (endM < startM) {
         if (slotM >= startM || slotM <= endM) return false;
         return true;
       }
-      // Normal case: staff is unavailable if slot in [startM, endM)
+      // Normal
       if (slotM >= startM && slotM < endM) return false;
       return true;
     }
 
     function violatesOneHourGapForGuardHouse(st, slot) {
       let idx = TIME_SLOTS.indexOf(slot);
-      // skip staff if assigned in previous 2 half-hour slots
       for (let i = 1; i <= 2; i++) {
         if (idx - i < 0) break;
         let checkSlot = TIME_SLOTS[idx - i];
@@ -534,13 +532,12 @@
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
       let prevSlot = TIME_SLOTS[idx - 1];
-      // if staff was assigned to `loc` in `prevSlot`, skip
       return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
     }
 
     function timeToMinutes(t) {
       let [H, M] = t.split(":");
-      return parseInt(H, 10) * 60 + parseInt(M, 10);
+      return parseInt(H, 10)*60 + parseInt(M, 10);
     }
 
     /*******************************************************
@@ -598,7 +595,7 @@
         alert("Please generate the roster first.");
         return;
       }
-      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour, No Repeat Vertical Patrol)*\n\n";
+      let rosterText = "📋 *Staff Roster (Strict Rules, No Repeat Vertical Patrol)*\n\n";
       const rows = table.querySelectorAll("tbody tr");
       rows.forEach(row => {
         const cells = row.querySelectorAll("td");
