@@ -10,6 +10,18 @@
       padding: 20px; 
       text-align: center;
     }
+
+    /* Button styling: dark blue background, white text */
+    button {
+      background-color: #0066cc;
+      color: #fff;
+      padding: 10px;
+      margin: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+    }
+
     table {
       width: 100%; 
       border-collapse: collapse; 
@@ -22,11 +34,6 @@
     }
     th {
       background-color: #f4f4f4;
-    }
-    button {
-      padding: 10px; 
-      margin: 10px; 
-      cursor: pointer;
     }
     input, select {
       padding: 5px; 
@@ -116,15 +123,22 @@
      *******************************************************/
     const STORAGE_KEY = 'staffListData_Hybrid_Debug';
 
-    // Half-hour increments from 20:00 to 07:30
-    // so we can place Vertical Patrol at half hours (20:30, 01:30, etc.)
+    // 1. Full half-hour increments from 20:00 to 07:30 (for internal logic).
     const TIME_SLOTS = [
       "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
       "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
       "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
 
-    // Display order of locations
+    // 2. Only show these slots in the final table.
+    //    (Skip 21:30, 22:30, 23:30, 00:30, 02:30, 03:30, 04:30, 05:30, etc.)
+    const DISPLAY_SLOTS = [
+      "20:00","20:30","21:00","22:00","23:00",
+      "00:00","01:00","01:30","02:00","03:00",
+      "04:00","05:00","06:00","06:30","07:00","07:30"
+    ];
+
+    // Locations in final display order
     const OUTPUT_ORDER = [
       "Vertical Patrol",
       "Lobby",
@@ -326,7 +340,7 @@
     }
 
     /*******************************************************
-     *          GENERATE ROSTER (HALF-HOUR HYBRID)
+     *          GENERATE ROSTER
      *******************************************************/
     function generateRoster() {
       // Save any new edits
@@ -420,29 +434,26 @@
      *       LOCATION APPLICABILITY
      *******************************************************/
     function locationApplies(loc, slot, isWeekend) {
-      // 1. Vertical Patrol at 20:30, 23:00, 01:30, 06:30 only
+      // Example rules:
+      // 1. Vertical Patrol only at 20:30, 23:00, 01:30, 06:30
       if (loc === "Vertical Patrol") {
         return ["20:30","23:00","01:30","06:30"].includes(slot);
       }
-
       // 2. Report Room only at 20:00 or 21:00 on weekdays
       if (loc === "Report Room") {
         if (isWeekend) return false;
         return (slot === "20:00" || slot === "21:00");
       }
-
       // 3. Tango Papa only at 07:30
       if (loc === "Tango Papa") {
         return (slot === "07:30");
       }
-
-      // 4. All other locations (Lobby, Pass Counter, HHMD, Guard House)
-      //    only at top of the hour from 20:00 to 07:00
-      const topOfHourSlots = [
+      // 4. Lobby/Pass Counter/HHMD/Guard House only at top of hour (20:00,21:00,...07:00)
+      const topOfHour = [
         "20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00",
         "04:00","05:00","06:00","07:00"
       ];
-      return topOfHourSlots.includes(slot);
+      return topOfHour.includes(slot);
     }
 
     /*******************************************************
@@ -487,7 +498,7 @@
       return true;
     }
 
-    // Staff can't be assigned to two different locations in the same slot
+    // No double-booking across different locations
     function alreadyAssignedSlot(st, slot) {
       return st.assigned.some(a => a.slot === slot);
     }
@@ -512,7 +523,7 @@
       return parseInt(H,10)*60 + parseInt(M,10);
     }
 
-    // Optional: no immediate back-to-back in same location
+    // No immediate back-to-back in the same location (optional)
     function isBackToBack(st, slot, loc) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
@@ -520,7 +531,7 @@
       return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
     }
 
-    // For Lobby, skip staff who were in Lobby in the previous slot (first pass only)
+    // For Lobby, skip staff who were in Lobby in the previous slot (1st pass)
     function isLobbyRepeat(st, slot) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
@@ -543,15 +554,16 @@
       const container = document.getElementById("rosterContainer");
       container.innerHTML = "";
 
+      // Only show DISPLAY_SLOTS in the table
       let tableHTML = `<table><thead><tr><th>Location</th>`;
-      TIME_SLOTS.forEach(slot => {
+      DISPLAY_SLOTS.forEach(slot => {
         tableHTML += `<th>${slot}</th>`;
       });
       tableHTML += "</tr></thead><tbody>";
 
       OUTPUT_ORDER.forEach(loc => {
         tableHTML += `<tr><td>${loc}</td>`;
-        TIME_SLOTS.forEach(slot => {
+        DISPLAY_SLOTS.forEach(slot => {
           let arr = roster[loc][slot] || [];
           if (arr.length > 1) {
             tableHTML += `<td>${arr.join("/")}</td>`;
