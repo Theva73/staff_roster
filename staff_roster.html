@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced Half-Hour Roster (Debug Mode)</title>
+  <title>Advanced One-Hour Roster (Debug Mode)</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -27,7 +27,7 @@
 </head>
 <body>
 
-  <h2>Advanced Half-Hour Roster (Debug Mode)</h2>
+  <h2>Advanced One-Hour Roster (Debug Mode)</h2>
 
   <!-- Date & Day Selection -->
   <div class="inline-block">
@@ -81,16 +81,16 @@
     /*******************************************************
      *            GLOBAL CONSTANTS & CONFIG
      *******************************************************/
-    const STORAGE_KEY = 'staffListData_HalfHour_Debug';
+    const STORAGE_KEY = 'staffListData_OneHour_Debug';
 
-    // Half-hour increments from 20:00 to 07:30 (24 slots).
+    // One-hour increments from 20:00 to 07:00 (12 slots).
     const HALF_HOURS = [
-      "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
-      "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
-      "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
+      "20:00", "21:00", "22:00", "23:00",
+      "00:00", "01:00", "02:00", "03:00",
+      "04:00", "05:00", "06:00", "07:00"
     ];
 
-    // Output rows
+    // Output rows (locations)
     const OUTPUT_ORDER = [
       "Vertical Patrol",
       "Pass Counter",
@@ -101,7 +101,7 @@
       "Tango Papa"
     ];
 
-    // Priority for each half-hour
+    // Priority for each location per time slot
     const PRIORITY = [
       { location: "Pass Counter", needed: 2 },
       { location: "HHMD",        needed: 1 },
@@ -197,7 +197,7 @@
      *         STAFF ROW CREATION/REMOVAL
      *******************************************************/
     function getStaffRowHTML(staff) {
-      let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:30","23:30"];
+      let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:00","23:00"];
       return `
         <tr data-worked='${JSON.stringify(staff.workedLastTwoDays || [])}'
             data-assigned='${JSON.stringify(staff.assigned || [])}'>
@@ -205,9 +205,9 @@
           <td><input type="text" value="${staff.name}"></td>
           <td>
             <div class="break-time-container draggable" draggable="true">
-              <input type="time" value="${startVal || "21:30"}" step="1">
+              <input type="time" value="${startVal || "21:00"}" step="1">
               <span>-</span>
-              <input type="time" value="${endVal   || "23:30"}" step="1">
+              <input type="time" value="${endVal   || "23:00"}" step="1">
             </div>
           </td>
           <td>
@@ -236,7 +236,7 @@
       const newStaff = {
         staffID: "",
         name: "",
-        breakTime: "21:30-23:30",
+        breakTime: "21:00-23:00",
         hhmdEligible: "No",
         attendance: "Yes",
         locked: false,
@@ -305,7 +305,7 @@
     }
 
     /*******************************************************
-     *          GENERATE ROSTER (HALF-HOUR)
+     *          GENERATE ROSTER (ONE-HOUR)
      *******************************************************/
     function generateRoster() {
       console.log("generateRoster() called");
@@ -325,7 +325,7 @@
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
 
-      // For each half-hour slot, fill in priority order
+      // For each one-hour slot, fill in priority order
       for (let slot of HALF_HOURS) {
         for (let p of PRIORITY) {
           let loc = p.location;
@@ -393,6 +393,7 @@
 
     function locationApplies(loc, slot, isWeekend) {
       if (loc === "Vertical Patrol") {
+        // For one-hour intervals, specific times for Vertical Patrol
         return ["20:00","23:00","01:00","06:00"].includes(slot);
       }
       if (loc === "Report Room") {
@@ -400,7 +401,7 @@
         return (slot === "20:00" || slot === "21:00");
       }
       if (loc === "Tango Papa") {
-        return (slot === "07:30");
+        return (slot === "07:00");
       }
       return true;
     }
@@ -410,7 +411,7 @@
       // 1st pass: skip staff who are "lobby repeats" if loc=Lobby
       for (let st of staffList) {
         if (!isStaffEligible(st, slot, loc)) continue;
-        // If loc=Lobby, skip staff who worked previous half-hour in Lobby
+        // If loc=Lobby, skip staff who worked previous slot in Lobby
         if (loc === "Lobby" && isLobbyRepeat(st, slot)) {
           continue;
         }
@@ -435,7 +436,7 @@
         return false;
       }
       if (st.attendance !== "Yes") return false;
-      if (!staffAvailableHalfHour(st, slot)) return false;
+      if (!staffAvailableSlot(st, slot)) return false;
       if (alreadyAssignedSlot(st, slot)) return false;
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
       if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
@@ -447,7 +448,7 @@
       return st.assigned.some(a => a.slot === slot);
     }
 
-    function staffAvailableHalfHour(st, slot) {
+    function staffAvailableSlot(st, slot) {
       const [bStart, bEnd] = st.breakTime.split("-");
       if (!bStart || !bEnd) return true;
       let startM = timeToMinutes(bStart);
@@ -481,7 +482,8 @@
 
     function violates2HourGap(st, slot, loc) {
       let idx = HALF_HOURS.indexOf(slot);
-      for (let i=1; i<=4; i++) {
+      // For one-hour intervals, check the previous 2 slots for a 2-hour gap
+      for (let i = 1; i <= 2; i++) {
         if (idx - i < 0) break;
         let checkSlot = HALF_HOURS[idx - i];
         if (st.assigned.some(a => a.slot === checkSlot && a.location === loc)) {
@@ -550,7 +552,7 @@
      *******************************************************/
     function sendWhatsApp() {
       console.log("sendWhatsApp() called");
-      let rosterText = "📋 *Staff Roster (Half-Hour)*\n\n";
+      let rosterText = "📋 *Staff Roster (One-Hour)*\n\n";
       const table = document.querySelector("#rosterContainer table");
       if (!table) {
         alert("Please generate the roster first.");
