@@ -597,7 +597,7 @@
         try {
           const importedData = JSON.parse(e.target.result);
           // Validate structure if needed, then set localStorage
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData);
           alert("Staff data imported successfully. Please refresh or re-open the page to see changes.");
         } catch (err) {
           alert("Error importing data: " + err.message);
