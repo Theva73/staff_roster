@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced Half-Hour Hybrid Roster (No Lock)</title>
+  <title>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin)</title>
   <style>
     body {
       font-family: Arial, sans-serif; 
@@ -41,11 +41,11 @@
       display: inline-block;
       margin: 10px;
     }
-    .break-time-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
+    .break-time-container { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 5px; 
       border: 1px solid #ccc;
       padding: 3px;
       background-color: #fafafa;
@@ -54,13 +54,13 @@
       cursor: move;
     }
     .shortfall-note {
-      color: red;
+      color: red; 
       font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>Advanced Half-Hour Hybrid Roster (No Lock)</h2>
+  <h2>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin)</h2>
   
   <!-- Date & Day Selection -->
   <div class="inline-block">
@@ -93,7 +93,7 @@
       </tr>
     </thead>
     <tbody>
-      <!-- Staff rows inserted here -->
+      <!-- Staff rows will be inserted here -->
     </tbody>
   </table>
   
@@ -118,19 +118,19 @@
      * GLOBAL CONSTANTS & CONFIGURATION
      *******************************************************/
     const STORAGE_KEY = 'staffListData_NoLock_Debug';
-    // Full half-hour increments used for internal scheduling logic.
+    // Full half-hour increments from 20:00 to 07:30 (for internal logic)
     const TIME_SLOTS = [
       "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
       "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
       "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
-    // Only these slots are displayed in the final table.
+    // Displayed slots (a trimmed version)
     const DISPLAY_SLOTS = [
       "20:00","20:30","21:00","22:00","23:00",
       "00:00","01:00","01:30","02:00","03:00",
       "04:00","05:00","06:00","06:30","07:00","07:30"
     ];
-    // Order of locations in the final display.
+    // Locations in display order
     const OUTPUT_ORDER = [
       "HHMD",
       "Guard House",
@@ -140,7 +140,7 @@
       "Report Room",
       "Tango Papa"
     ];
-    // Priority for assignment (HHMD and Guard House come before Lobby and Pass Counter).
+    // Priority for assignment (HHMD and Guard House have highest priority)
     const PRIORITY = [
       { location: "HHMD", needed: 1 },
       { location: "Guard House", needed: 1 },
@@ -204,7 +204,7 @@
      * STAFF ROW CREATION / REMOVAL
      *******************************************************/
     function getStaffRowHTML(staff) {
-      let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:00", "23:00"];
+      let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:00","23:00"];
       return `
         <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
           <td><input type="text" value="${staff.staffID}"></td>
@@ -296,17 +296,35 @@
     }
     
     /*******************************************************
+     * FISHER-YATES SHUFFLE (Round-Robin)
+     *******************************************************/
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+    
+    /*******************************************************
      * GENERATE ROSTER
      *******************************************************/
     function generateRoster() {
       saveStaffList();
       const dayValue = document.getElementById("rosterDay").value;
       const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
+      
       let staffList = getCurrentStaffList();
+      // Clear previous assignments
       staffList.forEach(st => { st.assigned = []; });
+      // Shuffle staff list for round-robin fairness using Fisher-Yates
+      staffList = shuffleArray(staffList);
+      
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
+      
+      // For each half-hour slot (internal TIME_SLOTS) and for each location by priority
       for (let slot of TIME_SLOTS) {
         for (let p of PRIORITY) {
           let loc = p.location;
@@ -353,17 +371,21 @@
      * LOCATION APPLICABILITY
      *******************************************************/
     function locationApplies(loc, slot, isWeekend) {
+      // For HHMD, Guard House, Lobby, Pass Counter: only at top-of-hour from 20:00 to 07:00.
       if (["HHMD", "Guard House", "Lobby", "Pass Counter"].includes(loc)) {
         const topOfHour = ["20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00"];
         return topOfHour.includes(slot);
       }
+      // Vertical Patrol only at 20:30, 23:00, 01:30, 06:30.
       if (loc === "Vertical Patrol") {
         return ["20:30","23:00","01:30","06:30"].includes(slot);
       }
+      // Report Room only at 20:00 or 21:00 on weekdays.
       if (loc === "Report Room") {
         if (isWeekend) return false;
         return (slot === "20:00" || slot === "21:00");
       }
+      // Tango Papa only at 07:30.
       if (loc === "Tango Papa") {
         return (slot === "07:30");
       }
@@ -382,11 +404,17 @@
     }
     
     function isStaffEligible(st, slot, loc) {
+      // Must be present.
       if (st.attendance !== "Yes") return false;
+      // Must not be on break.
       if (!staffAvailableSlot(st, slot)) return false;
+      // Must not already be assigned in this slot.
       if (alreadyAssignedSlot(st, slot)) return false;
+      // Must be HHMD-eligible if location is HHMD.
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
+      // Enforce a 1-hour gap for Guard House.
       if (loc === "Guard House" && violatesOneHourGapForGuardHouse(st, slot)) return false;
+      // Prevent immediate back-to-back assignments in the same location.
       if (isBackToBack(st, slot, loc)) return false;
       return true;
     }
@@ -395,25 +423,29 @@
       return st.assigned.some(a => a.slot === slot);
     }
     
+    // Enforce staff break times (handles breaks crossing midnight).
     function staffAvailableSlot(st, slot) {
       const [bStart, bEnd] = st.breakTime.split("-");
       if (!bStart || !bEnd) return true;
       let startM = timeToMinutes(bStart);
       let endM = timeToMinutes(bEnd);
       let slotM = timeToMinutes(slot);
+      // If break crosses midnight (e.g. 23:00-02:00)
       if (endM < startM) {
         if (slotM >= startM || slotM <= endM) return false;
         return true;
       }
+      // Normal case: staff is unavailable if slot is within [startM, endM)
       if (slotM >= startM && slotM < endM) return false;
       return true;
     }
     
     function timeToMinutes(t) {
       let [H, M] = t.split(":");
-      return parseInt(H,10) * 60 + parseInt(M,10);
+      return parseInt(H, 10) * 60 + parseInt(M, 10);
     }
     
+    // Enforce a 1-hour gap for Guard House (skip previous 2 half-hour slots)
     function violatesOneHourGapForGuardHouse(st, slot) {
       let idx = TIME_SLOTS.indexOf(slot);
       for (let i = 1; i <= 2; i++) {
@@ -426,6 +458,7 @@
       return false;
     }
     
+    // Prevent immediate back-to-back in same location.
     function isBackToBack(st, slot, loc) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
