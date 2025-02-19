@@ -83,11 +83,11 @@
      *******************************************************/
     const STORAGE_KEY = 'staffListData_OneHour_Debug';
 
-    // One-hour increments from 20:00 to 07:00 (12 slots).
+    // Time slots: one-hour increments from 20:00 to 07:00, plus an extra slot at 07:30 for Tango Papa.
     const HALF_HOURS = [
       "20:00", "21:00", "22:00", "23:00",
       "00:00", "01:00", "02:00", "03:00",
-      "04:00", "05:00", "06:00", "07:00"
+      "04:00", "05:00", "06:00", "07:00", "07:30"
     ];
 
     // Output rows (locations)
@@ -325,7 +325,7 @@
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
 
-      // For each one-hour slot, fill in priority order
+      // For each one-hour slot (plus the extra 07:30 slot), fill in priority order
       for (let slot of HALF_HOURS) {
         for (let p of PRIORITY) {
           let loc = p.location;
@@ -401,7 +401,8 @@
         return (slot === "20:00" || slot === "21:00");
       }
       if (loc === "Tango Papa") {
-        return (slot === "07:00");
+        // Tango Papa is assigned at the 07:30 slot
+        return (slot === "07:30");
       }
       return true;
     }
