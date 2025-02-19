@@ -6,11 +6,10 @@
   <title>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</title>
   <style>
     body {
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
+      font-family: Arial, sans-serif;
+      padding: 20px;
       text-align: center;
     }
-    /* Button styling: dark blue background, white text */
     button {
       background-color: #0066cc;
       color: #fff;
@@ -41,11 +40,11 @@
       display: inline-block;
       margin: 10px;
     }
-    .break-time-container { 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      gap: 5px; 
+    .break-time-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
       border: 1px solid #ccc;
       padding: 3px;
       background-color: #fafafa;
@@ -54,14 +53,17 @@
       cursor: move;
     }
     .shortfall-note {
-      color: red; 
+      color: red;
       font-weight: bold;
+    }
+    .shortfall-cell {
+      background-color: #ffe0e0; /* Light red background for shortfall cells */
     }
   </style>
 </head>
 <body>
   <h2>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</h2>
-  
+
   <!-- Date & Day Selection -->
   <div class="inline-block">
     <label for="rosterDate">Date:</label>
@@ -79,7 +81,7 @@
       <option value="Sunday">Sunday</option>
     </select>
   </div>
-  
+
   <!-- Staff Table (No Lock Column) -->
   <table id="staffTable">
     <thead>
@@ -96,23 +98,23 @@
       <!-- Staff rows will be inserted here -->
     </tbody>
   </table>
-  
+
   <!-- Roster Buttons -->
   <button type="button" onclick="addStaff()">Add Staff</button>
   <button type="button" onclick="generateRoster()">Generate Roster</button>
   <button type="button" onclick="sendWhatsApp()">Send via WhatsApp</button>
-  
+
   <!-- Export / Import Buttons -->
   <button type="button" onclick="exportStaffData()">Export Staff Data</button>
   <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
   <button type="button" onclick="document.getElementById('importFile').click()">Import Staff Data</button>
-  
-  <h3>Generated Staff Roster</h3>
+
+  <h3>Generated Staff Roster - <span id="rosterTitleDateDay"></span></h3>
   <div id="rosterContainer"></div>
-  
+
   <h4>Notes & Shortfalls</h4>
   <div id="notesContainer"></div>
-  
+
   <script>
     /*******************************************************
      * GLOBAL CONSTANTS & CONFIG
@@ -328,20 +330,23 @@
     function generateRoster() {
       saveStaffList();
       const dayValue = document.getElementById("rosterDay").value;
+      const dateValue = document.getElementById("rosterDate").value;
       const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-      
+
+      document.getElementById("rosterTitleDateDay").innerText = `${dateValue} (${dayValue})`;
+
       let staffList = getCurrentStaffList();
       // Clear previous assignments
       staffList.forEach(st => { st.assigned = []; });
       // Shuffle staff list for round-robin fairness
       staffList = shuffleArray(staffList);
-      
+
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
-      
+
       const totalStaffCount = staffList.length; // used for HHMD <-> Lobby double-book logic
-      
+
       // For each half-hour slot
       for (let slot of TIME_SLOTS) {
         for (let p of PRIORITY) {
@@ -350,7 +355,7 @@
           let needed = p.needed;
           if (!roster[loc][slot]) roster[loc][slot] = [];
           let assignedCount = roster[loc][slot].length;
-          
+
           while (assignedCount < needed) {
             let chosen = pickStaffForSlot(staffList, slot, loc, totalStaffCount);
             if (!chosen) break;
@@ -365,7 +370,7 @@
         }
       }
       saveAssignedToRows(staffList);
-      displayRoster(roster);
+      displayRoster(roster, shortfalls); // Pass shortfalls to displayRoster
       displayNotes(shortfalls);
     }
 
@@ -464,12 +469,12 @@
       // Check if staff is assigned to the same half-hour for any location
       let existingAssignments = st.assigned.filter(a => a.slot === slot);
       if (existingAssignments.length === 0) return false; // not assigned yet => no conflict
-      
+
       // If staff is already assigned to the same location => conflict
       if (existingAssignments.some(a => a.location === newLoc)) {
-        return true; 
+        return true;
       }
-      
+
       // If staff is assigned to a different location, check if it's HHMD <-> Lobby
       // and totalStaffCount ≤ 6
       for (let ea of existingAssignments) {
@@ -479,7 +484,7 @@
           return true; // staff is assigned => conflict
         }
         // If we have ≤ 6 staff => allow double booking only if it's exactly HHMD + Lobby
-        let validCombo = 
+        let validCombo =
           (assignedLoc === "HHMD" && newLoc === "Lobby") ||
           (assignedLoc === "Lobby" && newLoc === "HHMD");
         if (!validCombo) {
@@ -554,7 +559,7 @@
       saveStaffList();
     }
 
-    function displayRoster(roster) {
+    function displayRoster(roster, shortfalls) { // Modified to accept shortfalls
       const container = document.getElementById("rosterContainer");
       container.innerHTML = "";
       let tableHTML = `<table><thead><tr><th>Location</th>`;
@@ -566,19 +571,27 @@
         tableHTML += `<tr><td>${loc}</td>`;
         DISPLAY_SLOTS.forEach(slot => {
           let arr = roster[loc][slot] || [];
+          let cellContent;
+          let cellClass = '';
           if (arr.length > 1) {
-            tableHTML += `<td>${arr.join("/")}</td>`;
+            cellContent = arr.join("/");
           } else if (arr.length === 1) {
-            tableHTML += `<td>${arr[0]}</td>`;
+            cellContent = arr[0];
           } else {
-            tableHTML += `<td></td>`;
+            cellContent = '';
+            // Check if there is a shortfall for this location and slot
+            if (shortfalls.some(s => s === `Shortfall at ${loc} for ${slot}. Needed ${PRIORITY.find(p => p.location === loc).needed}, got 0.`)) {
+              cellClass = 'shortfall-cell'; // Apply class for shortfall
+            }
           }
+          tableHTML += `<td class="${cellClass}">${cellContent}</td>`;
         });
         tableHTML += `</tr>`;
       });
       tableHTML += `</tbody></table>`;
       container.innerHTML = tableHTML;
     }
+
 
     function displayNotes(shortfalls) {
       const notesDiv = document.getElementById("notesContainer");
@@ -598,7 +611,7 @@
         alert("Please generate the roster first.");
         return;
       }
-      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour, No Repeat Vertical Patrol)*\n\n";
+      let rosterText = `📋 *Staff Roster (Hybrid Half-Hour, No Repeat Vertical Patrol) - ${document.getElementById("rosterTitleDateDay").innerText}*\n\n`;
       const rows = table.querySelectorAll("tbody tr");
       rows.forEach(row => {
         const cells = row.querySelectorAll("td");
