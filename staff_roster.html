@@ -65,9 +65,16 @@
     </tbody>
   </table>
 
+  <!-- Roster Buttons -->
   <button onclick="addStaff()">Add Staff</button>
   <button onclick="generateRoster()">Generate Roster</button>
   <button onclick="sendWhatsApp()">Send via WhatsApp</button>
+
+  <!-- Export / Import Buttons -->
+  <button onclick="exportStaffData()">Export Staff Data</button>
+  <!-- Hidden file input for Import -->
+  <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;" />
+  <button onclick="document.getElementById('importFile').click()">Import Staff Data</button>
 
   <h3>Generated Staff Roster</h3>
   <div id="rosterContainer"></div>
@@ -83,8 +90,8 @@
      *******************************************************/
     const STORAGE_KEY = 'staffListData_OneHour_Debug';
 
-    // Time slots: one-hour increments from 20:00 to 07:00, plus an extra slot at 07:30 for Tango Papa.
-    const HALF_HOURS = [
+    // Example one-hour time slots
+    const TIME_SLOTS = [
       "20:00", "21:00", "22:00", "23:00",
       "00:00", "01:00", "02:00", "03:00",
       "04:00", "05:00", "06:00", "07:00", "07:30"
@@ -93,23 +100,23 @@
     // Output rows (locations)
     const OUTPUT_ORDER = [
       "Vertical Patrol",
-      "Pass Counter",
       "Lobby",
+      "Pass Counter",
       "HHMD",
       "Guard House",
       "Report Room",
       "Tango Papa"
     ];
 
-    // Priority for each location per time slot
+    // Priority for each location
     const PRIORITY = [
-      { location: "Pass Counter", needed: 2 },
-      { location: "HHMD",        needed: 1 },
-      { location: "Lobby",       needed: 2 },
-      { location: "Guard House", needed: 1 },
-      { location: "Vertical Patrol", needed: 1 },
-      { location: "Report Room",     needed: 1 },
-      { location: "Tango Papa",      needed: 1 }
+      { location: "Lobby",          needed: 2 },
+      { location: "Pass Counter",   needed: 2 },
+      { location: "HHMD",           needed: 1 },
+      { location: "Guard House",    needed: 1 },
+      { location: "Vertical Patrol",needed: 1 },
+      { location: "Report Room",    needed: 1 },
+      { location: "Tango Papa",     needed: 1 }
     ];
 
     /*******************************************************
@@ -314,6 +321,7 @@
       const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
 
       let staffList = getCurrentStaffList();
+      // Clear assignments for unlocked staff
       staffList.forEach(st => {
         if (!st.locked) {
           console.log(`Clearing assignments for unlocked staff ${st.staffID}`);
@@ -321,20 +329,23 @@
         }
       });
 
+      // Build a structure to store final assignments
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
 
-      // For each one-hour slot (plus the extra 07:30 slot), fill in priority order
-      for (let slot of HALF_HOURS) {
+      // For each time slot, fill in the order of PRIORITY
+      for (let slot of TIME_SLOTS) {
         for (let p of PRIORITY) {
           let loc = p.location;
+          // Skip if this location doesn't apply for the given time slot
           if (!locationApplies(loc, slot, isWeekend)) continue;
 
           let needed = p.needed;
           if (!roster[loc][slot]) roster[loc][slot] = [];
           let assignedCount = roster[loc][slot].length;
 
+          // Try to pick staff until we meet "needed" or run out
           while (assignedCount < needed) {
             let chosen = pickStaffForSlot(staffList, slot, loc);
             if (!chosen) {
@@ -346,13 +357,16 @@
             assignedCount++;
           }
 
-          if ((loc === "Pass Counter" || loc === "Lobby") && assignedCount < needed) {
+          // If short, note it for Lobby or Pass Counter
+          if ((loc === "Lobby" || loc === "Pass Counter") && assignedCount < needed) {
             shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
           }
         }
       }
 
+      // Save final assignments
       saveAssignedToRows(staffList);
+      // Display results
       displayRoster(roster);
       displayNotes(shortfalls);
     }
@@ -393,38 +407,33 @@
 
     function locationApplies(loc, slot, isWeekend) {
       if (loc === "Vertical Patrol") {
-        // For one-hour intervals, specific times for Vertical Patrol
         return ["20:00","23:00","01:00","06:00"].includes(slot);
       }
       if (loc === "Report Room") {
+        // Skip on weekends
         if (isWeekend) return false;
+        // Only at 20:00 or 21:00
         return (slot === "20:00" || slot === "21:00");
       }
       if (loc === "Tango Papa") {
-        // Tango Papa is assigned at the 07:30 slot
         return (slot === "07:30");
       }
       return true;
     }
 
     function pickStaffForSlot(staffList, slot, loc) {
-      console.log(`pickStaffForSlot(${loc}, ${slot})`);
-      // 1st pass: skip staff who are "lobby repeats" if loc=Lobby
+      // FIRST PASS: if loc=Lobby, skip staff who worked previous slot in Lobby
       for (let st of staffList) {
         if (!isStaffEligible(st, slot, loc)) continue;
-        // If loc=Lobby, skip staff who worked previous slot in Lobby
         if (loc === "Lobby" && isLobbyRepeat(st, slot)) {
           continue;
         }
-        console.log(`Picked staff ${st.staffID} for ${loc} at ${slot} (1st pass)`);
         return st;
       }
-      // 2nd pass (for Lobby): if none found, allow repeats
+      // SECOND PASS (for Lobby): allow repeats
       if (loc === "Lobby") {
-        console.log(`No staff found in 1st pass for Lobby at ${slot}; allowing repeats`);
         for (let st of staffList) {
           if (!isStaffEligible(st, slot, loc)) continue;
-          console.log(`Picked staff ${st.staffID} for Lobby at ${slot} (2nd pass)`);
           return st;
         }
       }
@@ -432,16 +441,13 @@
     }
 
     function isStaffEligible(st, slot, loc) {
-      // If locked & not assigned to this slot, skip
-      if (st.locked && !alreadyAssignedSlot(st, slot)) {
-        return false;
-      }
+      if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
       if (st.attendance !== "Yes") return false;
       if (!staffAvailableSlot(st, slot)) return false;
       if (alreadyAssignedSlot(st, slot)) return false;
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
+      // If you want to remove the gap entirely, remove or adjust this function
       if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
-      if (violates2HourGap(st, slot, loc)) return false;
       return true;
     }
 
@@ -456,7 +462,7 @@
       let endM   = timeToMinutes(bEnd);
       let slotM  = timeToMinutes(slot);
       if (endM < startM) {
-        // simplistic approach for wrap-around breaks
+        // If break crosses midnight in a simple way, we ignore it for now
         return true;
       }
       return !(slotM >= startM && slotM < endM);
@@ -468,34 +474,20 @@
     }
 
     function isBackToBack(st, slot, loc) {
-      let idx = HALF_HOURS.indexOf(slot);
+      let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
-      let prevSlot = HALF_HOURS[idx-1];
+      let prevSlot = TIME_SLOTS[idx-1];
       return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
     }
 
     function isLobbyRepeat(st, slot) {
-      let idx = HALF_HOURS.indexOf(slot);
+      let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
-      let prevSlot = HALF_HOURS[idx-1];
+      let prevSlot = TIME_SLOTS[idx-1];
       return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
     }
 
-    function violates2HourGap(st, slot, loc) {
-      let idx = HALF_HOURS.indexOf(slot);
-      // For one-hour intervals, check the previous 2 slots for a 2-hour gap
-      for (let i = 1; i <= 2; i++) {
-        if (idx - i < 0) break;
-        let checkSlot = HALF_HOURS[idx - i];
-        if (st.assigned.some(a => a.slot === checkSlot && a.location === loc)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
     function saveAssignedToRows(staffList) {
-      console.log("saveAssignedToRows() called");
       const rows = document.getElementById("staffTable").getElementsByTagName("tbody")[0].rows;
       let i = 0;
       for (let row of rows) {
@@ -505,23 +497,19 @@
       saveStaffList();
     }
 
-    /*******************************************************
-     *       DISPLAY THE ROSTER & SHORTFALL NOTES
-     *******************************************************/
     function displayRoster(roster) {
-      console.log("displayRoster() called");
       const container = document.getElementById("rosterContainer");
       container.innerHTML = "";
 
       let tableHTML = `<table><thead><tr><th>Location</th>`;
-      HALF_HOURS.forEach(slot => {
+      TIME_SLOTS.forEach(slot => {
         tableHTML += `<th>${slot}</th>`;
       });
       tableHTML += "</tr></thead><tbody>";
 
       OUTPUT_ORDER.forEach(loc => {
         tableHTML += `<tr><td>${loc}</td>`;
-        HALF_HOURS.forEach(slot => {
+        TIME_SLOTS.forEach(slot => {
           let arr = roster[loc][slot] || [];
           if (arr.length > 1) {
             tableHTML += `<td>${arr.join("/")}</td>`;
@@ -534,12 +522,11 @@
         tableHTML += "</tr>";
       });
 
-      tableHTML += "</tbody></table>";
+      tableHTML += "</tbody></table>`;
       container.innerHTML = tableHTML;
     }
 
     function displayNotes(shortfalls) {
-      console.log("displayNotes() called:", shortfalls);
       const notesDiv = document.getElementById("notesContainer");
       if (shortfalls.length === 0) {
         notesDiv.innerHTML = "<p>No critical shortfalls.</p>";
@@ -552,7 +539,6 @@
      *         WHATSAPP SHARING
      *******************************************************/
     function sendWhatsApp() {
-      console.log("sendWhatsApp() called");
       let rosterText = "📋 *Staff Roster (One-Hour)*\n\n";
       const table = document.querySelector("#rosterContainer table");
       if (!table) {
@@ -573,6 +559,51 @@
       });
       const whatsappURL = `https://wa.me/?text=${encodeURIComponent(rosterText)}`;
       window.open(whatsappURL, "_blank");
+    }
+
+    /*******************************************************
+     *         EXPORT & IMPORT STAFF DATA
+     *******************************************************/
+    // 1. Export Staff Data
+    function exportStaffData() {
+      // 1. Get data from localStorage
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) {
+        alert("No staff data found in localStorage.");
+        return;
+      }
+
+      // 2. Create a Blob and download it
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // 3. Create a temporary link to trigger the download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'StaffDataBackup.json';  // or any name you like
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    // 2. Import Staff Data
+    function importStaffData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          // Validate structure if needed, then set localStorage
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+          alert("Staff data imported successfully. Please refresh or re-open the page to see changes.");
+        } catch (err) {
+          alert("Error importing data: " + err.message);
+        }
+      };
+      reader.readAsText(file);
     }
   </script>
 </body>
