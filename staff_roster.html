@@ -333,34 +333,40 @@
       saveStaffList();
       const dayValue = document.getElementById("rosterDay").value;
       const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-      
+
       let staffList = getCurrentStaffList();
       // Clear previous assignments
       staffList.forEach(st => { st.assigned = []; });
-      // Shuffle staff list for round-robin fairness
+      // Initial shuffle
       staffList = shuffleArray(staffList);
-      
+
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
-      
+
       const totalStaffCount = staffList.length; // used for HHMD <-> Lobby double-book logic
-      
+
       // For each half-hour slot
       for (let slot of TIME_SLOTS) {
-        for (let p of PRIORITY) {
+        // Re-shuffle staff list for each time slot (Recommendation 2)
+        staffList = shuffleArray(staffList);
+        let availableStaffForSlot = [...staffList]; // Create a copy for this slot
+
+        for (let p of PRIORITY) { // Iterate through PRIORITY locations
           let loc = p.location;
           if (!locationApplies(loc, slot, isWeekend)) continue;
           let needed = p.needed;
           if (!roster[loc][slot]) roster[loc][slot] = [];
           let assignedCount = roster[loc][slot].length;
-          
+
           while (assignedCount < needed) {
-            let chosen = pickStaffForSlot(staffList, slot, loc, totalStaffCount);
-            if (!chosen) break;
+            let chosen = pickStaffForSlot(availableStaffForSlot, slot, loc, totalStaffCount); // Use availableStaffForSlot
+            if (!chosen) break; // If no eligible staff found, break out of inner loop for this location/slot
             roster[loc][slot].push(chosen.staffID);
             chosen.assigned.push({ slot: slot, location: loc });
             assignedCount++;
+            // Recommendation 1: Remove chosen staff from availableStaffForSlot (temporary removal)
+            availableStaffForSlot = availableStaffForSlot.filter(staff => staff.staffID !== chosen.staffID);
           }
           if (assignedCount < needed) {
             shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
@@ -478,14 +484,14 @@
           return true; // no double booking if > 6 staff
         }
         // If ≤6 staff => allow only if it's HHMD + Lobby
-        let validCombo = 
+        let validCombo =
           (assignedLoc === "HHMD" && newLoc === "Lobby") ||
           (assignedLoc === "Lobby" && newLoc === "HHMD");
         if (!validCombo) {
-          return true; 
+          return true;
         }
       }
-      return false; 
+      return false;
     }
 
     /*******************************************************
@@ -529,10 +535,15 @@
 
     // No consecutive half-hour usage in same location
     function isBackToBack(st, slot, loc) {
-      let idx = TIME_SLOTS.indexOf(slot);
-      if (idx <= 0) return false;
-      let prevSlot = TIME_SLOTS[idx - 1];
-      return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
+      let slotIndex = TIME_SLOTS.indexOf(slot);
+      if (slotIndex <= 0) return false; // Slot is the first one, no previous slot.
+
+      let prevSlotIndex = slotIndex - 1;
+      if (prevSlotIndex >= 0) { // Ensure there's a previous slot index
+        let prevSlot = TIME_SLOTS[prevSlotIndex];
+        return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
+      }
+      return false; // Should not reach here under normal circumstances, but for robustness.
     }
 
     function timeToMinutes(t) {
