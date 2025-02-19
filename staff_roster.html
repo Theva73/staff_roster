@@ -131,8 +131,7 @@
       "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
 
-    // 2. Only show these slots in the final table.
-    //    (Skipping 21:30, 22:30, 23:30, 00:30, 02:30, 03:30, 04:30, 05:30, etc.)
+    // 2. Only show these slots in the final table (omitting every half-hour except certain ones).
     const DISPLAY_SLOTS = [
       "20:00","20:30","21:00","22:00","23:00",
       "00:00","01:00","01:30","02:00","03:00",
@@ -435,20 +434,20 @@
      *       LOCATION APPLICABILITY
      *******************************************************/
     function locationApplies(loc, slot, isWeekend) {
-      // 1. Vertical Patrol only at 20:30, 23:00, 01:30, 06:30
+      // Vertical Patrol only at 20:30, 23:00, 01:30, 06:30
       if (loc === "Vertical Patrol") {
         return ["20:30","23:00","01:30","06:30"].includes(slot);
       }
-      // 2. Report Room only at 20:00 or 21:00 on weekdays
+      // Report Room only at 20:00 or 21:00 on weekdays
       if (loc === "Report Room") {
         if (isWeekend) return false;
         return (slot === "20:00" || slot === "21:00");
       }
-      // 3. Tango Papa only at 07:30
+      // Tango Papa only at 07:30
       if (loc === "Tango Papa") {
         return (slot === "07:30");
       }
-      // 4. Lobby/Pass Counter/HHMD/Guard House only at top of hour (20:00,21:00,...07:00)
+      // Lobby/Pass Counter/HHMD/Guard House only at top of hour from 20:00 to 07:00
       const topOfHour = [
         "20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00",
         "04:00","05:00","06:00","07:00"
@@ -486,12 +485,11 @@
       // Must be HHMD-eligible if location=HHMD
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
 
-      // If staff is locked for this slot, but not assigned, skip
+      // If staff is locked for this slot but not assigned, skip
       if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
 
-      // 1-Hour Gap in Guard House:
-      // If location is Guard House, skip if staff was in Guard House
-      // in either of the previous 2 half-hour slots.
+      // 1-hour gap for Guard House: skip if staff was in Guard House
+      // in the previous 2 half-hour slots
       if (loc === "Guard House" && violatesOneHourGapForGuardHouse(st, slot)) {
         return false;
       }
@@ -502,12 +500,13 @@
       return true;
     }
 
-    // No double-booking across different locations
+    // Check if staff is already assigned in this exact slot
     function alreadyAssignedSlot(st, slot) {
       return st.assigned.some(a => a.slot === slot);
     }
 
-    // Enforce the staff's break time, including crossing midnight
+    // Enforce staff's break time, inclusive of end boundary
+    // so if break=21:00-23:00, staff is unavailable at 21:00, 22:00, *and* 23:00
     function staffAvailableSlot(st, slot) {
       const [bStart, bEnd] = st.breakTime.split("-");
       if (!bStart || !bEnd) return true;
@@ -517,32 +516,32 @@
       let slotM  = timeToMinutes(slot);
 
       // If break crosses midnight (e.g. 23:00-02:00)
-      // staff is unavailable if slot >= startM or slot < endM
-      // Example: startM=1380, endM=120, slotM=...
+      // staff is unavailable if slot >= startM or slot <= endM
+      // because we treat it as inclusive of both endpoints
       if (endM < startM) {
-        // If slotM >= startM (e.g. 23:30) or slotM < endM (e.g. 00:30),
-        // then staff is on break
-        if (slotM >= startM || slotM < endM) {
+        // Example: break=23:00(1380) to 02:00(120)
+        // if slotM >= 1380 (23:00) or slotM <= 120 (02:00), staff is on break
+        if (slotM >= startM || slotM <= endM) {
           return false;
-        } else {
-          return true;
         }
+        return true;
       }
 
-      // Normal case (start < end)
-      // If slot is in [startM, endM), staff is unavailable
-      return !(slotM >= startM && slotM < endM);
+      // Normal case (startM < endM), inclusive end
+      // staff is unavailable if slot in [startM, endM]
+      if (slotM >= startM && slotM <= endM) {
+        return false;
+      }
+      return true;
     }
 
-    // Provide a 1-hour gap for Guard House:
-    // i.e., skip the previous 2 half-hour slots
+    // Provide a 1-hour gap for Guard House (skip the previous 2 half-hour slots)
     function violatesOneHourGapForGuardHouse(st, slot) {
       let idx = TIME_SLOTS.indexOf(slot);
       // Check the previous 2 half-hour slots
       for (let i = 1; i <= 2; i++) {
         if (idx - i < 0) break;
         let checkSlot = TIME_SLOTS[idx - i];
-        // If staff was in Guard House in the last 2 slots, it's a violation
         if (st.assigned.some(a => a.slot === checkSlot && a.location === "Guard House")) {
           return true;
         }
