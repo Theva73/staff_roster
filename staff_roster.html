@@ -6,41 +6,41 @@
   <title>Advanced One-Hour Roster (Debug Mode)</title>
   <style>
     body {
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
+      font-family: Arial, sans-serif;
+      padding: 20px;
       text-align: center;
     }
     table {
-      width: 100%; 
-      border-collapse: collapse; 
+      width: 100%;
+      border-collapse: collapse;
       margin-top: 20px;
     }
     th, td {
-      border: 1px solid #ccc; 
-      padding: 8px; 
+      border: 1px solid #ccc;
+      padding: 8px;
       text-align: center;
     }
     th {
       background-color: #f4f4f4;
     }
     button {
-      padding: 10px; 
-      margin: 10px; 
+      padding: 10px;
+      margin: 10px;
       cursor: pointer;
     }
     input, select {
-      padding: 5px; 
+      padding: 5px;
       text-align: center;
     }
     .inline-block {
-      display: inline-block; 
+      display: inline-block;
       margin: 10px;
     }
-    .break-time-container { 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      gap: 5px; 
+    .break-time-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
       border: 1px solid #ccc;
       padding: 3px;
       background-color: #fafafa;
@@ -49,7 +49,7 @@
       cursor: move;
     }
     .shortfall-note {
-      color: red; 
+      color: red;
       font-weight: bold;
     }
   </style>
@@ -604,6 +604,8 @@
           const importedData = JSON.parse(e.target.result);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
           alert("Staff data imported successfully. Please refresh or re-open the page to see changes.");
+          // Optional: Auto-refresh the staff list after import.
+          loadStaffList();
         } catch (err) {
           alert("Error importing data: " + err.message);
         }
