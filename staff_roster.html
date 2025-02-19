@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol) - REFINED</title>
+  <title>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
       text-align: center;
     }
     /* Button styling: dark blue background, white text */
@@ -41,11 +41,11 @@
       display: inline-block;
       margin: 10px;
     }
-    .break-time-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
+    .break-time-container { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 5px; 
       border: 1px solid #ccc;
       padding: 3px;
       background-color: #fafafa;
@@ -54,13 +54,14 @@
       cursor: move;
     }
     .shortfall-note {
-      color: red;
+      color: red; 
       font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol) - REFINED</h2>
+  <h2>Advanced Half-Hour Hybrid Roster (No Lock, Round-Robin, No Repeat Vertical Patrol)</h2>
+  
   <!-- Date & Day Selection -->
   <div class="inline-block">
     <label for="rosterDate">Date:</label>
@@ -78,6 +79,7 @@
       <option value="Sunday">Sunday</option>
     </select>
   </div>
+  
   <!-- Staff Table (No Lock Column) -->
   <table id="staffTable">
     <thead>
@@ -94,20 +96,23 @@
       <!-- Staff rows will be inserted here -->
     </tbody>
   </table>
+  
   <!-- Roster Buttons -->
-<button type="button" onclick="addStaff()">Add Staff</button>
-<button type="button" onclick="generateRoster()">Generate Roster</button>
-<button type="button" onclick="sendWhatsApp()">Send via WhatsApp</button>
-
+  <button type="button" onclick="addStaff()">Add Staff</button>
+  <button type="button" onclick="generateRoster()">Generate Roster</button>
+  <button type="button" onclick="sendWhatsApp()">Send via WhatsApp</button>
+  
   <!-- Export / Import Buttons -->
-<button type="button" onclick="exportStaffData()">Export Staff Data</button>
-<input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
-<button type="button" onclick="document.getElementById('importFile').click()">Import Staff Data</button>
-
+  <button type="button" onclick="exportStaffData()">Export Staff Data</button>
+  <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
+  <button type="button" onclick="document.getElementById('importFile').click()">Import Staff Data</button>
+  
   <h3>Generated Staff Roster</h3>
   <div id="rosterContainer"></div>
+  
   <h4>Notes & Shortfalls</h4>
   <div id="notesContainer"></div>
+  
   <script>
     /*******************************************************
      * GLOBAL CONSTANTS & CONFIG
@@ -128,7 +133,7 @@
       "04:00","05:00","06:00","06:30","07:00","07:30"
     ];
 
-    // Locations in display order (implicitly defines priority order)
+    // Locations in display order
     const OUTPUT_ORDER = [
       "HHMD",
       "Guard House",
@@ -139,7 +144,7 @@
       "Tango Papa"
     ];
 
-    // Priority for assignment (needed staff per location)
+    // Priority for assignment
     const PRIORITY = [
       { location: "HHMD",           needed: 1 },
       { location: "Guard House",    needed: 1 },
@@ -318,71 +323,48 @@
     }
 
     /*******************************************************
-     * GENERATE ROSTER - REFINED VERSION WITH PRIORITY & BETTER DOUBLE BOOKING
+     * GENERATE ROSTER
      *******************************************************/
     function generateRoster() {
       saveStaffList();
       const dayValue = document.getElementById("rosterDay").value;
       const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-
+      
       let staffList = getCurrentStaffList();
       // Clear previous assignments
       staffList.forEach(st => { st.assigned = []; });
-      // Shuffle staff list for round-robin fairness (shuffle ONCE at the beginning)
-      staffList = shuffleArray([...staffList]); // Shuffle a COPY to maintain original order for next priority level
-
+      // Shuffle staff list for round-robin fairness
+      staffList = shuffleArray(staffList);
+      
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
-
+      
       const totalStaffCount = staffList.length; // used for HHMD <-> Lobby double-book logic
-
-      // **Iterate through PRIORITY LEVELS**
-      for (let priorityLevel = 1; priorityLevel <= Math.max(...PRIORITY.map(p => p.needed)); priorityLevel++) {
-          // Create a copy of the staff list for each priority level to try assignments
-          let currentStaffList = [...staffList]; // Copy to avoid affecting the original shuffled order
-
-          // **Iterate through LOCATIONS based on OUTPUT_ORDER (which implicitly respects priority order)**
-          for (let loc of OUTPUT_ORDER) {
-              let p = PRIORITY.find(pr => pr.location === loc);
-              if (!p) continue; // Should not happen, but for safety
-              if (!locationApplies(loc, TIME_SLOTS[0], isWeekend)) continue; // Check if location is even relevant for this day type
-
-              // For each half-hour slot
-              for (let slot of TIME_SLOTS) {
-                  if (!locationApplies(loc, slot, isWeekend)) continue;
-                  let needed = p.needed;
-                  if (!roster[loc][slot]) roster[loc][slot] = [];
-                  let assignedCount = roster[loc][slot].length;
-
-                  while (assignedCount < needed) {
-                      let chosenIndex = -1;
-                      for (let i = 0; i < currentStaffList.length; i++) {
-                          let st = currentStaffList[i];
-                          if (isStaffEligible(st, slot, loc, totalStaffCount)) {
-                              chosenIndex = i;
-                              break; // Found eligible staff
-                          }
-                      }
-
-                      if (chosenIndex !== -1) {
-                          let chosen = currentStaffList.splice(chosenIndex, 1)[0]; // Remove chosen staff from current list
-                          roster[loc][slot].push(chosen.staffID);
-                          chosen.assigned.push({ slot: slot, location: loc });
-                          assignedCount++;
-                      } else {
-                          break; // No eligible staff found for this slot and location
-                      }
-                  }
-                  // If short, note it (including Vertical Patrol if no one was assigned)
-                  if (assignedCount < needed) {
-                      shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
-                  }
-              }
+      
+      // For each half-hour slot
+      for (let slot of TIME_SLOTS) {
+        for (let p of PRIORITY) {
+          let loc = p.location;
+          if (!locationApplies(loc, slot, isWeekend)) continue;
+          let needed = p.needed;
+          if (!roster[loc][slot]) roster[loc][slot] = [];
+          let assignedCount = roster[loc][slot].length;
+          
+          while (assignedCount < needed) {
+            let chosen = pickStaffForSlot(staffList, slot, loc, totalStaffCount);
+            if (!chosen) break;
+            roster[loc][slot].push(chosen.staffID);
+            chosen.assigned.push({ slot: slot, location: loc });
+            assignedCount++;
           }
+          // If short, note it (including Vertical Patrol if no one was assigned)
+          if (assignedCount < needed) {
+            shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
+          }
+        }
       }
-
-      saveAssignedToRows(staffList); // Save assignments back to original staffList
+      saveAssignedToRows(staffList);
       displayRoster(roster);
       displayNotes(shortfalls);
     }
@@ -476,34 +458,36 @@
     }
 
     /*******************************************************
-     * ALLOW HHMD <-> LOBBY DOUBLE BOOKING IF staffCount ≤ 6 - REFINED VERSION
+     * ALLOW HHMD <-> LOBBY DOUBLE BOOKING IF staffCount ≤ 6
      *******************************************************/
     function alreadyAssignedSlot(st, slot, newLoc, totalStaffCount) {
-      // Check if staff is already assigned to the same half-hour for any location
+      // Check if staff is assigned to the same half-hour for any location
       let existingAssignments = st.assigned.filter(a => a.slot === slot);
       if (existingAssignments.length === 0) return false; // not assigned yet => no conflict
-
-      // **Strict NO Double Booking in SAME LOCATION**
+      
+      // If staff is already assigned to the same location => conflict
       if (existingAssignments.some(a => a.location === newLoc)) {
-        return true;
+        return true; 
       }
-
-      // **General NO Double Booking (unless HHMD/Lobby combo with <= 6 staff)**
-      if (totalStaffCount > 6) {
-        return true; // More than 6 staff, NO double booking allowed at all
-      } else {
-        // <= 6 staff, allow ONLY HHMD/Lobby combo
-        for (let ea of existingAssignments) {
-          let assignedLoc = ea.location;
-          let validCombo =
-            (assignedLoc === "HHMD" && newLoc === "Lobby") ||
-            (assignedLoc === "Lobby" && newLoc === "HHMD");
-          if (!validCombo) {
-            return true; // Not HHMD/Lobby combo, disallow double booking
-          }
+      
+      // If staff is assigned to a different location, check if it's HHMD <-> Lobby
+      // and totalStaffCount ≤ 6
+      for (let ea of existingAssignments) {
+        let assignedLoc = ea.location;
+        // If we have > 6 staff => no double booking at all
+        if (totalStaffCount > 6) {
+          return true; // staff is assigned => conflict
         }
-        return false; // HHMD/Lobby combo allowed if <= 6 staff
+        // If we have ≤ 6 staff => allow double booking only if it's exactly HHMD + Lobby
+        let validCombo = 
+          (assignedLoc === "HHMD" && newLoc === "Lobby") ||
+          (assignedLoc === "Lobby" && newLoc === "HHMD");
+        if (!validCombo) {
+          return true; // not a valid combo => conflict
+        }
       }
+      // If we reached here, it's assigned to HHMD or Lobby, and newLoc is the complementary one, totalStaffCount ≤ 6 => allowed
+      return false;
     }
 
     /*******************************************************
@@ -614,7 +598,7 @@
         alert("Please generate the roster first.");
         return;
       }
-      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour, No Repeat Vertical Patrol) - REFINED*\n\n";
+      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour, No Repeat Vertical Patrol)*\n\n";
       const rows = table.querySelectorAll("tbody tr");
       rows.forEach(row => {
         const cells = row.querySelectorAll("td");
