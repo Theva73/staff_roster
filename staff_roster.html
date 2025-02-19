@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Advanced Half-Hour Hybrid Roster (Debug Mode)</title>
+  <title>Advanced Half-Hour Hybrid Roster (No Lock)</title>
   <style>
     body {
       font-family: Arial, sans-serif; 
@@ -63,7 +63,7 @@
 </head>
 <body>
 
-  <h2>Advanced Half-Hour Hybrid Roster (Debug Mode)</h2>
+  <h2>Advanced Half-Hour Hybrid Roster (No Lock)</h2>
 
   <!-- Date & Day Selection -->
   <div class="inline-block">
@@ -83,7 +83,7 @@
     </select>
   </div>
 
-  <!-- Staff Table -->
+  <!-- Staff Table (No Lock column) -->
   <table id="staffTable">
     <thead>
       <tr>
@@ -92,7 +92,6 @@
         <th>Break Time (Start - End)</th>
         <th>HHMD Eligible?</th>
         <th>Attendance</th>
-        <th>Lock</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -121,17 +120,16 @@
     /*******************************************************
      *            GLOBAL CONSTANTS & CONFIG
      *******************************************************/
-    const STORAGE_KEY = 'staffListData_Hybrid_Debug';
+    const STORAGE_KEY = 'staffListData_NoLock_Debug';
 
-    // 1. Full half-hour increments from 20:00 to 07:30 (for internal logic).
-    //    This ensures break checks & vertical patrol at half-hour times.
+    // Half-hour increments from 20:00 to 07:30 for internal logic.
     const TIME_SLOTS = [
       "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
       "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
       "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
     ];
 
-    // 2. Only show these slots in the final table (omitting every half-hour except certain ones).
+    // Only show these slots in the final table.
     const DISPLAY_SLOTS = [
       "20:00","20:30","21:00","22:00","23:00",
       "00:00","01:00","01:30","02:00","03:00",
@@ -140,23 +138,21 @@
 
     // Locations in final display order
     const OUTPUT_ORDER = [
-      "Vertical Patrol",
-      "Lobby",
-      "Pass Counter",
       "HHMD",
       "Guard House",
+      "Lobby",
+      "Pass Counter",
+      "Vertical Patrol",
       "Report Room",
       "Tango Papa"
     ];
 
-    // Priority for assignment
-    // - Lobby & Pass Counter need 2 staff
-    // - Others need 1
+    // Priority for assignment (HHMD & Guard House before Lobby & Pass Counter)
     const PRIORITY = [
-      { location: "Lobby",          needed: 2 },
-      { location: "Pass Counter",   needed: 2 },
       { location: "HHMD",           needed: 1 },
       { location: "Guard House",    needed: 1 },
+      { location: "Lobby",          needed: 2 },
+      { location: "Pass Counter",   needed: 2 },
       { location: "Vertical Patrol",needed: 1 },
       { location: "Report Room",    needed: 1 },
       { location: "Tango Papa",     needed: 1 }
@@ -214,10 +210,9 @@
 
         const hhmdEligible = row.cells[3].querySelector("select").value;
         const attendance   = row.cells[4].querySelector("select").value;
-        const locked       = row.cells[5].querySelector("input[type='checkbox']").checked;
 
-        let workedLastTwoDays = row.dataset.worked ? JSON.parse(row.dataset.worked) : [];
         let assigned = row.dataset.assigned ? JSON.parse(row.dataset.assigned) : [];
+        // no "locked" property here
 
         staffList.push({
           staffID,
@@ -225,8 +220,6 @@
           breakTime,
           hhmdEligible,
           attendance,
-          locked,
-          workedLastTwoDays,
           assigned
         });
       }
@@ -243,8 +236,7 @@
     function getStaffRowHTML(staff) {
       let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:00","23:00"];
       return `
-        <tr data-worked='${JSON.stringify(staff.workedLastTwoDays || [])}'
-            data-assigned='${JSON.stringify(staff.assigned || [])}'>
+        <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
           <td><input type="text" value="${staff.staffID}"></td>
           <td><input type="text" value="${staff.name}"></td>
           <td>
@@ -266,9 +258,6 @@
               <option ${staff.attendance==="No"  ? "selected" : ""}>No</option>
             </select>
           </td>
-          <td>
-            <input type="checkbox" ${staff.locked ? "checked" : ""}>
-          </td>
           <td><button type="button" onclick="removeRow(this)">Remove</button></td>
         </tr>
       `;
@@ -282,8 +271,6 @@
         breakTime: "21:00-23:00",
         hhmdEligible: "No",
         attendance: "Yes",
-        locked: false,
-        workedLastTwoDays: [],
         assigned: []
       };
       tbody.insertAdjacentHTML("beforeend", getStaffRowHTML(newStaff));
@@ -351,18 +338,16 @@
       // Load staff from table
       let staffList = getCurrentStaffList();
 
-      // Clear assignments for unlocked staff
+      // Clear any previous assigned array
       staffList.forEach(st => {
-        if (!st.locked) {
-          st.assigned = [];
-        }
+        st.assigned = [];
       });
 
       let roster = {};
       OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
       let shortfalls = [];
 
-      // For each half-hour slot, fill in priority order
+      // For each half-hour slot, fill in new priority
       for (let slot of TIME_SLOTS) {
         for (let p of PRIORITY) {
           let loc = p.location;
@@ -389,7 +374,7 @@
         }
       }
 
-      // Save final assignment data back to each row
+      // Save final assignment data
       saveAssignedToRows(staffList);
 
       // Show results
@@ -411,9 +396,7 @@
 
         const hhmdEligible = row.cells[3].querySelector("select").value;
         const attendance   = row.cells[4].querySelector("select").value;
-        const locked       = row.cells[5].querySelector("input[type='checkbox']").checked;
 
-        let workedLastTwoDays = row.dataset.worked ? JSON.parse(row.dataset.worked) : [];
         let assigned = row.dataset.assigned ? JSON.parse(row.dataset.assigned) : [];
 
         staffList.push({
@@ -422,8 +405,6 @@
           breakTime,
           hhmdEligible,
           attendance,
-          locked,
-          workedLastTwoDays,
           assigned
         });
       }
@@ -434,43 +415,44 @@
      *       LOCATION APPLICABILITY
      *******************************************************/
     function locationApplies(loc, slot, isWeekend) {
+      // Example rules from previous script:
+      // HHMD, Guard House, Lobby, Pass Counter => top of hour 20:00–07:00
+      if (["HHMD","Guard House","Lobby","Pass Counter"].includes(loc)) {
+        const topOfHour = [
+          "20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00",
+          "04:00","05:00","06:00","07:00"
+        ];
+        return topOfHour.includes(slot);
+      }
+
       // Vertical Patrol only at 20:30, 23:00, 01:30, 06:30
       if (loc === "Vertical Patrol") {
         return ["20:30","23:00","01:30","06:30"].includes(slot);
       }
+
       // Report Room only at 20:00 or 21:00 on weekdays
       if (loc === "Report Room") {
         if (isWeekend) return false;
         return (slot === "20:00" || slot === "21:00");
       }
+
       // Tango Papa only at 07:30
       if (loc === "Tango Papa") {
         return (slot === "07:30");
       }
-      // Lobby/Pass Counter/HHMD/Guard House only at top of hour from 20:00 to 07:00
-      const topOfHour = [
-        "20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00",
-        "04:00","05:00","06:00","07:00"
-      ];
-      return topOfHour.includes(slot);
+
+      return false;
     }
 
     /*******************************************************
      *       STAFF SELECTION & ELIGIBILITY
      *******************************************************/
     function pickStaffForSlot(staffList, slot, loc) {
-      // FIRST PASS for Lobby: skip staff who worked the previous slot in Lobby
+      // Single pass: no lock, no second pass for Lobby
+      // (But if you still want a "2nd pass for Lobby," you can keep it.)
       for (let st of staffList) {
         if (!isStaffEligible(st, slot, loc)) continue;
-        if (loc === "Lobby" && isLobbyRepeat(st, slot)) continue;
         return st;
-      }
-      // SECOND PASS (for Lobby): allow repeats if none found
-      if (loc === "Lobby") {
-        for (let st of staffList) {
-          if (!isStaffEligible(st, slot, loc)) continue;
-          return st;
-        }
       }
       return null;
     }
@@ -485,28 +467,22 @@
       // Must be HHMD-eligible if location=HHMD
       if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
 
-      // If staff is locked for this slot but not assigned, skip
-      if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
-
-      // 1-hour gap for Guard House: skip if staff was in Guard House
-      // in the previous 2 half-hour slots
+      // 1-hour gap for Guard House
       if (loc === "Guard House" && violatesOneHourGapForGuardHouse(st, slot)) {
         return false;
       }
 
-      // For non-Lobby, skip if back-to-back in the same location
-      if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
+      // No immediate back-to-back in the same location (unless you want to allow HHMD to also do Lobby simultaneously, which is not standard)
+      if (isBackToBack(st, slot, loc)) return false;
 
       return true;
     }
 
-    // Check if staff is already assigned in this exact slot
     function alreadyAssignedSlot(st, slot) {
       return st.assigned.some(a => a.slot === slot);
     }
 
-    // Enforce staff's break time, inclusive of end boundary
-    // so if break=21:00-23:00, staff is unavailable at 21:00, 22:00, *and* 23:00
+    // Enforce staff's break time, crossing midnight if needed
     function staffAvailableSlot(st, slot) {
       const [bStart, bEnd] = st.breakTime.split("-");
       if (!bStart || !bEnd) return true;
@@ -516,29 +492,25 @@
       let slotM  = timeToMinutes(slot);
 
       // If break crosses midnight (e.g. 23:00-02:00)
-      // staff is unavailable if slot >= startM or slot <= endM
-      // because we treat it as inclusive of both endpoints
       if (endM < startM) {
-        // Example: break=23:00(1380) to 02:00(120)
-        // if slotM >= 1380 (23:00) or slotM <= 120 (02:00), staff is on break
+        // staff is unavailable if slot >= startM or slot <= endM
         if (slotM >= startM || slotM <= endM) {
           return false;
         }
         return true;
       }
 
-      // Normal case (startM < endM), inclusive end
-      // staff is unavailable if slot in [startM, endM]
-      if (slotM >= startM && slotM <= endM) {
+      // Normal case
+      if (slotM >= startM && slotM < endM) {
         return false;
       }
       return true;
     }
 
-    // Provide a 1-hour gap for Guard House (skip the previous 2 half-hour slots)
+    // Provide a 1-hour gap for Guard House
     function violatesOneHourGapForGuardHouse(st, slot) {
+      if (OUTPUT_ORDER.indexOf("Guard House") === -1) return false; // just a sanity check
       let idx = TIME_SLOTS.indexOf(slot);
-      // Check the previous 2 half-hour slots
       for (let i = 1; i <= 2; i++) {
         if (idx - i < 0) break;
         let checkSlot = TIME_SLOTS[idx - i];
@@ -549,20 +521,12 @@
       return false;
     }
 
-    // For non-Lobby, skip staff who were in the same location in the previous slot
+    // No back-to-back in the same location
     function isBackToBack(st, slot, loc) {
       let idx = TIME_SLOTS.indexOf(slot);
       if (idx <= 0) return false;
       let prevSlot = TIME_SLOTS[idx-1];
       return st.assigned.some(a => a.slot === prevSlot && a.location === loc);
-    }
-
-    // For Lobby, skip staff who were in Lobby in the previous slot (1st pass)
-    function isLobbyRepeat(st, slot) {
-      let idx = TIME_SLOTS.indexOf(slot);
-      if (idx <= 0) return false;
-      let prevSlot = TIME_SLOTS[idx-1];
-      return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
     }
 
     function timeToMinutes(t) {
@@ -585,7 +549,6 @@
       const container = document.getElementById("rosterContainer");
       container.innerHTML = "";
 
-      // Only show DISPLAY_SLOTS in the final table
       let tableHTML = `<table><thead><tr><th>Location</th>`;
       DISPLAY_SLOTS.forEach(slot => {
         tableHTML += `<th>${slot}</th>`;
@@ -607,7 +570,7 @@
         tableHTML += "</tr>";
       });
 
-      tableHTML += "</tbody></table>";
+      tableHTML += "</tbody></table>`;
       container.innerHTML = tableHTML;
     }
 
@@ -629,11 +592,11 @@
         alert("Please generate the roster first.");
         return;
       }
-      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour)*\n\n";
+      let rosterText = "📋 *Staff Roster (Hybrid Half-Hour, No Lock)*\n\n";
       const rows = table.querySelectorAll("tbody tr");
       rows.forEach(row => {
         const cells = row.querySelectorAll("td");
-        rosterText += `*${cells[0].innerText}*\n`; // location
+        rosterText += `*${cells[0].innerText}*\n`;
         for (let i = 1; i < cells.length; i++) {
           if (cells[i].innerText) {
             const slot = table.querySelector("thead").rows[0].cells[i].innerText;
