@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Refined Roster (Backtracking)</title>
+  <title>Refined Roster (No Lock, Round-Robin, Strict Rules)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -131,7 +131,7 @@
 <body>
 
 <header>
-  <h2>Refined Roster (Backtracking Approach)</h2>
+  <h2>Refined Roster (No Lock, Round-Robin, Strict Rules)</h2>
 </header>
 
 <div class="content">
@@ -214,7 +214,7 @@
   /*******************************************************
    * GLOBAL CONSTANTS & CONFIG
    *******************************************************/
-  const STORAGE_KEY = 'staffListData_StrictRules_Backtracking';
+  const STORAGE_KEY = 'staffListData_StrictRules_Debug';
 
   // Full half-hour increments from 20:00 to 07:30 (for internal logic)
   const TIME_SLOTS = [
@@ -242,7 +242,6 @@
   ];
 
   // Priority for assignment
-  // (Feel free to reorder if you want Vertical Patrol earlier)
   const PRIORITY = [
     { location: "HHMD", needed: 1 },
     { location: "Guard House", needed: 1 },
@@ -420,143 +419,73 @@
   }
 
   /*******************************************************
-   * BACKTRACKING-BASED ROSTER GENERATION
+   * FISHER-YATES SHUFFLE (Round-Robin)
+   *******************************************************/
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      let j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  /*******************************************************
+   * GENERATE ROSTER
    *******************************************************/
   function generateRoster() {
     saveStaffList();
-    let staffList = getCurrentStaffList();
-    // Clear previous assignments
-    staffList.forEach(st => { st.assigned = []; });
-
-    // Build a list of tasks (each task is a slot+location needing X staff)
-    let tasks = buildTasks();
-    // We'll store final assignments here: { [location]: { [slot]: [staffIDs] } }
-    let roster = {};
-    OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
-
-    // Attempt to fill tasks in order
-    let success = backtrackTasks(0, tasks, staffList, roster);
-
-    // If success == false, no perfect coverage found
-    if (!success) {
-      alert("No valid complete assignment found. Possibly not enough staff or constraints too strict.");
-    }
-
-    // Update UI
-    saveAssignedToRows(staffList);
-    displayRoster(roster);
-
-    // Show notes if no solution
-    if (!success) {
-      displayNotes(["No complete solution found. Some coverage is missing."]);
-    } else {
-      displayNotes([]);
-    }
-
-    // Update placeholders for coverage, etc.
-    document.getElementById("coverage").innerText = success ? "Full" : "Partial";
-    document.getElementById("optimizationScore").innerText = "N/A (Backtracking)";
-    document.getElementById("staffUtilization").innerText =
-      staffList.reduce((sum, s) => sum + s.assigned.length, 0);
-  }
-
-  // Build an array of {slot, location, needed} for all times that locationApplies()
-  function buildTasks() {
     const dayValue = document.getElementById("rosterDay").value;
     const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
 
-    let tasks = [];
+    let staffList = getCurrentStaffList();
+    // Clear previous assignments
+    staffList.forEach(st => { st.assigned = []; });
+    // Initial shuffle
+    staffList = shuffleArray(staffList);
+
+    let roster = {};
+    OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
+    let shortfalls = [];
+
+    const totalStaffCount = staffList.length;
+
+    // For each half-hour slot
     for (let slot of TIME_SLOTS) {
+      // Re-shuffle staff list for each time slot
+      staffList = shuffleArray(staffList);
+      let availableStaffForSlot = [...staffList]; // copy for this slot
+
       for (let p of PRIORITY) {
-        if (locationApplies(p.location, slot, isWeekend)) {
-          tasks.push({
-            slot: slot,
-            location: p.location,
-            needed: p.needed
-          });
+        let loc = p.location;
+        if (!locationApplies(loc, slot, isWeekend)) continue;
+        let needed = p.needed;
+        if (!roster[loc][slot]) roster[loc][slot] = [];
+        let assignedCount = roster[loc][slot].length;
+
+        while (assignedCount < needed) {
+          let chosen = pickStaffForSlot(availableStaffForSlot, slot, loc, totalStaffCount);
+          if (!chosen) break;
+          roster[loc][slot].push(chosen.staffID);
+          chosen.assigned.push({ slot: slot, location: loc });
+          assignedCount++;
+          // Remove chosen staff from available list
+          availableStaffForSlot = availableStaffForSlot.filter(st => st.staffID !== chosen.staffID);
+        }
+        if (assignedCount < needed) {
+          shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
         }
       }
     }
-    // Optional: you could reorder tasks for better backtracking performance
-    return tasks;
+    saveAssignedToRows(staffList);
+    displayRoster(roster);
+    displayNotes(shortfalls);
+
+    // Update the Coverage / Optimization Score / Staff Utilization placeholders
+    document.getElementById("coverage").innerText = calculateCoverage(roster);
+    document.getElementById("optimizationScore").innerText = calculateOptimizationScore(roster);
+    document.getElementById("staffUtilization").innerText = calculateStaffUtilization(staffList);
   }
 
-  // The backtracking function
-  function backtrackTasks(taskIndex, tasks, staffList, roster) {
-    // Base case: if we've assigned all tasks, success
-    if (taskIndex >= tasks.length) {
-      return true;
-    }
-
-    let { slot, location, needed } = tasks[taskIndex];
-    // Find staff who are eligible for this slot/location
-    let eligibleStaff = getEligibleStaffForTask(staffList, slot, location);
-
-    if (eligibleStaff.length < needed) {
-      // Not enough staff to fill this location => immediate fail
-      return false;
-    }
-
-    // Generate all combinations of size 'needed' from eligible staff
-    let combos = generateCombinations(eligibleStaff, needed);
-
-    // Try each combination in turn
-    for (let combo of combos) {
-      // Assign them
-      for (let st of combo) {
-        st.assigned.push({ slot: slot, location: location });
-      }
-      roster[location][slot] = combo.map(st => st.staffID);
-
-      // Recurse
-      if (backtrackTasks(taskIndex + 1, tasks, staffList, roster)) {
-        return true;
-      }
-
-      // Otherwise, revert the assignment (backtrack)
-      for (let st of combo) {
-        let idx = st.assigned.findIndex(a => a.slot === slot && a.location === location);
-        if (idx !== -1) {
-          st.assigned.splice(idx, 1);
-        }
-      }
-      roster[location][slot] = [];
-    }
-
-    // If all combos failed, no solution at this path
-    return false;
-  }
-
-  /*******************************************************
-   * HELPER: Return staff who can fill this slot/location
-   *******************************************************/
-  function getEligibleStaffForTask(staffList, slot, loc) {
-    return staffList.filter(st => isStaffEligible(st, slot, loc, staffList.length));
-  }
-
-  /*******************************************************
-   * HELPER: Generate combinations of size k from an array
-   *******************************************************/
-  function generateCombinations(array, k) {
-    let results = [];
-    function backtrack(start, combo) {
-      if (combo.length === k) {
-        results.push([...combo]);
-        return;
-      }
-      for (let i = start; i < array.length; i++) {
-        combo.push(array[i]);
-        backtrack(i + 1, combo);
-        combo.pop();
-      }
-    }
-    backtrack(0, []);
-    return results;
-  }
-
-  /*******************************************************
-   * GET CURRENT STAFF
-   *******************************************************/
   function getCurrentStaffList() {
     let staffList = [];
     const rows = document.getElementById("staffTable").querySelector("tbody").rows;
@@ -619,8 +548,16 @@
   }
 
   /*******************************************************
-   * STAFF ELIGIBILITY CHECKS
+   * STAFF SELECTION & ELIGIBILITY
    *******************************************************/
+  function pickStaffForSlot(staffList, slot, loc, totalStaffCount) {
+    for (let st of staffList) {
+      if (!isStaffEligible(st, slot, loc, totalStaffCount)) continue;
+      return st;
+    }
+    return null;
+  }
+
   function isStaffEligible(st, slot, loc, totalStaffCount) {
     // Must be present
     if (st.attendance !== "Yes") return false;
@@ -640,8 +577,9 @@
     return true;
   }
 
-  // If staff is already assigned in the same slot
-  // (except we allow HHMD <-> Lobby double booking if staffCount ≤ 6)
+  /*******************************************************
+   * ALLOW HHMD <-> LOBBY DOUBLE BOOKING IF staffCount ≤ 6
+   *******************************************************/
   function alreadyAssignedSlot(st, slot, newLoc, totalStaffCount) {
     let existingAssignments = st.assigned.filter(a => a.slot === slot);
     if (existingAssignments.length === 0) return false;
@@ -667,12 +605,16 @@
     return false;
   }
 
-  // No repeat vertical patrol
+  /*******************************************************
+   * NO REPEAT VERTICAL PATROL
+   *******************************************************/
   function alreadyDidVerticalPatrol(st) {
     return st.assigned.some(a => a.location === "Vertical Patrol");
   }
 
-  // Staff not on break
+  /*******************************************************
+   * BREAK & GAP RULES
+   *******************************************************/
   function staffAvailableSlot(st, slot) {
     const [bStart, bEnd] = st.breakTime.split("-");
     if (!bStart || !bEnd) return true;
@@ -682,7 +624,6 @@
 
     // If break crosses midnight
     if (endM < startM) {
-      // e.g. break 22:00 - 02:00
       if (slotM >= startM || slotM < endM) return false;
       return true;
     }
@@ -691,7 +632,6 @@
     return true;
   }
 
-  // 1-hour gap for Guard House
   function violatesOneHourGapForGuardHouse(st, slot) {
     let idx = TIME_SLOTS.indexOf(slot);
     for (let i = 1; i <= 2; i++) {
@@ -758,12 +698,12 @@
     container.innerHTML = tableHTML;
   }
 
-  function displayNotes(notes) {
+  function displayNotes(shortfalls) {
     const notesDiv = document.getElementById("notesContainer");
-    if (!notes || notes.length === 0) {
+    if (shortfalls.length === 0) {
       notesDiv.innerHTML = "<p>No critical shortfalls.</p>";
     } else {
-      notesDiv.innerHTML = notes.map(s => `<p class="shortfall-note">${s}</p>`).join("");
+      notesDiv.innerHTML = shortfalls.map(s => `<p class="shortfall-note">${s}</p>`).join("");
     }
   }
 
@@ -776,7 +716,7 @@
       alert("Please generate the roster first.");
       return;
     }
-    let rosterText = "📋 *Staff Roster (Backtracking)*\n\n";
+    let rosterText = "📋 *Staff Roster (Strict Rules)*\n\n";
     const rows = table.querySelectorAll("tbody tr");
     rows.forEach(row => {
       const cells = row.querySelectorAll("td");
@@ -838,6 +778,40 @@
 
   function validateRoster() {
     alert("Validate roster feature coming soon!");
+  }
+
+  /*******************************************************
+   * PLACEHOLDER CALCULATIONS FOR THE STATS
+   *******************************************************/
+  function calculateCoverage(roster) {
+    // Example: count how many total slots are filled vs. total needed
+    let totalAssigned = 0;
+    let totalNeeded = 0;
+    PRIORITY.forEach(p => {
+      TIME_SLOTS.forEach(ts => {
+        // Count it as needed if locationApplies is true for either weekday or weekend
+        if (locationApplies(p.location, ts, false) || locationApplies(p.location, ts, true)) {
+          totalNeeded += p.needed;
+          let assignedArr = (roster[p.location] && roster[p.location][ts]) || [];
+          totalAssigned += assignedArr.length;
+        }
+      });
+    });
+    return `${totalAssigned}/${totalNeeded}`;
+  }
+
+  function calculateOptimizationScore(roster) {
+    // Placeholder. You might do advanced metrics like minimal idle time, etc.
+    return "N/A";
+  }
+
+  function calculateStaffUtilization(staffList) {
+    // Placeholder: how many total half-hour slots staff are assigned to
+    let totalSlotsAssigned = 0;
+    staffList.forEach(st => {
+      totalSlotsAssigned += st.assigned.length;
+    });
+    return totalSlotsAssigned.toString();
   }
 </script>
 </body>
