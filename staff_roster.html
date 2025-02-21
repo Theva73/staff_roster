@@ -151,7 +151,7 @@
   <div class="button-bar">
     <button type="button" onclick="addStaff()">Add Staff</button>
     <button type="button" onclick="generateRoster()">Generate Roster</button>
-    <button type="button" onclick="downloadTSV()">Download Roster</button>
+    <button type="button" onclick="copyTSV()">Copy Roster TSV</button>
     <button type="button" onclick="exportStaffData()">Export</button>
     <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
     <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
@@ -282,19 +282,14 @@
     for (let row of rows) {
       const staffID = row.cells[0].querySelector("input").value.trim();
       const name = row.cells[1].querySelector("input").value.trim();
-
       const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
       const startVal = timeInputs[0].value;
       const endVal   = timeInputs[1].value;
       const breakTime = startVal + "-" + endVal;
-
       const hhmdEligible = row.cells[3].querySelector("select").value;
       const attendance   = row.cells[4].querySelector("select").value;
-
       const constraints  = row.cells[5].querySelector("input").value.trim() || "";
-
       let assigned = row.dataset.assigned ? JSON.parse(row.dataset.assigned) : [];
-
       staffList.push({
         staffID,
         name,
@@ -427,30 +422,25 @@
     saveStaffList();
     const dayValue = document.getElementById("rosterDay").value;
     const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-
     let staffList = getCurrentStaffList();
     // Clear previous assignments
     staffList.forEach(st => { st.assigned = []; });
     // Initial shuffle
     staffList = shuffleArray(staffList);
-
     let roster = {};
     OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
     let shortfalls = [];
     const totalStaffCount = staffList.length;
-
     // For each half-hour slot
     for (let slot of TIME_SLOTS) {
       staffList = shuffleArray(staffList); // Re-shuffle for each slot
       let availableStaffForSlot = [...staffList]; // copy for this slot
-
       for (let p of PRIORITY) {
         let loc = p.location;
         if (!locationApplies(loc, slot, isWeekend)) continue;
         let needed = p.needed;
         if (!roster[loc][slot]) roster[loc][slot] = [];
         let assignedCount = roster[loc][slot].length;
-
         while (assignedCount < needed) {
           let chosen = pickStaffForSlot(availableStaffForSlot, slot, loc, totalStaffCount);
           if (!chosen) break;
@@ -467,12 +457,10 @@
     saveAssignedToRows(staffList);
     displayRoster(roster);
     displayNotes(shortfalls);
-
     // Update stats
     document.getElementById("coverage").innerText = calculateCoverage(roster);
     document.getElementById("optimizationScore").innerText = calculateOptimizationScore(roster);
     document.getElementById("staffUtilization").innerText = calculateStaffUtilization(staffList);
-
     // Store the generated roster for TSV export
     lastRoster = roster;
   }
@@ -662,9 +650,9 @@
   }
 
   /*******************************************************
-   * DOWNLOAD ROSTER AS TSV FILE
+   * COPY ROSTER AS TSV TO CLIPBOARD
    *******************************************************/
-  function downloadTSV() {
+  function copyTSV() {
     if (!lastRoster) {
       alert("No roster found. Please generate the roster first.");
       return;
@@ -679,13 +667,12 @@
       }
       tsv += "\n";
     }
-    let blob = new Blob([tsv], { type: "text/tab-separated-values" });
-    let url = URL.createObjectURL(blob);
-    let link = document.createElement("a");
-    link.href = url;
-    link.download = "roster.tsv";
-    link.click();
-    URL.revokeObjectURL(url);
+    // Use the Clipboard API to copy the TSV text
+    navigator.clipboard.writeText(tsv).then(function() {
+      alert("Roster TSV copied to clipboard!");
+    }, function(err) {
+      alert("Error copying TSV: " + err);
+    });
   }
 
   /*******************************************************
