@@ -5,7 +5,216 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Enhanced Roster System v2.0</title>
   <style>
-    /* ... your existing CSS ... */
+    :root {
+      --primary: #0066cc;
+      --error: #dc2626;
+      --success: #059669;
+      --warning: #d97706;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      background: #f8fafc;
+    }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .controls-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background-color: #64748b;
+    }
+
+    button.warning {
+      background-color: var(--warning);
+    }
+
+    .table-container {
+      overflow-x: auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+    }
+
+    input, select {
+      padding: 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 1px;
+    }
+
+    .break-time-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background-color: #f8fafc;
+    }
+
+    .draggable {
+      cursor: move;
+    }
+
+    .shortfall-note {
+      color: var(--error);
+      font-weight: 500;
+    }
+
+    .success-note {
+      color: var(--success);
+      font-weight: 500;
+    }
+
+    .warning-note {
+      color: var(--warning);
+      font-weight: 500;
+    }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .stat-card {
+      padding: 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 200px;
+      background-color: #333;
+      color: white;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -34,7 +243,6 @@
     </div>
 
     <div class="button-group">
-      <!-- These buttons call the functions we must define -->
       <button type="button" onclick="addStaff()">Add Staff</button>
       <button type="button" onclick="generateRoster()">Generate Roster</button>
       <button type="button" onclick="optimizeRoster()" class="secondary">Optimize</button>
@@ -88,23 +296,6 @@
   </div>
 
   <script>
-    // Example arrays for your time slots and output order
-    const TIME_SLOTS = [
-      "08:00","09:00","10:00","11:00","12:00",
-      "13:00","14:00","15:00","16:00","17:00",
-      "18:00","19:00","20:00","21:00","22:00",
-      "23:00","00:00","01:00","02:00","03:00",
-      "04:00","05:00","06:00","07:00"
-    ];
-
-    // The order in which you want to iterate over your locations
-    const OUTPUT_ORDER = [
-      "HHMD",
-      "Guard House",
-      "Vertical Patrol",
-      "Lobby"
-    ];
-
     // Configuration object
     const CONFIG = {
       version: '2.0.0',
@@ -258,24 +449,26 @@
 
       async generateBaseRoster() {
         // Implement the core roster generation logic here
-        // ...
+        // This would include all the logic from our previous implementation
+        // but with enhanced error handling and optimization
       }
 
       async optimizeRoster() {
         // Implement optimization logic here
-        // ...
+        // This would include staff swapping and adjustment logic
+        // to improve coverage and efficiency
       }
 
       validateRoster() {
         // Implement comprehensive validation
-        // ...
+        // Check all rules and constraints
+        // Return validation results
       }
 
       calculateStats() {
-        // Just an example calculation
-        this.stats.coverage = 100;       // placeholder
-        this.stats.optimization = 80;    // placeholder
-        this.stats.utilization = 90;     // placeholder
+        // Calculate coverage percentage
+        // Calculate optimization score
+        // Calculate staff utilization
       }
 
       showLoading() {
@@ -295,9 +488,7 @@
     const staffManager = new StaffManager();
     let currentRosterGenerator = null;
 
-    // --- MISSING FUNCTIONS YOU REFERENCE ---
-
-    // UI event: Add staff
+    // UI Event Handlers
     function addStaff() {
       const newStaff = {
         staffId: generateStaffId(),
@@ -307,131 +498,19 @@
         attendance: "Yes",
         constraints: []
       };
+      
       staffManager.addStaff(newStaff);
       refreshStaffTable();
     }
 
-    // UI event: Generate roster
     async function generateRoster() {
       const date = document.getElementById('rosterDate').value;
       const day = document.getElementById('rosterDay').value;
-      const isWeekend = (day === 'Saturday' || day === 'Sunday');
+      const isWeekend = day === 'Saturday' || day === 'Sunday';
 
       currentRosterGenerator = new RosterGenerator(staffManager, date, isWeekend);
       const success = await currentRosterGenerator.generateRoster();
 
       if (success) {
-        // Display the roster in the UI
         displayRoster(currentRosterGenerator.roster);
-
-        // Update stats
-        updateStats(currentRosterGenerator.stats);
-      }
-    }
-
-    // Stub: Optimize roster
-    function optimizeRoster() {
-      alert("Optimize roster clicked! (Not yet implemented.)");
-    }
-
-    // Stub: Validate roster
-    function validateRoster() {
-      alert("Validate roster clicked! (Not yet implemented.)");
-    }
-
-    // Stub: Export roster
-    function exportRoster() {
-      alert("Export roster clicked! (Not yet implemented.)");
-    }
-
-    // Stub: Send WhatsApp
-    function sendWhatsApp() {
-      alert("Send WhatsApp clicked! (Not yet implemented.)");
-    }
-
-    // Example: Generate staff ID
-    function generateStaffId() {
-      return "S" + Math.floor(Math.random() * 100000);
-    }
-
-    // Example: Refresh staff table
-    function refreshStaffTable() {
-      const tableBody = document.querySelector("#staffTable tbody");
-      tableBody.innerHTML = "";
-
-      staffManager.staff.forEach(staff => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${staff.staffId}</td>
-          <td><input value="${staff.name}" onchange="updateStaffName('${staff.staffId}', this.value)" /></td>
-          <td>${staff.breakTime}</td>
-          <td>${staff.hhmdEligible}</td>
-          <td>${staff.attendance}</td>
-          <td>${staff.constraints.join(", ")}</td>
-          <td>
-            <button onclick="removeStaff('${staff.staffId}')">Remove</button>
-          </td>
-        `;
-        tableBody.appendChild(row);
-      });
-    }
-
-    // Example: Update staff name
-    function updateStaffName(staffId, newName) {
-      staffManager.updateStaff(staffId, { name: newName });
-    }
-
-    // Example: Remove staff
-    function removeStaff(staffId) {
-      staffManager.removeStaff(staffId);
-      refreshStaffTable();
-    }
-
-    // Example: Display roster
-    function displayRoster(roster) {
-      const rosterContainer = document.getElementById("rosterContainer");
-      rosterContainer.innerHTML = "";
-
-      // For each location in roster
-      for (const loc of Object.keys(roster)) {
-        const locDiv = document.createElement("div");
-        locDiv.innerHTML = `<h3>${loc}</h3>`;
-        
-        const table = document.createElement("table");
-        const thead = document.createElement("thead");
-        thead.innerHTML = "<tr><th>Time Slot</th><th>Assigned Staff</th></tr>";
-        table.appendChild(thead);
-
-        const tbody = document.createElement("tbody");
-
-        // Each time slot
-        for (const slot of Object.keys(roster[loc])) {
-          const staffArray = roster[loc][slot];
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${slot}</td>
-            <td>${staffArray.join(", ")}</td>
-          `;
-          tbody.appendChild(row);
-        }
-
-        table.appendChild(tbody);
-        locDiv.appendChild(table);
-        rosterContainer.appendChild(locDiv);
-      }
-    }
-
-    // Example: Update stats in UI
-    function updateStats(stats) {
-      document.getElementById("coverageStats").textContent = stats.coverage + "%";
-      document.getElementById("optimizationScore").textContent = stats.optimization + "%";
-      document.getElementById("utilizationStats").textContent = stats.utilization + "%";
-    }
-
-    // On page load, refresh staff table so we see existing staff from localStorage
-    window.onload = () => {
-      refreshStaffTable();
-    };
-  </script>
-</body>
-</html>
+        updateStats(
