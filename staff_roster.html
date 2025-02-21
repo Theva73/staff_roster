@@ -159,8 +159,7 @@
   <div class="button-bar">
     <button type="button" onclick="addStaff()">Add Staff</button>
     <button type="button" onclick="generateRoster()">Generate Roster</button>
-    <button type="button" onclick="optimizeRoster()">Optimize</button>
-    <button type="button" onclick="validateRoster()">Validate</button>
+    <!-- Removed the Optimize and Validate buttons here -->
     <button type="button" onclick="exportStaffData()">Export</button>
     <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
     <button type="button" onclick="sendWhatsApp()">Share</button>
@@ -767,17 +766,6 @@
       }
     };
     reader.readAsText(file);
-  }
-
-  /*******************************************************
-   * PLACEHOLDERS FOR OPTIMIZE & VALIDATE
-   *******************************************************/
-  function optimizeRoster() {
-    alert("Optimize roster feature coming soon!");
-  }
-
-  function validateRoster() {
-    alert("Validate roster feature coming soon!");
   }
 
   /*******************************************************
