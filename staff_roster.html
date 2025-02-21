@@ -19,6 +19,7 @@
     h2 {
       margin: 0;
     }
+
     .top-bar {
       display: flex;
       align-items: center;
@@ -163,10 +164,9 @@
     </div>
   </div>
 
-  <!-- Button bar (now only has Add Staff, Export, Import) -->
+  <!-- Button bar (Add Staff, Export, Import) -->
   <div class="button-bar">
     <button type="button" onclick="addStaff()">Add Staff</button>
-    <!-- Moved Generate Roster & Copy Roster TSV to the roster-header -->
     <button type="button" onclick="exportStaffData()">Export</button>
     <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
     <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
@@ -184,6 +184,7 @@
     </div>
     <div class="stat-box">
       <h4>Staff Utilization</h4>
+      <!-- This will now show total headcount (Attendance = Yes) -->
       <p id="staffUtilization">-</p>
     </div>
   </div>
@@ -463,8 +464,9 @@
 
     // For each half-hour slot
     for (let slot of TIME_SLOTS) {
-      staffList = shuffleArray(staffList); // Re-shuffle for each slot
-      let availableStaffForSlot = [...staffList]; // copy for this slot
+      // Re-shuffle staff list for each slot
+      staffList = shuffleArray(staffList);
+      let availableStaffForSlot = [...staffList];
 
       for (let p of PRIORITY) {
         let loc = p.location;
@@ -479,7 +481,6 @@
           roster[loc][slot].push(chosen.staffID);
           chosen.assigned.push({ slot: slot, location: loc });
           assignedCount++;
-          // Remove chosen from available list
           availableStaffForSlot = availableStaffForSlot.filter(st => st.staffID !== chosen.staffID);
         }
         if (assignedCount < needed) {
@@ -491,12 +492,12 @@
     displayRoster(roster);
     displayNotes(shortfalls);
 
-    // Update stats
+    // Update the Coverage, Optimization Score, and Staff Utilization
     document.getElementById("coverage").innerText = calculateCoverage(roster);
     document.getElementById("optimizationScore").innerText = calculateOptimizationScore(roster);
     document.getElementById("staffUtilization").innerText = calculateStaffUtilization(staffList);
 
-    // Store the generated roster for TSV export
+    // Store the roster for TSV export
     lastRoster = roster;
   }
 
@@ -516,7 +517,6 @@
       const attendance   = row.cells[4].querySelector("select").value;
 
       const constraints  = row.cells[5].querySelector("input").value.trim() || "";
-
       let assigned = row.dataset.assigned ? JSON.parse(row.dataset.assigned) : [];
 
       staffList.push({
@@ -790,12 +790,10 @@
     return "N/A";
   }
 
+  // *** NEW LOGIC: Count how many staff have Attendance = "Yes" ***
   function calculateStaffUtilization(staffList) {
-    let totalSlotsAssigned = 0;
-    staffList.forEach(st => {
-      totalSlotsAssigned += st.assigned.length;
-    });
-    return totalSlotsAssigned.toString();
+    const yesCount = staffList.filter(st => st.attendance === "Yes").length;
+    return yesCount.toString();
   }
 </script>
 </body>
