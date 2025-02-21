@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Refined Roster (No Lock, Round-Robin, Strict Rules)</title>
+  <title>Daily Roster</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -127,11 +127,15 @@
       margin-top: 20px;
     }
   </style>
+
+  <!-- Include html2canvas and jsPDF from CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
 <header>
-  <h2>Refined Roster (No Lock, Round-Robin, Strict Rules)</h2>
+  <h2>Daily Roster</h2>
 </header>
 
 <div class="content">
@@ -159,10 +163,10 @@
   <div class="button-bar">
     <button type="button" onclick="addStaff()">Add Staff</button>
     <button type="button" onclick="generateRoster()">Generate Roster</button>
-    <!-- Removed the Optimize and Validate buttons here -->
+    <!-- Removed the old "Share" (WhatsApp) button; replaced with "Generate PDF" -->
+    <button type="button" onclick="generatePDF()">Generate PDF</button>
     <button type="button" onclick="exportStaffData()">Export</button>
     <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
-    <button type="button" onclick="sendWhatsApp()">Share</button>
     <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" style="display:none;">
   </div>
 
@@ -208,7 +212,7 @@
   <div id="notesContainer"></div>
 </div>
 
-<!-- Place the script at the bottom so all HTML is parsed first -->
+<!-- Place the main script at the bottom so all HTML is parsed first -->
 <script>
   /*******************************************************
    * GLOBAL CONSTANTS & CONFIG
@@ -707,29 +711,36 @@
   }
 
   /*******************************************************
-   * WHATSAPP (Share)
+   * GENERATE PDF (New Approach)
    *******************************************************/
-  function sendWhatsApp() {
-    const table = document.querySelector("#rosterContainer table");
-    if (!table) {
+  async function generatePDF() {
+    // 1) Reference the roster container
+    const rosterContainer = document.getElementById("rosterContainer");
+
+    if (!rosterContainer.querySelector("table")) {
       alert("Please generate the roster first.");
       return;
     }
-    let rosterText = "📋 *Staff Roster (Strict Rules)*\n\n";
-    const rows = table.querySelectorAll("tbody tr");
-    rows.forEach(row => {
-      const cells = row.querySelectorAll("td");
-      rosterText += `*${cells[0].innerText}*\n`;
-      for (let i = 1; i < cells.length; i++) {
-        if (cells[i].innerText) {
-          const slot = table.querySelector("thead").rows[0].cells[i].innerText;
-          rosterText += `- ${cells[i].innerText} at ${slot}\n`;
-        }
-      }
-      rosterText += "\n";
-    });
-    const whatsappURL = `https://wa.me/?text=${encodeURIComponent(rosterText)}`;
-    window.open(whatsappURL, "_blank");
+
+    // 2) Capture the container as a canvas
+    const canvas = await html2canvas(rosterContainer, { scale: 2 });
+
+    // 3) Convert canvas to image data
+    const imgData = canvas.toDataURL("image/png");
+
+    // 4) Create a new jsPDF instance (landscape or portrait)
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("l", "pt", "a4"); // 'l' = landscape, 'pt' = points, 'a4' = page size
+
+    // 5) Calculate width/height so the image fits the page
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+
+    // 6) Add the image to the PDF (x=0, y=0 places it at top-left corner)
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+    // 7) Save the PDF (prompts user to download)
+    pdf.save("Roster.pdf");
   }
 
   /*******************************************************
