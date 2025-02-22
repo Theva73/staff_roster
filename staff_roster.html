@@ -1,175 +1,383 @@
-// Time slot constants
-const HALF_HOURS = [
-    "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
-    "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
-    "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
-];
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Staff Roster Management System</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            text-align: center; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        th, td { 
+            border: 1px solid #ccc; 
+            padding: 8px; 
+            text-align: center; 
+        }
+        th { 
+            background-color: #f4f4f4; 
+        }
+        button { 
+            padding: 10px; 
+            margin: 10px; 
+            cursor: pointer; 
+        }
+        input, select { 
+            padding: 5px; 
+            text-align: center; 
+        }
+        .inline-block { 
+            display: inline-block; 
+            margin: 10px; 
+        }
+        .break-time-container { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 5px; 
+            border: 1px solid #ccc;
+            padding: 3px;
+            background-color: #fafafa;
+        }
+        .shortfall-note { 
+            color: red; 
+            font-weight: bold; 
+        }
+    </style>
+</head>
+<body>
+    <h2>Staff Roster Management System</h2>
 
-// Location priority and staffing needs
-const PRIORITY = [
-    { location: "Pass Counter", needed: 2 },
-    { location: "HHMD", needed: 1 },
-    { location: "Lobby", needed: 2 },
-    { location: "Guard House", needed: 1 },
-    { location: "Vertical Patrol", needed: 1 },
-    { location: "Report Room", needed: 1 },
-    { location: "Tango Papa", needed: 1 }
-];
+    <!-- Date & Day Selection -->
+    <div class="inline-block">
+        <label for="rosterDate">Date:</label>
+        <input type="date" id="rosterDate" />
+    </div>
+    <div class="inline-block">
+        <label for="rosterDay">Day:</label>
+        <select id="rosterDay">
+            <option value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Saturday">Saturday</option>
+            <option value="Sunday">Sunday</option>
+        </select>
+    </div>
 
-// Break time check
-function staffAvailableHalfHour(st, slot) {
-    const [bStart, bEnd] = st.breakTime.split("-");
-    if (!bStart || !bEnd) return true;
-    
-    // Direct comparison for break period
-    if (slot >= bStart && slot <= bEnd) {
-        return false; // Staff is on break
-    }
-    return true;
-}
+    <!-- Staff Table -->
+    <table id="staffTable">
+        <thead>
+            <tr>
+                <th>Staff ID</th>
+                <th>Name</th>
+                <th>Break Time</th>
+                <th>HHMD Eligible</th>
+                <th>Attendance</th>
+                <th>Lock</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
 
-// Eligibility check with all constraints
-function isStaffEligible(st, slot, loc) {
-    // Basic checks
-    if (st.attendance !== "Yes") return false;
-    if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
-    
-    // Break time check
-    if (!staffAvailableHalfHour(st, slot)) return false;
-    
-    // Assignment checks
-    if (st.assigned.some(a => a.slot === slot)) return false;
-    
-    // Special location requirements
-    if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
-    
-    // Back-to-back prevention
-    if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
-    
-    // 2-hour gap rule
-    if (violates2HourGap(st, slot, loc)) return false;
-    
-    return true;
-}
+    <!-- Control Buttons -->
+    <button onclick="addStaff()">Add Staff</button>
+    <button onclick="generateRoster()">Generate Roster</button>
 
-// Back-to-back prevention
-function isBackToBack(st, slot, loc) {
-    const idx = HALF_HOURS.indexOf(slot);
-    if (idx <= 0) return false;
-    
-    const prevSlot = HALF_HOURS[idx-1];
-    const nextSlot = HALF_HOURS[idx+1];
-    
-    // Check both previous and next slots
-    return st.assigned.some(a => 
-        (a.slot === prevSlot || a.slot === nextSlot) && 
-        a.location === loc
-    );
-}
+    <!-- Generated Roster Display -->
+    <h3>Generated Roster</h3>
+    <div id="rosterContainer"></div>
 
-// Check for existing assignment
-function alreadyAssignedSlot(st, slot) {
-    return st.assigned.some(a => a.slot === slot);
-}
+    <!-- Notes & Shortfalls Display -->
+    <h4>Notes & Shortfalls</h4>
+    <div id="notesContainer"></div>
 
-// 2-hour gap rule check
-function violates2HourGap(st, slot, loc) {
-    const idx = HALF_HOURS.indexOf(slot);
-    for (let i = 1; i <= 4; i++) {
-        if (idx - i < 0) break;
-        const checkSlot = HALF_HOURS[idx - i];
-        if (st.assigned.some(a => a.slot === checkSlot && a.location === loc)) {
+    <script>
+        // Constants
+        const STORAGE_KEY = 'staffListData';
+        const HALF_HOURS = [
+            "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
+            "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
+            "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
+        ];
+
+        const OUTPUT_ORDER = [
+            "Vertical Patrol", "Pass Counter", "Lobby", "HHMD",
+            "Guard House", "Report Room", "Tango Papa"
+        ];
+
+        const PRIORITY = [
+            { location: "Pass Counter", needed: 2 },
+            { location: "HHMD", needed: 1 },
+            { location: "Lobby", needed: 2 },
+            { location: "Guard House", needed: 1 },
+            { location: "Vertical Patrol", needed: 1 },
+            { location: "Report Room", needed: 1 },
+            { location: "Tango Papa", needed: 1 }
+        ];
+
+        // Load staff list from storage
+        function loadStaffList() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            const tbody = document.getElementById("staffTable").getElementsByTagName("tbody")[0];
+
+            if (stored) {
+                const staffList = JSON.parse(stored);
+                tbody.innerHTML = "";
+                staffList.forEach(staff => {
+                    tbody.innerHTML += getStaffRowHTML(staff);
+                });
+            } else {
+                addStaff(); // Create one sample row
+            }
+            addListenersToAllRows();
+        }
+
+        // Save staff list to storage
+        function saveStaffList() {
+            const staffList = [];
+            const rows = document.getElementById("staffTable").getElementsByTagName("tbody")[0].rows;
+
+            for (let row of rows) {
+                const staffData = {
+                    staffID: row.cells[0].querySelector("input").value.trim(),
+                    name: row.cells[1].querySelector("input").value.trim(),
+                    breakTime: row.cells[2].querySelectorAll("input[type='time']")[0].value + "-" +
+                              row.cells[2].querySelectorAll("input[type='time']")[1].value,
+                    hhmdEligible: row.cells[3].querySelector("select").value,
+                    attendance: row.cells[4].querySelector("select").value,
+                    locked: row.cells[5].querySelector("input[type='checkbox']").checked,
+                    assigned: row.dataset.assigned ? JSON.parse(row.dataset.assigned) : []
+                };
+                staffList.push(staffData);
+            }
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+        }
+
+        // Generate HTML for a staff row
+        function getStaffRowHTML(staff = {}) {
+            const [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:30","23:30"];
+            return `
+                <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
+                    <td><input type="text" value="${staff.staffID || ''}"></td>
+                    <td><input type="text" value="${staff.name || ''}"></td>
+                    <td>
+                        <div class="break-time-container">
+                            <input type="time" value="${startVal}" step="1800">
+                            <span>-</span>
+                            <input type="time" value="${endVal}" step="1800">
+                        </div>
+                    </td>
+                    <td>
+                        <select>
+                            <option value="Yes" ${staff.hhmdEligible==="Yes"?"selected":""}>Yes</option>
+                            <option value="No" ${staff.hhmdEligible==="No"?"selected":""}>No</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select>
+                            <option value="Yes" ${staff.attendance==="Yes"?"selected":""}>Yes</option>
+                            <option value="No" ${staff.attendance==="No"?"selected":""}>No</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="checkbox" ${staff.locked?"checked":""}>
+                    </td>
+                    <td><button onclick="removeRow(this)">Remove</button></td>
+                </tr>
+            `;
+        }
+
+        // Add a new staff row
+        function addStaff() {
+            const tbody = document.getElementById("staffTable").getElementsByTagName("tbody")[0];
+            tbody.insertAdjacentHTML("beforeend", getStaffRowHTML());
+            addListenersToAllRows();
+            saveStaffList();
+        }
+
+        // Remove a staff row
+        function removeRow(button) {
+            button.closest("tr").remove();
+            saveStaffList();
+        }
+
+        // Add event listeners to all rows
+        function addListenersToAllRows() {
+            const tbody = document.getElementById("staffTable").getElementsByTagName("tbody")[0];
+            for (let row of tbody.rows) {
+                const allInputs = row.querySelectorAll("input, select");
+                allInputs.forEach(inp => {
+                    inp.addEventListener("change", saveStaffList);
+                });
+            }
+        }
+
+        // Check if staff is available during a time slot
+        function staffAvailableHalfHour(st, slot) {
+            const [bStart, bEnd] = st.breakTime.split("-");
+            if (!bStart || !bEnd) return true;
+            
+            if (slot >= bStart && slot <= bEnd) {
+                return false;
+            }
             return true;
         }
-    }
-    return false;
-}
 
-// Location availability check
-function locationApplies(loc, slot, isWeekend) {
-    if (loc === "Vertical Patrol") {
-        return ["20:00","23:00","01:00","06:00"].includes(slot);
-    }
-    if (loc === "Report Room") {
-        if (isWeekend) return false;
-        return ["20:00","21:00"].includes(slot);
-    }
-    if (loc === "Tango Papa") {
-        return slot === "07:30";
-    }
-    return true;
-}
-
-// Staff selection with conflict prevention
-function pickStaffForSlot(staffList, slot, loc) {
-    // First pass: normal selection with all constraints
-    for (let st of staffList) {
-        if (!isStaffEligible(st, slot, loc)) continue;
-        if (loc === "Lobby" && isLobbyRepeat(st, slot)) continue;
-        return st;
-    }
-    
-    // Second pass: relaxed constraints for Lobby only
-    if (loc === "Lobby") {
-        for (let st of staffList) {
-            if (!isStaffEligible(st, slot, loc)) continue;
-            return st;
+        // Check if staff is eligible for assignment
+        function isStaffEligible(st, slot, loc) {
+            if (st.attendance !== "Yes") return false;
+            if (st.locked && !alreadyAssignedSlot(st, slot)) return false;
+            if (!staffAvailableHalfHour(st, slot)) return false;
+            if (st.assigned.some(a => a.slot === slot)) return false;
+            if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
+            if (loc !== "Lobby" && isBackToBack(st, slot, loc)) return false;
+            if (violates2HourGap(st, slot, loc)) return false;
+            return true;
         }
-    }
-    return null;
-}
 
-// Special Lobby repeat prevention
-function isLobbyRepeat(st, slot) {
-    const idx = HALF_HOURS.indexOf(slot);
-    if (idx <= 0) return false;
-    const prevSlot = HALF_HOURS[idx-1];
-    return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
-}
+        // Check for back-to-back assignments
+        function isBackToBack(st, slot, loc) {
+            const idx = HALF_HOURS.indexOf(slot);
+            if (idx <= 0) return false;
+            
+            const prevSlot = HALF_HOURS[idx-1];
+            const nextSlot = HALF_HOURS[idx+1];
+            
+            return st.assigned.some(a => 
+                (a.slot === prevSlot || a.slot === nextSlot) && 
+                a.location === loc
+            );
+        }
 
-// Main roster generation function
-function generateRoster() {
-    const dayValue = document.getElementById("rosterDay").value;
-    const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-    
-    let staffList = getCurrentStaffList();
-    // Clear previous assignments for unlocked staff
-    staffList.forEach(st => {
-        if (!st.locked) st.assigned = [];
-    });
-    
-    let roster = {};
-    OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
-    let shortfalls = [];
-    
-    // Generate assignments
-    for (let slot of HALF_HOURS) {
-        for (let p of PRIORITY) {
-            let loc = p.location;
-            if (!locationApplies(loc, slot, isWeekend)) continue;
-            
-            let needed = p.needed;
-            if (!roster[loc][slot]) roster[loc][slot] = [];
-            let assignedCount = roster[loc][slot].length;
-            
-            while (assignedCount < needed) {
-                let chosen = pickStaffForSlot(staffList, slot, loc);
-                if (!chosen) break;
-                
-                roster[loc][slot].push(chosen.staffID);
-                chosen.assigned.push({ slot, location: loc });
-                assignedCount++;
+        // Check if staff is already assigned to a slot
+        function alreadyAssignedSlot(st, slot) {
+            return st.assigned.some(a => a.slot === slot);
+        }
+
+        // Check for 2-hour gap rule violation
+        function violates2HourGap(st, slot, loc) {
+            const idx = HALF_HOURS.indexOf(slot);
+            for (let i = 1; i <= 4; i++) {
+                if (idx - i < 0) break;
+                const checkSlot = HALF_HOURS[idx - i];
+                if (st.assigned.some(a => a.slot === checkSlot && a.location === loc)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Check if location applies for the time slot
+        function locationApplies(loc, slot, isWeekend) {
+            if (loc === "Vertical Patrol") {
+                return ["20:00","23:00","01:00","06:00"].includes(slot);
+            }
+            if (loc === "Report Room") {
+                if (isWeekend) return false;
+                return ["20:00","21:00"].includes(slot);
+            }
+            if (loc === "Tango Papa") {
+                return slot === "07:30";
+            }
+            return true;
+        }
+
+        // Select staff for a slot
+        function pickStaffForSlot(staffList, slot, loc) {
+            for (let st of staffList) {
+                if (!isStaffEligible(st, slot, loc)) continue;
+                if (loc === "Lobby" && isLobbyRepeat(st, slot)) continue;
+                return st;
             }
             
-            // Track shortfalls for critical positions
-            if ((loc === "Pass Counter" || loc === "Lobby") && assignedCount < needed) {
-                shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
+            if (loc === "Lobby") {
+                for (let st of staffList) {
+                    if (!isStaffEligible(st, slot, loc)) continue;
+                    return st;
+                }
+            }
+            return null;
+        }
+
+        // Check for lobby repeat assignments
+        function isLobbyRepeat(st, slot) {
+            const idx = HALF_HOURS.indexOf(slot);
+            if (idx <= 0) return false;
+            const prevSlot = HALF_HOURS[idx-1];
+            return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
+        }
+
+        // Get current staff list from table
+        function getCurrentStaffList() {
+            const staffList = [];
+            const rows = document.getElementById("staffTable").getElementsByTagName("tbody")[0].rows;
+            
+            for (let row of rows) {
+                const staffData = {
+                    staffID: row.cells[0].querySelector("input").value.trim(),
+                    name: row.cells[1].querySelector("input").value.trim(),
+                    breakTime: row.cells[2].querySelectorAll("input[type='time']")[0].value + "-" +
+                              row.cells[2].querySelectorAll("input[type='time']")[1].value,
+                    hhmdEligible: row.cells[3].querySelector("select").value,
+                    attendance: row.cells[4].querySelector("select").value,
+                    locked: row.cells[5].querySelector("input[type='checkbox']").checked,
+                    assigned: row.dataset.assigned ? JSON.parse(row.dataset.assigned) : []
+                };
+                staffList.push(staffData);
+            }
+            return staffList;
+        }
+
+        // Save assignments back to table rows
+        function saveAssignedToRows(staffList) {
+            const rows = document.getElementById("staffTable").getElementsByTagName("tbody")[0].rows;
+            for (let i = 0; i < rows.length; i++) {
+                rows[i].dataset.assigned = JSON.stringify(staffList[i].assigned);
+            }
+            saveStaffList();
+        }
+
+        // Display the generated roster
+        function displayRoster(roster) {
+            const container = document.getElementById("rosterContainer");
+            let tableHTML = `<table><thead><tr><th>Location</th>`;
+            
+            HALF_HOURS.forEach(slot => {
+                tableHTML += `<th>${slot}</th>`;
+            });
+            tableHTML += "</tr></thead><tbody>";
+
+            OUTPUT_ORDER.forEach(loc => {
+                tableHTML += `<tr><td>${loc}</td>`;
+                HALF_HOURS.forEach(slot => {
+                    const assignments = roster[loc][slot] || [];
+                    tableHTML += `<td>${assignments.join("/") || ""}</td>`;
+                });
+                tableHTML += "</tr>";
+            });
+
+            tableHTML += "</tbody></table>";
+            container.innerHTML = tableHTML;
+        }
+
+        // Display notes and shortfalls
+        function displayNotes(shortfalls) {
+            const notesDiv = document.getElementById("notesContainer");
+            if (shortfalls.length === 0) {
+                notesDiv.innerHTML = "<p>No critical shortfalls.</p>";
+            } else {
+                notesDiv.innerHTML = shortfalls.map(s => 
+                    `<p class="shortfall-note">${s}</p>`
+                ).join("");
             }
         }
-    }
-    
-    // Save and display results
-    saveAssignedToRows(staffList);
-    displayRoster(roster);
-    displayNotes(shortfalls);
-}
