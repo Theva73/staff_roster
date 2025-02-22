@@ -3,40 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Roster</title>
-    <!-- Required libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <title>Staff Roster Management</title>
     <style>
-        body {
+        body { 
             margin: 0;
             padding: 16px;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #f3f4f6;
+            background: #f3f4f6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: #111827;
+        }
+
+        .date-section {
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .date-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .date-label {
+            font-size: 16px;
+            color: #374151;
+            width: 60px;
+            line-height: 32px;
+        }
+
+        .date-input {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .staff-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .staff-table th {
+            background: #f3f4f6;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .staff-table td {
+            padding: 12px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .staff-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: #4b5563;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #374151;
+        }
+
+        .btn-section {
+            margin: 20px 0;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
         }
 
         .download-section {
             background: white;
             border-radius: 12px;
-            padding: 16px;
-            margin: 16px auto;
-            max-width: 200px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 24px;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         .download-title {
-            color: #1f2937;
-            font-size: 16px;
-            font-weight: 600;
-            margin: 0 0 12px 0;
-            text-align: center;
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #374151;
         }
 
         .download-buttons {
             display: flex;
             flex-direction: column;
             gap: 8px;
+            max-width: 200px;
+            margin: 0 auto;
         }
 
         .download-btn {
@@ -44,56 +134,228 @@
             color: white;
             border: none;
             border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 13px;
+            padding: 8px 16px;
+            font-size: 14px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 6px;
             justify-content: center;
-        }
-
-        .download-icon {
-            width: 14px;
-            height: 14px;
-            fill: currentColor;
+            gap: 8px;
         }
     </style>
 </head>
 <body>
-    <div class="download-section">
-        <h3 class="download-title">Download Roster</h3>
-        <div class="download-buttons">
-            <button class="download-btn" onclick="downloadRoster('excel')">
-                <svg class="download-icon" viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                </svg>
-                Excel (.xlsx)
-            </button>
-            <button class="download-btn" onclick="downloadRoster('csv')">
-                <svg class="download-icon" viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                </svg>
-                CSV
-            </button>
-            <button class="download-btn" onclick="downloadRoster('pdf')">
-                <svg class="download-icon" viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                </svg>
-                PDF
-            </button>
+    <div class="container">
+        <h1>Staff Roster Management System</h1>
+
+        <div class="date-section">
+            <div class="date-group">
+                <span class="date-label">Date:</span>
+                <input type="date" id="rosterDate" class="date-input">
+            </div>
+            <div class="date-group">
+                <span class="date-label">Day:</span>
+                <select id="rosterDay" class="date-input">
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                </select>
+            </div>
+        </div>
+
+        <table class="staff-table">
+            <thead>
+                <tr>
+                    <th>Staff ID</th>
+                    <th>Name</th>
+                    <th>Break Time</th>
+                    <th>HHMD Eligible</th>
+                    <th>Attendance</th>
+                    <th>Lock</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="staffTableBody"></tbody>
+        </table>
+
+        <div class="btn-section">
+            <button class="btn" onclick="addStaff()">Add Staff</button>
+            <button class="btn" onclick="generateRoster()">Generate Roster</button>
+        </div>
+
+        <div id="rosterOutput"></div>
+
+        <div class="download-section">
+            <h2 class="download-title">Download Roster</h2>
+            <div class="download-buttons">
+                <button class="download-btn" onclick="downloadRoster('excel')">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    </svg>
+                    Excel (.xlsx)
+                </button>
+                <button class="download-btn" onclick="downloadRoster('csv')">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    </svg>
+                    CSV
+                </button>
+                <button class="download-btn" onclick="downloadRoster('pdf')">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    </svg>
+                    PDF
+                </button>
+            </div>
         </div>
     </div>
 </body>
 </html>
 
+<!-- Add these script tags for required libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
 <script>
-    // Download handler function
-    function downloadRoster(format) {
-        const date = new Date().toISOString().split('T')[0];
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const day = days[new Date().getDay()];
+    // Constants
+    const HALF_HOURS = [
+        "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
+        "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
+        "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
+    ];
+
+    const LOCATIONS = [
+        "Vertical Patrol", "Pass Counter", "Lobby", "HHMD",
+        "Guard House", "Report Room", "Tango Papa"
+    ];
+
+    let rosterData = {};
+
+    // Initialize page
+    window.onload = function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('rosterDate').value = today;
         
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const currentDay = days[new Date().getDay()];
+        document.getElementById('rosterDay').value = currentDay;
+        
+        addStaff(); // Add first staff row
+    };
+
+    // Staff management functions
+    function addStaff() {
+        const tbody = document.getElementById('staffTableBody');
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td><input type="text" class="staff-input" placeholder="Staff ID"></td>
+            <td><input type="text" class="staff-input" placeholder="Name"></td>
+            <td>
+                <input type="time" value="21:30" class="staff-input" style="width: 85px">
+                -
+                <input type="time" value="23:30" class="staff-input" style="width: 85px">
+            </td>
+            <td>
+                <select class="staff-input">
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                </select>
+            </td>
+            <td>
+                <select class="staff-input">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                </select>
+            </td>
+            <td><input type="checkbox"></td>
+            <td><button class="btn" onclick="removeStaff(this)">Remove</button></td>
+        `;
+        
+        tbody.appendChild(row);
+    }
+
+    function removeStaff(button) {
+        button.closest('tr').remove();
+    }
+
+    function generateRoster() {
+        // Get all staff data
+        const staffRows = document.getElementById('staffTableBody').getElementsByTagName('tr');
+        const staffList = Array.from(staffRows).map(row => ({
+            id: row.cells[0].getElementsByTagName('input')[0].value,
+            name: row.cells[1].getElementsByTagName('input')[0].value,
+            breakStart: row.cells[2].getElementsByTagName('input')[0].value,
+            breakEnd: row.cells[2].getElementsByTagName('input')[1].value,
+            hhmdEligible: row.cells[3].getElementsByTagName('select')[0].value,
+            attendance: row.cells[4].getElementsByTagName('select')[0].value,
+            locked: row.cells[5].getElementsByTagName('input')[0].checked
+        }));
+
+        // Generate roster logic here
+        // For demonstration, we'll create a simple roster
+        rosterData = generateSampleRoster(staffList);
+        displayRoster(rosterData);
+    }
+
+    function generateSampleRoster(staffList) {
+        const roster = {};
+        LOCATIONS.forEach(loc => {
+            roster[loc] = {};
+            HALF_HOURS.forEach(time => {
+                roster[loc][time] = '';
+            });
+        });
+
+        // Assign staff to shifts (simplified logic)
+        staffList.forEach((staff, index) => {
+            if (staff.attendance === 'Yes') {
+                const timeSlot = HALF_HOURS[index % HALF_HOURS.length];
+                const location = LOCATIONS[index % LOCATIONS.length];
+                roster[location][timeSlot] = staff.id;
+            }
+        });
+
+        return roster;
+    }
+
+    function displayRoster(roster) {
+        const output = document.getElementById('rosterOutput');
+        let html = '<table class="staff-table"><thead><tr><th>Location</th>';
+        
+        HALF_HOURS.forEach(time => {
+            html += `<th>${time}</th>`;
+        });
+        
+        html += '</tr></thead><tbody>';
+        
+        LOCATIONS.forEach(location => {
+            html += `<tr><td>${location}</td>`;
+            HALF_HOURS.forEach(time => {
+                html += `<td>${roster[location][time] || ''}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        output.innerHTML = html;
+    }
+
+    // Download functions
+    function downloadRoster(format) {
+        if (!rosterData || Object.keys(rosterData).length === 0) {
+            alert('Please generate roster first');
+            return;
+        }
+
+        const date = document.getElementById('rosterDate').value;
+        const day = document.getElementById('rosterDay').value;
+
         try {
             switch(format) {
                 case 'excel':
@@ -112,44 +374,39 @@
         }
     }
 
-    // Excel download function
     function downloadExcel(date, day) {
         const wb = XLSX.utils.book_new();
         const data = [
             [`Staff Roster - ${day} ${date}`],
-            [],  // Empty row
+            [],
             ['Location', ...HALF_HOURS]
         ];
-        
-        OUTPUT_ORDER.forEach(location => {
+
+        LOCATIONS.forEach(location => {
             const row = [location];
             HALF_HOURS.forEach(time => {
-                row.push(rosterData[location]?.[time] || '');
+                row.push(rosterData[location][time] || '');
             });
             data.push(row);
         });
-        
+
         const ws = XLSX.utils.aoa_to_sheet(data);
         XLSX.utils.book_append_sheet(wb, ws, 'Roster');
         XLSX.writeFile(wb, `roster_${date}_${day}.xlsx`);
     }
 
-    // CSV download function
     function downloadCSV(date, day) {
         let csv = `Staff Roster - ${day} ${date}\n\n`;
-        
-        // Add headers
         csv += ['Location', ...HALF_HOURS].join(',') + '\n';
-        
-        // Add data
-        OUTPUT_ORDER.forEach(location => {
+
+        LOCATIONS.forEach(location => {
             const row = [location];
             HALF_HOURS.forEach(time => {
-                row.push(rosterData[location]?.[time] || '');
+                row.push(rosterData[location][time] || '');
             });
             csv += row.join(',') + '\n';
         });
-        
+
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -160,25 +417,24 @@
         URL.revokeObjectURL(link.href);
     }
 
-    // PDF download function
     function downloadPDF(date, day) {
         const doc = new jspdf.jsPDF({
             orientation: 'landscape',
             unit: 'pt',
             format: 'a4'
         });
-        
+
         doc.setFontSize(16);
         doc.text(`Staff Roster - ${day} ${date}`, 40, 40);
-        
-        const tableData = OUTPUT_ORDER.map(location => {
+
+        const tableData = LOCATIONS.map(location => {
             const row = [location];
             HALF_HOURS.forEach(time => {
-                row.push(rosterData[location]?.[time] || '');
+                row.push(rosterData[location][time] || '');
             });
             return row;
         });
-        
+
         doc.autoTable({
             head: [['Location', ...HALF_HOURS]],
             body: tableData,
@@ -197,34 +453,7 @@
                 fontStyle: 'bold',
             }
         });
-        
+
         doc.save(`roster_${date}_${day}.pdf`);
     }
-
-    // Constants for the roster system
-    const HALF_HOURS = [
-        "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
-        "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
-        "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
-    ];
-
-    const OUTPUT_ORDER = [
-        "Vertical Patrol", "Pass Counter", "Lobby", "HHMD",
-        "Guard House", "Report Room", "Tango Papa"
-    ];
-
-    // Sample roster data structure (replace with your actual data)
-    const rosterData = {
-        "Vertical Patrol": {
-            "20:00": "3984",
-            "01:00": "7972",
-            "06:00": "6288"
-        },
-        "Pass Counter": {
-            "20:00": "4511/6288",
-            "20:30": "6347/6399",
-            "21:00": "7481"
-        }
-        // Add other locations and data as needed
-    };
 </script>
