@@ -3,273 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster Management</title>
+    <title>Download Roster</title>
     <!-- Required libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <style>
-        body { 
+        body {
             margin: 0;
             padding: 16px;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #f3f4f6;
+            background-color: #f3f4f6;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            font-size: 24px;
-            margin-bottom: 24px;
-            color: #111827;
-        }
-
-        .date-section {
-            background: white;
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-
-        .date-group {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 12px;
-        }
-
-        .date-label {
-            font-size: 16px;
-            color: #374151;
-            width: 60px;
-            line-height: 32px;
-        }
-
-        .date-input {
-            padding: 6px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .staff-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-
-        .staff-table th {
-            background: #f3f4f6;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        .staff-table td {
-            padding: 12px;
-            border-top: 1px solid #e5e7eb;
-        }
-
-        .staff-input {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        /* Compact Button Styles */
-        .btn-section {
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-        }
-
-        .btn {
-            background: #4b5563;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 12px;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            min-width: 80px;
-            justify-content: center;
-        }
-
-        .btn-small {
-            min-width: 64px;
-        }
-
-        .btn:hover {
-            background: #374151;
-        }
-
-        /* Download Section */
         .download-section {
             background: white;
             border-radius: 12px;
-            padding: 12px;
-            margin: 20px auto;
-            max-width: 120px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            padding: 16px;
+            margin: 16px auto;
+            max-width: 200px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
         .download-title {
-            color: #374151;
-            font-size: 14px;
+            color: #1f2937;
+            font-size: 16px;
             font-weight: 600;
-            margin: 0 0 8px 0;
+            margin: 0 0 12px 0;
             text-align: center;
         }
 
         .download-buttons {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }
 
         .download-btn {
-            background: #6b7280;
+            background: #4b5563;
             color: white;
             border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
+            border-radius: 6px;
+            padding: 8px 12px;
             font-size: 13px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             justify-content: center;
         }
 
         .download-icon {
-            width: 10px;
-            height: 10px;
+            width: 14px;
+            height: 14px;
             fill: currentColor;
-        }
-
-        #importFile {
-            display: none;
-        }
-
-        @media (max-width: 480px) {
-            .btn-group {
-                flex-direction: column;
-                width: 100%;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-
-            .download-section {
-                margin: 20px 16px;
-            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Staff Roster Management System</h1>
-
-        <div class="date-section">
-            <div class="date-group">
-                <span class="date-label">Date:</span>
-                <input type="date" id="rosterDate" class="date-input">
-            </div>
-            <div class="date-group">
-                <span class="date-label">Day:</span>
-                <select id="rosterDay" class="date-input">
-                    <option value="Monday">Monday</option>
-                    <option value="Tuesday">Tuesday</option>
-                    <option value="Wednesday">Wednesday</option>
-                    <option value="Thursday">Thursday</option>
-                    <option value="Friday">Friday</option>
-                    <option value="Saturday">Saturday</option>
-                    <option value="Sunday">Sunday</option>
-                </select>
-            </div>
+    <div class="download-section">
+        <h3 class="download-title">Download Roster</h3>
+        <div class="download-buttons">
+            <button class="download-btn" onclick="downloadRoster('excel')">
+                <svg class="download-icon" viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+                Excel (.xlsx)
+            </button>
+            <button class="download-btn" onclick="downloadRoster('csv')">
+                <svg class="download-icon" viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+                CSV
+            </button>
+            <button class="download-btn" onclick="downloadRoster('pdf')">
+                <svg class="download-icon" viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+                PDF
+            </button>
         </div>
-
-        <table class="staff-table">
-            <thead>
-                <tr>
-                    <th>Staff ID</th>
-                    <th>Name</th>
-                    <th>Break Time</th>
-                    <th>HHMD Eligible</th>
-                    <th>Attendance</th>
-                    <th>Lock</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="staffTableBody"></tbody>
-        </table>
-
-        <div class="btn-section">
-            <div class="btn-group">
-                <button class="btn btn-small" onclick="addStaff()">
-                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                    </svg>
-                    Add
-                </button>
-            </div>
-            <div class="btn-group">
-                <button class="btn" onclick="generateRoster()">Gen</button>
-                <button class="btn" onclick="importStaffData()">Import</button>
-                <button class="btn" onclick="exportStaffData()">Export</button>
-            </div>
-        </div>
-
-        <div id="rosterOutput"></div>
-
-        <div class="download-section">
-            <h2 class="download-title">Download</h2>
-            <div class="download-buttons">
-                <button class="download-btn" onclick="downloadRoster('excel')">
-                    <svg class="download-icon" viewBox="0 0 24 24">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                    XLS
-                </button>
-                <button class="download-btn" onclick="downloadRoster('csv')">
-                    <svg class="download-icon" viewBox="0 0 24 24">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                    CSV
-                </button>
-                <button class="download-btn" onclick="downloadRoster('pdf')">
-                    <svg class="download-icon" viewBox="0 0 24 24">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                    PDF
-                </button>
-            </div>
-        </div>
-
-        <input type="file" id="importFile" accept=".json">
     </div>
 </body>
 </html>
 
+<script>
+    // Download handler function
+    function downloadRoster(format) {
+        const date = new Date().toISOString().split('T')[0];
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const day = days[new Date().getDay()];
+        
+        try {
+            switch(format) {
+                case 'excel':
+                    downloadExcel(date, day);
+                    break;
+                case 'csv':
+                    downloadCSV(date, day);
+                    break;
+                case 'pdf':
+                    downloadPDF(date, day);
+                    break;
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Error generating file. Please try again.');
+        }
+    }
+
+    // Excel download function
+    function downloadExcel(date, day) {
+        const wb = XLSX.utils.book_new();
+        const data = [
+            [`Staff Roster - ${day} ${date}`],
+            [],  // Empty row
+            ['Location', ...HALF_HOURS]
+        ];
+        
+        OUTPUT_ORDER.forEach(location => {
+            const row = [location];
+            HALF_HOURS.forEach(time => {
+                row.push(rosterData[location]?.[time] || '');
+            });
+            data.push(row);
+        });
+        
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, 'Roster');
+        XLSX.writeFile(wb, `roster_${date}_${day}.xlsx`);
+    }
+
+    // CSV download function
+    function downloadCSV(date, day) {
+        let csv = `Staff Roster - ${day} ${date}\n\n`;
+        
+        // Add headers
+        csv += ['Location', ...HALF_HOURS].join(',') + '\n';
+        
+        // Add data
+        OUTPUT_ORDER.forEach(location => {
+            const row = [location];
+            HALF_HOURS.forEach(time => {
+                row.push(rosterData[location]?.[time] || '');
+            });
+            csv += row.join(',') + '\n';
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `roster_${date}_${day}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+
+    // PDF download function
+    function downloadPDF(date, day) {
+        const doc = new jspdf.jsPDF({
+            orientation: 'landscape',
+            unit: 'pt',
+            format: 'a4'
+        });
+        
+        doc.setFontSize(16);
+        doc.text(`Staff Roster - ${day} ${date}`, 40, 40);
+        
+        const tableData = OUTPUT_ORDER.map(location => {
+            const row = [location];
+            HALF_HOURS.forEach(time => {
+                row.push(rosterData[location]?.[time] || '');
+            });
+            return row;
+        });
+        
+        doc.autoTable({
+            head: [['Location', ...HALF_HOURS]],
+            body: tableData,
+            startY: 60,
+            styles: {
+                fontSize: 8,
+                cellPadding: 2,
+            },
+            columnStyles: {
+                0: { cellWidth: 80 },
+            },
+            headStyles: {
+                fillColor: [244, 244, 244],
+                textColor: [0, 0, 0],
+                fontSize: 8,
+                fontStyle: 'bold',
+            }
+        });
+        
+        doc.save(`roster_${date}_${day}.pdf`);
+    }
+
+    // Constants for the roster system
+    const HALF_HOURS = [
+        "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
+        "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
+        "04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"
+    ];
+
+    const OUTPUT_ORDER = [
+        "Vertical Patrol", "Pass Counter", "Lobby", "HHMD",
+        "Guard House", "Report Room", "Tango Papa"
+    ];
+
+    // Sample roster data structure (replace with your actual data)
+    const rosterData = {
+        "Vertical Patrol": {
+            "20:00": "3984",
+            "01:00": "7972",
+            "06:00": "6288"
+        },
+        "Pass Counter": {
+            "20:00": "4511/6288",
+            "20:30": "6347/6399",
+            "21:00": "7481"
+        }
+        // Add other locations and data as needed
+    };
+</script>
