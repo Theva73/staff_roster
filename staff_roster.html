@@ -11,6 +11,7 @@
       text-align: center;
       font-size: 14px;
       background-color: #f3f4f6;
+      margin: 0; 
     }
     table { 
       width: 100%; 
@@ -35,6 +36,7 @@
       display: flex;
       justify-content: center;
       gap: 20px;
+      flex-wrap: wrap;
     }
     .date-container > div {
       display: flex;
@@ -50,23 +52,23 @@
     .button-container {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
       margin: 16px 0;
       align-items: center;
     }
     .button-row {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
       justify-content: center;
     }
     .roster-btn {
       background-color: #6B7280;
       color: white;
-      padding: 2px 8px;
+      padding: 4px 10px;
       font-size: 12px;
       border-radius: 4px;
       border: none;
-      min-width: 80px;
       cursor: pointer;
     }
     .roster-btn:hover {
@@ -88,6 +90,9 @@
     }
     #importFile {
       display: none;
+    }
+    #rosterContainer {
+      overflow-x: auto; /* So wide tables can scroll on mobile */
     }
   </style>
   <!-- External libraries -->
@@ -132,15 +137,22 @@
     <tbody></tbody>
   </table>
 
+  <!-- All buttons in one container, so they stay together -->
   <div class="button-container">
+    <!-- First row of buttons -->
     <div class="button-row">
       <button class="roster-btn" onclick="window.rosterSystem.addStaff()">Add Staff</button>
       <button class="roster-btn" onclick="window.rosterSystem.importData()">Import Data</button>
-    </div>
-    <div class="button-row">
       <button class="roster-btn" onclick="window.rosterSystem.generateRoster()">Generate Roster</button>
+    </div>
+    <!-- Second row of buttons -->
+    <div class="button-row">
       <button class="roster-btn" onclick="window.rosterSystem.exportData()">Export Data</button>
       <button class="roster-btn" onclick="window.rosterSystem.copyTSV()">Copy Roster TSV</button>
+      <!-- Download Roster Buttons -->
+      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('excel')">Excel (.xlsx)</button>
+      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('csv')">CSV</button>
+      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('pdf')">PDF</button>
     </div>
   </div>
 
@@ -151,14 +163,6 @@
 
   <h4>Notes & Shortfalls</h4>
   <div id="notesContainer"></div>
-
-  <!-- Download Roster Section -->
-  <h3>Download Roster</h3>
-  <div id="downloadSection" style="text-align: center; margin-bottom: 20px;">
-    <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('excel')">Excel (.xlsx)</button>
-    <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('csv')">CSV</button>
-    <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('pdf')">PDF</button>
-  </div>
 
   <script>
     window.rosterSystem = {};
@@ -433,6 +437,8 @@
           return st;
         }
         
+        // If we can't find a staff who meets the 'Lobby repeat' rule, 
+        // allow ignoring that rule in a second pass:
         if (loc === "Lobby") {
           for (let st of staffList) {
             if (!this.isStaffEligible(st, slot, loc)) continue;
@@ -459,6 +465,7 @@
           return;
         }
 
+        // Clear assigned slots (unless locked)
         staffList.forEach(st => {
           if (!st.locked) st.assigned = [];
         });
@@ -467,6 +474,7 @@
         OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
         let shortfalls = [];
         
+        // Build the roster
         for (let slot of HALF_HOURS) {
           for (let p of PRIORITY) {
             let loc = p.location;
@@ -484,13 +492,15 @@
               assignedCount++;
             }
             
+            // Track shortfalls for "Pass Counter" and "Lobby"
             if ((loc === "Pass Counter" || loc === "Lobby") && assignedCount < needed) {
               shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
             }
           }
         }
         
-        window.generatedRosterData = roster; // store generated roster globally for download
+        // Store final roster in a global var for downloads
+        window.generatedRosterData = roster;
         
         this.saveAssignedToRows(staffList);
         this.displayRoster(roster);
@@ -538,6 +548,7 @@
         }
       },
 
+      /* ---- Download Functions ---- */
       downloadRoster: function(format) {
         const date = document.getElementById('rosterDate').value || new Date().toISOString().split('T')[0];
         const day = document.getElementById('rosterDay').value || "Day";
@@ -629,6 +640,7 @@
           return row;
         });
         
+        // Center-align columns, left-align the first column (Location)
         doc.autoTable({
           head: [['Location', ...HALF_HOURS]],
           body: tableData,
@@ -636,15 +648,17 @@
           styles: {
             fontSize: 8,
             cellPadding: 2,
+            halign: 'center'    // center text by default
           },
           columnStyles: {
-            0: { cellWidth: 80 },
+            0: { cellWidth: 80, halign: 'left' } // left-align the "Location" column
           },
           headStyles: {
             fillColor: [244, 244, 244],
             textColor: [0, 0, 0],
             fontSize: 8,
             fontStyle: 'bold',
+            halign: 'center'
           }
         });
         
