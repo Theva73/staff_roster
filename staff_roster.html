@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Roster Management</title>
+    <!-- Required libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <style>
         body { 
             margin: 0;
@@ -82,65 +86,105 @@
             font-size: 14px;
         }
 
+        /* Compact Button Styles */
+        .btn-section {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
         .btn {
             background: #4b5563;
             color: white;
             border: none;
             border-radius: 6px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             font-size: 14px;
             cursor: pointer;
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
+            min-width: 80px;
+            justify-content: center;
+        }
+
+        .btn-small {
+            min-width: 64px;
         }
 
         .btn:hover {
             background: #374151;
         }
 
-        .btn-section {
-            margin: 20px 0;
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
+        /* Download Section */
         .download-section {
             background: white;
             border-radius: 12px;
-            padding: 20px;
-            margin-top: 24px;
-            text-align: center;
+            padding: 12px;
+            margin: 20px auto;
+            max-width: 120px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         .download-title {
-            font-size: 18px;
-            margin-bottom: 16px;
             color: #374151;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            text-align: center;
         }
 
         .download-buttons {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            max-width: 200px;
-            margin: 0 auto;
+            gap: 6px;
         }
 
         .download-btn {
-            background: #4b5563;
+            background: #6b7280;
             color: white;
             border: none;
-            border-radius: 6px;
-            padding: 8px 16px;
-            font-size: 14px;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 13px;
             cursor: pointer;
             display: flex;
             align-items: center;
+            gap: 4px;
             justify-content: center;
-            gap: 8px;
+        }
+
+        .download-icon {
+            width: 10px;
+            height: 10px;
+            fill: currentColor;
+        }
+
+        #importFile {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            .btn-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+
+            .download-section {
+                margin: 20px 16px;
+            }
         }
     </style>
 </head>
@@ -183,46 +227,55 @@
         </table>
 
         <div class="btn-section">
-            <button class="btn" onclick="addStaff()">Add Staff</button>
-            <button class="btn" onclick="generateRoster()">Generate Roster</button>
+            <div class="btn-group">
+                <button class="btn btn-small" onclick="addStaff()">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Add
+                </button>
+            </div>
+            <div class="btn-group">
+                <button class="btn" onclick="generateRoster()">Gen</button>
+                <button class="btn" onclick="importStaffData()">Import</button>
+                <button class="btn" onclick="exportStaffData()">Export</button>
+            </div>
         </div>
 
         <div id="rosterOutput"></div>
 
         <div class="download-section">
-            <h2 class="download-title">Download Roster</h2>
+            <h2 class="download-title">Download</h2>
             <div class="download-buttons">
                 <button class="download-btn" onclick="downloadRoster('excel')">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    <svg class="download-icon" viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                     </svg>
-                    Excel (.xlsx)
+                    XLS
                 </button>
                 <button class="download-btn" onclick="downloadRoster('csv')">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    <svg class="download-icon" viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                     </svg>
                     CSV
                 </button>
                 <button class="download-btn" onclick="downloadRoster('pdf')">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+                    <svg class="download-icon" viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
                     </svg>
                     PDF
                 </button>
             </div>
         </div>
+
+        <input type="file" id="importFile" accept=".json">
     </div>
 </body>
 </html>
 
-<!-- Add these script tags for required libraries -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-
 <script>
     // Constants
+    const STORAGE_KEY = 'staffListData';
     const HALF_HOURS = [
         "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
         "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
@@ -245,10 +298,10 @@
         const currentDay = days[new Date().getDay()];
         document.getElementById('rosterDay').value = currentDay;
         
-        addStaff(); // Add first staff row
+        loadStaffList();
     };
 
-    // Staff management functions
+    // Staff Management Functions
     function addStaff() {
         const tbody = document.getElementById('staffTableBody');
         const row = document.createElement('tr');
@@ -274,20 +327,23 @@
                 </select>
             </td>
             <td><input type="checkbox"></td>
-            <td><button class="btn" onclick="removeStaff(this)">Remove</button></td>
+            <td>
+                <button class="btn btn-small" onclick="removeStaff(this)">Del</button>
+            </td>
         `;
         
         tbody.appendChild(row);
+        saveStaffList();
     }
 
     function removeStaff(button) {
         button.closest('tr').remove();
+        saveStaffList();
     }
 
-    function generateRoster() {
-        // Get all staff data
+    function getStaffList() {
         const staffRows = document.getElementById('staffTableBody').getElementsByTagName('tr');
-        const staffList = Array.from(staffRows).map(row => ({
+        return Array.from(staffRows).map(row => ({
             id: row.cells[0].getElementsByTagName('input')[0].value,
             name: row.cells[1].getElementsByTagName('input')[0].value,
             breakStart: row.cells[2].getElementsByTagName('input')[0].value,
@@ -296,9 +352,100 @@
             attendance: row.cells[4].getElementsByTagName('select')[0].value,
             locked: row.cells[5].getElementsByTagName('input')[0].checked
         }));
+    }
 
-        // Generate roster logic here
-        // For demonstration, we'll create a simple roster
+    function loadStaffList() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const staffList = JSON.parse(stored);
+            const tbody = document.getElementById('staffTableBody');
+            tbody.innerHTML = '';
+            staffList.forEach(staff => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" class="staff-input" value="${staff.id || ''}" placeholder="Staff ID"></td>
+                    <td><input type="text" class="staff-input" value="${staff.name || ''}" placeholder="Name"></td>
+                    <td>
+                        <input type="time" value="${staff.breakStart || '21:30'}" class="staff-input" style="width: 85px">
+                        -
+                        <input type="time" value="${staff.breakEnd || '23:30'}" class="staff-input" style="width: 85px">
+                    </td>
+                    <td>
+                        <select class="staff-input">
+                            <option value="No" ${staff.hhmdEligible === "No" ? "selected" : ""}>No</option>
+                            <option value="Yes" ${staff.hhmdEligible === "Yes" ? "selected" : ""}>Yes</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="staff-input">
+                            <option value="Yes" ${staff.attendance === "Yes" ? "selected" : ""}>Yes</option>
+                            <option value="No" ${staff.attendance === "No" ? "selected" : ""}>No</option>
+                        </select>
+                    </td>
+                    <td><input type="checkbox" ${staff.locked ? "checked" : ""}></td>
+                    <td>
+                        <button class="btn btn-small" onclick="removeStaff(this)">Del</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+            addStaff(); // Add first staff row if no saved data
+        }
+    }
+
+    function saveStaffList() {
+        const staffList = getStaffList();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+    }
+
+    // Import/Export Functions
+    function importStaffData() {
+        const input = document.getElementById('importFile');
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const staffList = JSON.parse(e.target.result);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+                    loadStaffList();
+                    alert('Staff data imported successfully!');
+                } catch (error) {
+                    console.error('Import error:', error);
+                    alert('Error importing file: ' + error.message);
+                }
+            };
+            
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    function exportStaffData() {
+        const staffList = getStaffList();
+        const dataStr = JSON.stringify(staffList, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    // Generate and Display Roster
+    function generateRoster() {
+        const staffList = getStaffList();
+        if (staffList.length === 0) {
+            alert('Please add staff members first.');
+            return;
+        }
+
         rosterData = generateSampleRoster(staffList);
         displayRoster(rosterData);
     }
@@ -312,7 +459,6 @@
             });
         });
 
-        // Assign staff to shifts (simplified logic)
         staffList.forEach((staff, index) => {
             if (staff.attendance === 'Yes') {
                 const timeSlot = HALF_HOURS[index % HALF_HOURS.length];
@@ -346,7 +492,7 @@
         output.innerHTML = html;
     }
 
-    // Download functions
+    // Download Functions
     function downloadRoster(format) {
         if (!rosterData || Object.keys(rosterData).length === 0) {
             alert('Please generate roster first');
@@ -456,189 +602,4 @@
 
         doc.save(`roster_${date}_${day}.pdf`);
     }
-</script>
-
-<!-- Update the button section in your HTML -->
-<div class="btn-section">
-    <div class="btn-group">
-        <button class="btn" onclick="addStaff()">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Add Staff
-        </button>
-        <button class="btn" onclick="importStaffData()">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-            </svg>
-            Import Staff
-        </button>
-    </div>
-    <div class="btn-group">
-        <button class="btn" onclick="generateRoster()">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-            </svg>
-            Generate Roster
-        </button>
-        <button class="btn" onclick="exportStaffData()">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            Export Staff
-        </button>
-    </div>
-</div>
-
-<input type="file" id="importFile" accept=".json" style="display: none;">
-
-<!-- Add these styles to your CSS -->
-<style>
-.btn-section {
-    margin: 20px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.btn-group {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-}
-
-.btn {
-    background: #4b5563;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 14px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 120px;
-    justify-content: center;
-}
-
-.btn:hover {
-    background: #374151;
-}
-
-@media (max-width: 480px) {
-    .btn-group {
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-    }
-}
-</style>
-
-<!-- Add these functions to your JavaScript -->
-<script>
-// Add these new functions to your existing JavaScript
-function importStaffData() {
-    const input = document.getElementById('importFile');
-    input.onchange = (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-            try {
-                const staffList = JSON.parse(e.target.result);
-                localStorage.setItem('staffListData', JSON.stringify(staffList));
-                loadStaffList();
-                alert('Staff data imported successfully!');
-            } catch (error) {
-                console.error('Import error:', error);
-                alert('Error importing file: ' + error.message);
-            }
-        };
-        
-        reader.readAsText(file);
-    };
-    input.click();
-}
-
-function exportStaffData() {
-    const staffList = getStaffList();
-    const dataStr = JSON.stringify(staffList, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-}
-
-function getStaffList() {
-    const staffRows = document.getElementById('staffTableBody').getElementsByTagName('tr');
-    return Array.from(staffRows).map(row => ({
-        id: row.cells[0].getElementsByTagName('input')[0].value,
-        name: row.cells[1].getElementsByTagName('input')[0].value,
-        breakStart: row.cells[2].getElementsByTagName('input')[0].value,
-        breakEnd: row.cells[2].getElementsByTagName('input')[1].value,
-        hhmdEligible: row.cells[3].getElementsByTagName('select')[0].value,
-        attendance: row.cells[4].getElementsByTagName('select')[0].value,
-        locked: row.cells[5].getElementsByTagName('input')[0].checked
-    }));
-}
-
-function loadStaffList() {
-    const stored = localStorage.getItem('staffListData');
-    if (stored) {
-        const staffList = JSON.parse(stored);
-        const tbody = document.getElementById('staffTableBody');
-        tbody.innerHTML = '';
-        staffList.forEach(staff => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><input type="text" class="staff-input" value="${staff.id || ''}" placeholder="Staff ID"></td>
-                <td><input type="text" class="staff-input" value="${staff.name || ''}" placeholder="Name"></td>
-                <td>
-                    <input type="time" value="${staff.breakStart || '21:30'}" class="staff-input" style="width: 85px">
-                    -
-                    <input type="time" value="${staff.breakEnd || '23:30'}" class="staff-input" style="width: 85px">
-                </td>
-                <td>
-                    <select class="staff-input">
-                        <option value="No" ${staff.hhmdEligible === "No" ? "selected" : ""}>No</option>
-                        <option value="Yes" ${staff.hhmdEligible === "Yes" ? "selected" : ""}>Yes</option>
-                    </select>
-                </td>
-                <td>
-                    <select class="staff-input">
-                        <option value="Yes" ${staff.attendance === "Yes" ? "selected" : ""}>Yes</option>
-                        <option value="No" ${staff.attendance === "No" ? "selected" : ""}>No</option>
-                    </select>
-                </td>
-                <td><input type="checkbox" ${staff.locked ? "checked" : ""}></td>
-                <td><button class="btn" onclick="removeStaff(this)">Remove</button></td>
-            `;
-            tbody.appendChild(row);
-        });
-    }
-}
-
-// Add this to your window.onload function
-window.onload = function() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('rosterDate').value = today;
-    
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDay = days[new Date().getDay()];
-    document.getElementById('rosterDay').value = currentDay;
-    
-    loadStaffList(); // Load saved staff data
-    if (document.getElementById('staffTableBody').children.length === 0) {
-        addStaff(); // Only add first staff row if no saved data
-    }
-};
 </script>
