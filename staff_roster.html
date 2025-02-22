@@ -1,8 +1,10 @@
+PCC roster Script by ChatGPT
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Roster Management System</title>
   <style>
     body { 
@@ -10,8 +12,6 @@
       padding: 20px; 
       text-align: center;
       font-size: 14px;
-      background-color: #f3f4f6;
-      margin: 0; 
     }
     table { 
       width: 100%; 
@@ -36,7 +36,6 @@
       display: flex;
       justify-content: center;
       gap: 20px;
-      flex-wrap: wrap;
     }
     .date-container > div {
       display: flex;
@@ -52,23 +51,23 @@
     .button-container {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
       margin: 16px 0;
       align-items: center;
     }
     .button-row {
       display: flex;
       gap: 8px;
-      flex-wrap: wrap;
       justify-content: center;
     }
     .roster-btn {
       background-color: #6B7280;
       color: white;
-      padding: 4px 10px;
+      padding: 2px 8px;
       font-size: 12px;
       border-radius: 4px;
       border: none;
+      min-width: 80px;
       cursor: pointer;
     }
     .roster-btn:hover {
@@ -91,14 +90,7 @@
     #importFile {
       display: none;
     }
-    #rosterContainer {
-      overflow-x: auto; /* So wide tables can scroll on mobile */
-    }
   </style>
-  <!-- External libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <h2>Staff Roster Management System</h2>
@@ -137,22 +129,15 @@
     <tbody></tbody>
   </table>
 
-  <!-- All buttons in one container, so they stay together -->
   <div class="button-container">
-    <!-- First row of buttons -->
     <div class="button-row">
       <button class="roster-btn" onclick="window.rosterSystem.addStaff()">Add Staff</button>
       <button class="roster-btn" onclick="window.rosterSystem.importData()">Import Data</button>
-      <button class="roster-btn" onclick="window.rosterSystem.generateRoster()">Generate Roster</button>
     </div>
-    <!-- Second row of buttons -->
     <div class="button-row">
+      <button class="roster-btn" onclick="window.rosterSystem.generateRoster()">Generate Roster</button>
       <button class="roster-btn" onclick="window.rosterSystem.exportData()">Export Data</button>
       <button class="roster-btn" onclick="window.rosterSystem.copyTSV()">Copy Roster TSV</button>
-      <!-- Download Roster Buttons -->
-      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('excel')">Excel (.xlsx)</button>
-      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('csv')">CSV</button>
-      <button class="roster-btn" onclick="window.rosterSystem.downloadRoster('pdf')">PDF</button>
     </div>
   </div>
 
@@ -437,8 +422,6 @@
           return st;
         }
         
-        // If we can't find a staff who meets the 'Lobby repeat' rule, 
-        // allow ignoring that rule in a second pass:
         if (loc === "Lobby") {
           for (let st of staffList) {
             if (!this.isStaffEligible(st, slot, loc)) continue;
@@ -465,7 +448,6 @@
           return;
         }
 
-        // Clear assigned slots (unless locked)
         staffList.forEach(st => {
           if (!st.locked) st.assigned = [];
         });
@@ -474,7 +456,6 @@
         OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
         let shortfalls = [];
         
-        // Build the roster
         for (let slot of HALF_HOURS) {
           for (let p of PRIORITY) {
             let loc = p.location;
@@ -492,15 +473,11 @@
               assignedCount++;
             }
             
-            // Track shortfalls for "Pass Counter" and "Lobby"
             if ((loc === "Pass Counter" || loc === "Lobby") && assignedCount < needed) {
               shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${assignedCount}.`);
             }
           }
         }
-        
-        // Store final roster in a global var for downloads
-        window.generatedRosterData = roster;
         
         this.saveAssignedToRows(staffList);
         this.displayRoster(roster);
@@ -528,6 +505,7 @@
           tableHTML += `<tr><td>${loc}</td>`;
           HALF_HOURS.forEach(slot => {
             const assignments = roster[loc][slot] || [];
+            // Make each cell editable so you can manually add or fix missing staff IDs.
             tableHTML += `<td contenteditable="true">${assignments.join("/") || ""}</td>`;
           });
           tableHTML += "</tr>";
@@ -546,126 +524,10 @@
             `<p class="shortfall-note">${s}</p>`
           ).join("");
         }
-      },
-
-      /* ---- Download Functions ---- */
-      downloadRoster: function(format) {
-        const date = document.getElementById('rosterDate').value || new Date().toISOString().split('T')[0];
-        const day = document.getElementById('rosterDay').value || "Day";
-        
-        if (!window.generatedRosterData) {
-          alert("Please generate the roster first.");
-          return;
-        }
-        
-        try {
-          switch(format) {
-            case 'excel':
-              this.downloadExcel(date, day);
-              break;
-            case 'csv':
-              this.downloadCSV(date, day);
-              break;
-            case 'pdf':
-              this.downloadPDF(date, day);
-              break;
-          }
-        } catch(error) {
-          console.error('Download error:', error);
-          alert('Error generating file. Please try again.');
-        }
-      },
-
-      downloadExcel: function(date, day) {
-        const wb = XLSX.utils.book_new();
-        const data = [
-          [`Staff Roster - ${day} ${date}`],
-          [],
-          ['Location', ...HALF_HOURS]
-        ];
-        
-        OUTPUT_ORDER.forEach(location => {
-          const row = [location];
-          HALF_HOURS.forEach(time => {
-            const cellData = window.generatedRosterData[location] && window.generatedRosterData[location][time];
-            row.push(cellData ? cellData.join("/") : '');
-          });
-          data.push(row);
-        });
-        
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, 'Roster');
-        XLSX.writeFile(wb, `roster_${date}_${day}.xlsx`);
-      },
-
-      downloadCSV: function(date, day) {
-        let csv = `Staff Roster - ${day} ${date}\n\n`;
-        csv += ['Location', ...HALF_HOURS].join(',') + '\n';
-        
-        OUTPUT_ORDER.forEach(location => {
-          const row = [location];
-          HALF_HOURS.forEach(time => {
-            const cellData = window.generatedRosterData[location] && window.generatedRosterData[location][time];
-            row.push(cellData ? cellData.join("/") : '');
-          });
-          csv += row.join(',') + '\n';
-        });
-        
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `roster_${date}_${day}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-      },
-
-      downloadPDF: function(date, day) {
-        const doc = new jspdf.jsPDF({
-          orientation: 'landscape',
-          unit: 'pt',
-          format: 'a4'
-        });
-        
-        doc.setFontSize(16);
-        doc.text(`Staff Roster - ${day} ${date}`, 40, 40);
-        
-        const tableData = OUTPUT_ORDER.map(location => {
-          const row = [location];
-          HALF_HOURS.forEach(time => {
-            const cellData = window.generatedRosterData[location] && window.generatedRosterData[location][time];
-            row.push(cellData ? cellData.join("/") : '');
-          });
-          return row;
-        });
-        
-        // Center-align columns, left-align the first column (Location)
-        doc.autoTable({
-          head: [['Location', ...HALF_HOURS]],
-          body: tableData,
-          startY: 60,
-          styles: {
-            fontSize: 8,
-            cellPadding: 2,
-            halign: 'center'    // center text by default
-          },
-          columnStyles: {
-            0: { cellWidth: 80, halign: 'left' } // left-align the "Location" column
-          },
-          headStyles: {
-            fillColor: [244, 244, 244],
-            textColor: [0, 0, 0],
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center'
-          }
-        });
-        
-        doc.save(`roster_${date}_${day}.pdf`);
       }
     };
 
+    // Initialize on page load
     window.onload = function() {
       window.rosterSystem.init();
     };
