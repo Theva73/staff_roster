@@ -747,6 +747,83 @@
     const yesCount = staffList.filter(st => st.attendance === "Yes").length;
     return yesCount.toString();
   }
+  
+  /*******************************************************
+ * DEBUGGING HELPERS
+ *******************************************************/
+
+// Logs all staff assignments in the console.
+function debugLogAllAssignments(staffList) {
+  console.log("=== Debug: All Staff Assignments ===");
+  staffList.forEach(st => {
+    console.log(`Staff ${st.staffID} (${st.name}) -> assigned:`);
+    if (st.assigned.length === 0) {
+      console.log("   (none)");
+    } else {
+      st.assigned.forEach(a => {
+        console.log(`   Slot: '${a.slot}', Location: '${a.location}'`);
+      });
+    }
+  });
+  console.log("=== End of Assignments ===");
+}
+
+// Checks if any assigned slot string has an extra seconds component (e.g. "21:00:00").
+function debugCheckTimeFormat(staffList) {
+  console.log("=== Debug: Checking for :SS in time strings ===");
+  staffList.forEach(st => {
+    st.assigned.forEach(a => {
+      // If 'a.slot' has more than one colon, it's probably HH:MM:SS
+      if ((a.slot.match(/:/g) || []).length > 1) {
+        console.warn(
+          `Staff ${st.staffID} has a slot '${a.slot}' with possible seconds. ` +
+          `Expected 'HH:MM' but got 'HH:MM:SS'?`
+        );
+      }
+    });
+  });
+  console.log("=== Done checking time formats ===");
+}
+
+// Checks for double‐assignments in the same slot, and consecutive‐hour assignments.
+function debugCheckForViolations(staffList) {
+  console.log("=== Debug: Checking for potential rule violations ===");
+
+  // 1) Double‐assignments in the same time slot
+  const slotMap = {};
+  staffList.forEach(st => {
+    st.assigned.forEach(a => {
+      const key = a.slot + "__" + st.staffID; 
+      if (!slotMap[key]) {
+        slotMap[key] = [];
+      }
+      slotMap[key].push(a.location);
+    });
+  });
+
+  for (let key in slotMap) {
+    if (slotMap[key].length > 1) {
+      console.warn(`Double assignment! Staff+slot = ${key}, multiple locations: ${slotMap[key].join(", ")}`);
+    }
+  }
+
+  // 2) Consecutive hours at the same location
+  staffList.forEach(st => {
+    st.assigned.forEach(a => {
+      const prevHour = subtractOneHour(a.slot);
+      // Find if this staff has the same location at prevHour
+      const conflict = st.assigned.find(b => b.slot === prevHour && b.location === a.location);
+      if (conflict) {
+        console.warn(
+          `Consecutive hour violation for staff ${st.staffID} at location '${a.location}'. ` +
+          `Assigned at ${conflict.slot} and ${a.slot}.`
+        );
+      }
+    });
+  });
+
+  console.log("=== Done checking for rule violations ===");
+}
 </script>
 </body>
 </html>
