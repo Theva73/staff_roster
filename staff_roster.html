@@ -354,7 +354,7 @@
         // Initialize each location in roster
         PRIORITY.forEach(({location}) => { roster[location] = {}; });
 
-        // Initial round-robin assignment using existing logic
+        // Fill roster
         for (let slot of ROSTER_TIMES) {
           for (let p of PRIORITY) {
             let loc = p.location;
@@ -379,13 +379,6 @@
             }
           }
         }
-
-        // ----- NEW: Fish Algorithm Inspired Refinement -----
-        // Use the refinement function to improve the roster without breaking existing rules.
-        const refined = this.refineRosterWithFishAlgorithm(roster, staffList, isWeekend);
-        roster = refined.roster;
-        staffList = refined.staffList;
-        // ----- End Refinement -----
 
         // Save final assignment in memory
         window.generatedRosterData = roster;
@@ -486,93 +479,6 @@
         if (idx <= 0) return false;
         const prevSlot = ROSTER_TIMES[idx - 1];
         return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
-      },
-
-      // -----------------------
-      // New: Fish Algorithm–Inspired Refinement Methods
-      // -----------------------
-
-      // Compute a simple fitness value: the lower the sum of deficits the better.
-      computeFitness: function(roster, isWeekend) {
-        let fitness = 0;
-        for (let p of PRIORITY) {
-          let loc = p.location;
-          for (let slot of ROSTER_TIMES) {
-            if (!this.locationApplies(loc, slot, isWeekend)) continue;
-            let assignedCount = (roster[loc] && roster[loc][slot]) ? roster[loc][slot].length : 0;
-            let deficit = Math.max(0, p.needed - assignedCount);
-            fitness += deficit;
-          }
-        }
-        return fitness;
-      },
-
-      // The refinement function simulates fish movement by trying random perturbations (via shuffling)
-      // and accepts any change that reduces the overall deficit (fitness).
-      refineRosterWithFishAlgorithm: function(initialRoster, initialStaffList, isWeekend) {
-        const iterations = 10;
-        let bestRoster = JSON.parse(JSON.stringify(initialRoster));
-        let bestStaffList = JSON.parse(JSON.stringify(initialStaffList));
-        let bestFitness = this.computeFitness(bestRoster, isWeekend);
-        
-        // Arrow function for shuffle to maintain lexical "this"
-        const shuffle = (array) => {
-          for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-          }
-          return array;
-        };
-
-        for (let iter = 0; iter < iterations; iter++) {
-          // Clone the current best candidate into a new candidate solution
-          let candidateRoster = JSON.parse(JSON.stringify(bestRoster));
-          let candidateStaffList = JSON.parse(JSON.stringify(bestStaffList));
-
-          // For each priority location and applicable slot, try to fill any deficit
-          for (let p of PRIORITY) {
-            let loc = p.location;
-            for (let slot of ROSTER_TIMES) {
-              if (!this.locationApplies(loc, slot, isWeekend)) continue;
-              if (!candidateRoster[loc]) {
-                candidateRoster[loc] = {};
-              }
-              if (!candidateRoster[loc][slot]) {
-                candidateRoster[loc][slot] = [];
-              }
-              let currentCount = candidateRoster[loc][slot].length;
-              let needed = p.needed;
-              let deficit = needed - currentCount;
-
-              // While there is a shortfall, try to find an eligible candidate from a shuffled list
-              while (deficit > 0) {
-                let shuffledStaff = shuffle(candidateStaffList.slice());
-                let chosen = null;
-                for (let st of shuffledStaff) {
-                  if (!this.isStaffEligible(st, slot, loc)) continue;
-                  if (loc === "Lobby" && this.isLobbyRepeat(st, slot)) continue;
-                  chosen = st;
-                  break;
-                }
-                if (!chosen) break;
-                candidateRoster[loc][slot].push(chosen.staffID);
-                if (!chosen.assigned) {
-                  chosen.assigned = [];
-                }
-                chosen.assigned.push({ slot: slot, location: loc });
-                deficit--;
-              }
-            }
-          }
-
-          let candidateFitness = this.computeFitness(candidateRoster, isWeekend);
-          if (candidateFitness < bestFitness) {
-            bestFitness = candidateFitness;
-            bestRoster = candidateRoster;
-            bestStaffList = candidateStaffList;
-          }
-        }
-        return { roster: bestRoster, staffList: bestStaffList };
       },
 
       // -----------------------
