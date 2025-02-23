@@ -381,7 +381,7 @@
         }
 
         // ----- NEW: Fish Algorithm Inspired Refinement -----
-        // Use a fish-school–inspired local search to try and reduce overall deficits
+        // Use the refinement function to improve the roster without breaking existing rules.
         const refined = this.refineRosterWithFishAlgorithm(roster, staffList, isWeekend);
         roster = refined.roster;
         staffList = refined.staffList;
@@ -514,15 +514,15 @@
         let bestRoster = JSON.parse(JSON.stringify(initialRoster));
         let bestStaffList = JSON.parse(JSON.stringify(initialStaffList));
         let bestFitness = this.computeFitness(bestRoster, isWeekend);
-
-        // Helper: Fisher-Yates shuffle
-        function shuffle(array) {
+        
+        // Arrow function for shuffle to maintain lexical "this"
+        const shuffle = (array) => {
           for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
           }
           return array;
-        }
+        };
 
         for (let iter = 0; iter < iterations; iter++) {
           // Clone the current best candidate into a new candidate solution
