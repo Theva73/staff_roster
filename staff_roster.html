@@ -1,135 +1,142 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
-  <!-- [Metadata and CSS remain unchanged] -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Roster</title>
   <style>
-    /* [Original CSS preserved] */
+    /* [Keep the original CSS styles here] */
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd; text-align: center; }
+    /* ... (Include all CSS from the original script) ... */
   </style>
 </head>
 <body>
-  <!-- [HTML structure unchanged] -->
+  <header>
+    <h2>Daily Roster</h2>
+  </header>
+  <div class="content">
+    <!-- [Keep all HTML elements from the original script] -->
+    <div class="top-bar">
+      <div>
+        <label for="rosterDate">Date:</label>
+        <input type="date" id="rosterDate">
+      </div>
+      <div>
+        <label for="rosterDay">Day:</label>
+        <select id="rosterDay">
+          <option value="Monday">Monday</option>
+          <option value="Tuesday">Tuesday</option>
+          <option value="Wednesday">Wednesday</option>
+          <option value="Thursday">Thursday</option>
+          <option value="Friday">Friday</option>
+          <option value="Saturday">Saturday</option>
+          <option value="Sunday">Sunday</option>
+        </select>
+      </div>
+    </div>
+    <div class="button-bar">
+      <button type="button" onclick="addStaff()">Add Staff</button>
+      <button type="button" onclick="exportStaffData()">Export</button>
+      <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
+      <input type="file" id="importFile" accept=".json" style="display:none;">
+    </div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <h4>Coverage</h4>
+        <p id="coverage">-</p>
+      </div>
+      <div class="stat-box">
+        <h4>Optimization Score</h4>
+        <p id="optimizationScore">-</p>
+      </div>
+      <div class="stat-box">
+        <h4>Total Headcount</h4>
+        <p id="staffUtilization">-</p>
+      </div>
+    </div>
+    <table id="staffTable">
+      <thead>
+        <tr>
+          <th>Staff ID</th>
+          <th>Name</th>
+          <th>Break Time</th>
+          <th>HHMD Eligible?</th>
+          <th>Attendance</th>
+          <th>Constraints</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="roster-header">
+      <h3>Generated Roster</h3>
+      <button type="button" onclick="generateRoster()">Generate Roster</button>
+      <button type="button" onclick="copyTSV()">Copy Roster TSV</button>
+    </div>
+    <div id="rosterContainer"></div>
+    <h4>Notes & Shortfalls</h4>
+    <div id="notesContainer"></div>
+  </div>
 
-<script>
-  // ... (Previous constants remain the same)
+  <!-- JavaScript Fixes -->
+  <script>
+    // ... (Replace the entire <script> block with the code below) ...
+    const STORAGE_KEY = 'staffListData_StrictRules_Debug';
+    const TIME_SLOTS = ["20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30","00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30","04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30"];
+    const DISPLAY_SLOTS = ["20:00","20:30","21:00","22:00","23:00","00:00","01:00","01:30","02:00","03:00","04:00","05:00","06:00","06:30","07:00","07:30"];
+    const OUTPUT_ORDER = ["HHMD","Guard House","Lobby","Pass Counter","Vertical Patrol","Report Room","Tango Papa"];
+    const PRIORITY = [
+      { location: "HHMD", needed: 1 },
+      { location: "Guard House", needed: 1 },
+      { location: "Lobby", needed: 2 },
+      { location: "Pass Counter", needed: 2 },
+      { location: "Vertical Patrol", needed: 1 },
+      { location: "Report Room", needed: 1 },
+      { location: "Tango Papa", needed: 1 }
+    ];
+    let lastRoster = null;
 
-  /*******************************************************
-   * MODIFIED: GENERATE ROSTER WITH STRICTER RULES
-   *******************************************************/
-  function generateRoster() {
-    saveStaffList();
-    const dayValue = document.getElementById("rosterDay").value;
-    const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-    let staffList = getCurrentStaffList();
-    
-    // Reset assignments and track location last assignments
-    staffList.forEach(st => { st.assigned = []; });
-    let lastGuardHouseAssignment = {}; // Track last time per staff
+    // Initialize on load
+    window.onload = function() {
+      loadStaffList();
+      document.getElementById('importFile').addEventListener('change', importStaffData);
+    };
 
-    staffList = shuffleArray(staffList);
-    let roster = {};
-    OUTPUT_ORDER.forEach(loc => { roster[loc] = {}; });
-    let shortfalls = [];
-
-    for (let slot of TIME_SLOTS) {
-      staffList = shuffleArray(staffList);
-      let availableStaffForSlot = [...staffList];
-      
-      // Track Guard House last assignment time
-      const guardHouseLastSlot = lastGuardHouseAssignment[slot] || null;
-
-      for (let p of PRIORITY) {
-        let loc = p.location;
-        if (!locationApplies(loc, slot, isWeekend)) continue;
-        
-        // Modified: Guard House gap enforcement (location-based)
-        if (loc === "Guard House" && guardHouseLastSlot) {
-          const timeDiff = timeToMinutes(slot) - timeToMinutes(guardHouseLastSlot);
-          if (timeDiff < 60) {
-            shortfalls.push(`Guard House gap violation at ${slot}`);
-            continue;
-          }
+    // Load/Save Staff Data
+    function loadStaffList() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const tbody = document.querySelector("#staffTable tbody");
+      if (stored) {
+        try {
+          const staffList = JSON.parse(stored);
+          tbody.innerHTML = staffList.map(staff => getStaffRowHTML(staff)).join("");
+        } catch (e) {
+          console.error("Error loading staff data:", e);
+          tbody.innerHTML = "";
         }
-
-        let needed = p.needed;
-        if (!roster[loc][slot]) roster[loc][slot] = [];
-        
-        while (roster[loc][slot].length < needed) {
-          let chosen = pickStaffForSlot(availableStaffForSlot, slot, loc, staffList.length);
-          if (!chosen) break;
-          
-          // Vertical Patrol assignment limiter
-          if (loc === "Vertical Patrol" && alreadyDidVerticalPatrol(chosen)) {
-            continue;
-          }
-
-          roster[loc][slot].push(chosen.staffID);
-          chosen.assigned.push({ slot: slot, location: loc });
-          
-          // Update Guard House tracking
-          if (loc === "Guard House") {
-            lastGuardHouseAssignment[slot] = slot;
-          }
-
-          availableStaffForSlot = availableStaffForSlot.filter(st => st.staffID !== chosen.staffID);
-        }
-        
-        if (roster[loc][slot].length < needed) {
-          shortfalls.push(`Shortfall at ${loc} for ${slot}. Needed ${needed}, got ${roster[loc][slot].length}.`);
-        }
+      } else {
+        addStaff(); // Add default row
       }
+      addDragAndDropListeners();
     }
-    
-    saveAssignedToRows(staffList);
-    displayRoster(roster);
-    displayNotes(shortfalls);
-    updateStats(roster, staffList);
-    lastRoster = roster;
-  }
 
-  /*******************************************************
-   * NEW: BREAK TIME VALIDATION
-   *******************************************************/
-  function validateBreakTime(start, end) {
-    const startM = timeToMinutes(start);
-    const endM = timeToMinutes(end);
-    if (startM >= endM) {
-      alert("Break start time must be before end time!");
-      return false;
+    function saveStaffList() {
+      const staffList = [];
+      document.querySelectorAll("#staffTable tbody tr").forEach(row => {
+        const staffID = row.querySelector("td:nth-child(1) input").value.trim();
+        const name = row.querySelector("td:nth-child(2) input").value.trim();
+        const breakStart = row.querySelector("td:nth-child(3) input[type='time']:nth-child(1)").value;
+        const breakEnd = row.querySelector("td:nth-child(3) input[type='time']:nth-child(3)").value;
+        const hhmdEligible = row.querySelector("td:nth-child(4) select").value;
+        const attendance = row.querySelector("td:nth-child(5) select").value;
+        const constraints = row.querySelector("td:nth-child(6) input").value.trim();
+        staffList.push({ staffID, name, breakTime: `${breakStart}-${breakEnd}`, hhmdEligible, attendance, constraints });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
     }
-    return true;
-  }
 
-  /*******************************************************
-   * ENHANCED: STAFF ELIGIBILITY CHECKS
-   *******************************************************/
-  function isStaffEligible(st, slot, loc, totalStaffCount) {
-    if (st.attendance !== "Yes") return false;
-    if (!staffAvailableSlot(st, slot)) return false;
-    if (alreadyAssignedSlot(st, slot, loc, totalStaffCount)) return false;
-    
-    // Strict HHMD check
-    if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
-    
-    // Enhanced Guard House gap (now location-based)
-    if (loc === "Guard House") {
-      const lastAssigned = lastGuardHouseAssignment[slot];
-      if (lastAssigned && (timeToMinutes(slot) - timeToMinutes(lastAssigned)) < 60) return false;
-    }
-    
-    return true;
-  }
-
-  /*******************************************************
-   * NEW: REPORT ROOM WEEKEND HANDLING
-   *******************************************************/
-  function locationApplies(loc, slot, isWeekend) {
-    if (loc === "Report Room" && isWeekend) return false;
-    // ... (rest of original logic)
-  }
-
-  // ... (Remaining functions updated with enhanced checks)
-
-  // [Rest of the original script remains with these key modifications]
-</script>
+    // ... (Include the rest of the JavaScript functions from the original script, ensuring no syntax errors) ...
+  </script>
 </body>
 </html>
