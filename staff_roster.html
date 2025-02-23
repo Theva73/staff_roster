@@ -514,6 +514,7 @@
         let bestRoster = JSON.parse(JSON.stringify(initialRoster));
         let bestStaffList = JSON.parse(JSON.stringify(initialStaffList));
         let bestFitness = this.computeFitness(bestRoster, isWeekend);
+        console.log("Initial Fitness: ", bestFitness);
         
         // Arrow function for shuffle to maintain lexical "this"
         const shuffle = (array) => {
@@ -525,7 +526,6 @@
         };
 
         for (let iter = 0; iter < iterations; iter++) {
-          // Clone the current best candidate into a new candidate solution
           let candidateRoster = JSON.parse(JSON.stringify(bestRoster));
           let candidateStaffList = JSON.parse(JSON.stringify(bestStaffList));
 
@@ -544,7 +544,6 @@
               let needed = p.needed;
               let deficit = needed - currentCount;
 
-              // While there is a shortfall, try to find an eligible candidate from a shuffled list
               while (deficit > 0) {
                 let shuffledStaff = shuffle(candidateStaffList.slice());
                 let chosen = null;
@@ -566,12 +565,15 @@
           }
 
           let candidateFitness = this.computeFitness(candidateRoster, isWeekend);
+          console.log("Iteration", iter, " candidateFitness:", candidateFitness);
           if (candidateFitness < bestFitness) {
             bestFitness = candidateFitness;
             bestRoster = candidateRoster;
             bestStaffList = candidateStaffList;
+            console.log("New best found at iteration", iter, " with fitness", bestFitness);
           }
         }
+        console.log("Final best fitness:", bestFitness);
         return { roster: bestRoster, staffList: bestStaffList };
       },
 
