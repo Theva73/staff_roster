@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Daily Roster</title>
+  <title>Daily Roster - Debug Version</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -117,7 +117,7 @@
 <body>
 
 <header>
-  <h2>Daily Roster</h2>
+  <h2>Daily Roster (Debug Version)</h2>
 </header>
 
 <div class="content">
@@ -171,6 +171,7 @@
       <tr>
         <th>Staff ID</th>
         <th>Name</th>
+        <!-- We removed step="1" to avoid "HH:MM:SS" -->
         <th>Break Time (Start - End)</th>
         <th>HHMD Eligible?</th>
         <th>Attendance</th>
@@ -274,6 +275,16 @@
     addListenersToAllRows();
   }
 
+  // Helper: strip out ":SS" if present, turning "HH:MM:SS" into "HH:MM"
+  function stripSeconds(t) {
+    if (!t) return t;
+    // If it's at least 8 chars, e.g. "21:00:00", slice first 5 -> "21:00"
+    if (t.length >= 8 && t.charAt(2) === ':' && t.charAt(5) === ':') {
+      return t.slice(0,5);
+    }
+    return t;
+  }
+
   function saveStaffList() {
     const staffList = [];
     const rows = document.getElementById("staffTable").querySelector("tbody").rows;
@@ -282,8 +293,12 @@
       const name = row.cells[1].querySelector("input").value.trim();
 
       const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
-      const startVal = timeInputs[0].value;
-      const endVal   = timeInputs[1].value;
+      // Strip seconds if any
+      const startValRaw = timeInputs[0].value;
+      const endValRaw   = timeInputs[1].value;
+      const startVal    = stripSeconds(startValRaw);
+      const endVal      = stripSeconds(endValRaw);
+
       const breakTime = startVal + "-" + endVal;
 
       const hhmdEligible = row.cells[3].querySelector("select").value;
@@ -310,15 +325,16 @@
    *******************************************************/
   function getStaffRowHTML(staff) {
     let [startVal, endVal] = staff.breakTime ? staff.breakTime.split("-") : ["21:00","23:00"];
+    // We do NOT include step="1" to avoid "HH:MM:SS"
     return `
       <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
         <td><input type="text" value="${staff.staffID || ''}"></td>
         <td><input type="text" value="${staff.name || ''}"></td>
         <td>
           <div class="break-time-container draggable" draggable="true">
-            <input type="time" value="${startVal}" step="1">
+            <input type="time" value="${startVal}" >
             <span>-</span>
-            <input type="time" value="${endVal}" step="1">
+            <input type="time" value="${endVal}" >
           </div>
         </td>
         <td>
@@ -464,12 +480,17 @@
     displayRoster(roster);
     displayNotes(shortfalls);
 
+    // Debug checks: Log staff assignments, check time format, and rule violations
+    console.log("=== DEBUG: Checking final staff assignments ===");
+    debugLogAllAssignments(staffList);
+    debugCheckTimeFormat(staffList);
+    debugCheckForViolations(staffList);
+
     // Update stats
     document.getElementById("coverage").innerText = calculateCoverage(roster);
     document.getElementById("optimizationScore").innerText = calculateOptimizationScore(roster);
     document.getElementById("staffUtilization").innerText = calculateStaffUtilization(staffList);
 
-    // Store the roster for reference if needed
     lastRoster = roster;
   }
 
@@ -480,8 +501,8 @@
       const staffID = row.cells[0].querySelector("input").value.trim();
       const name = row.cells[1].querySelector("input").value.trim();
       const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
-      const startVal = timeInputs[0].value;
-      const endVal   = timeInputs[1].value;
+      const startVal = stripSeconds(timeInputs[0].value);
+      const endVal   = stripSeconds(timeInputs[1].value);
       const breakTime = startVal + "-" + endVal;
       const hhmdEligible = row.cells[3].querySelector("select").value;
       const attendance   = row.cells[4].querySelector("select").value;
@@ -540,17 +561,17 @@
   function isStaffEligible(st, slot, loc) {
     if (st.attendance !== "Yes") return false;
     if (!staffAvailableSlot(st, slot)) return false;
-    if (alreadyAssignedSlot(st, slot, loc)) return false;
+    if (alreadyAssignedSlot(st, slot)) return false;
     if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
     if (loc === "Guard House" && violatesOneHourGapForGuardHouse(st, slot)) return false;
-    // New consecutive-hour check: block if the same staff was assigned one hour earlier at the same location.
+    // "No consecutive hours at the same location"
     if (isConsecutiveHour(st, slot, loc)) return false;
     if (loc === "Vertical Patrol" && alreadyDidVerticalPatrol(st)) return false;
     return true;
   }
 
-  // SIMPLIFIED: block ANY double assignment in the same exact slot.
-  function alreadyAssignedSlot(st, slot, newLoc) {
+  // We block ANY double assignment in the same exact slot.
+  function alreadyAssignedSlot(st, slot) {
     return st.assigned.some(a => a.slot === slot);
   }
 
@@ -587,16 +608,13 @@
     return false;
   }
 
-  // Helper: Convert HH:MM time to total minutes.
+  // Convert HH:MM -> total minutes
   function timeToMinutes(t) {
     let [H, M] = t.split(":");
-    return parseInt(H, 10) * 60 + parseInt(M, 10);
+    return parseInt(H, 10)*60 + parseInt(M, 10);
   }
 
-  /*******************************************************
-   * NEW HELPER: No consecutive hours at same location
-   *******************************************************/
-  // Subtract one hour from a given HH:MM string (with wrap-around).
+  // Subtract one hour from a given HH:MM string
   function subtractOneHour(timeStr) {
     const [hours, minutes] = timeStr.split(":").map(Number);
     let totalMinutes = hours * 60 + minutes - 60;
@@ -606,7 +624,7 @@
     return (newHours < 10 ? "0" + newHours : newHours) + ":" + (newMinutes < 10 ? "0" + newMinutes : newMinutes);
   }
 
-  // Check if staff was assigned to the same location one hour earlier.
+  // Check if staff was assigned to the same location one hour earlier
   function isConsecutiveHour(st, slot, loc) {
     const prevHour = subtractOneHour(slot);
     return st.assigned.some(a => a.slot === prevHour && a.location === loc);
@@ -747,83 +765,75 @@
     const yesCount = staffList.filter(st => st.attendance === "Yes").length;
     return yesCount.toString();
   }
-  
+
   /*******************************************************
- * DEBUGGING HELPERS
- *******************************************************/
-
-// Logs all staff assignments in the console.
-function debugLogAllAssignments(staffList) {
-  console.log("=== Debug: All Staff Assignments ===");
-  staffList.forEach(st => {
-    console.log(`Staff ${st.staffID} (${st.name}) -> assigned:`);
-    if (st.assigned.length === 0) {
-      console.log("   (none)");
-    } else {
-      st.assigned.forEach(a => {
-        console.log(`   Slot: '${a.slot}', Location: '${a.location}'`);
-      });
-    }
-  });
-  console.log("=== End of Assignments ===");
-}
-
-// Checks if any assigned slot string has an extra seconds component (e.g. "21:00:00").
-function debugCheckTimeFormat(staffList) {
-  console.log("=== Debug: Checking for :SS in time strings ===");
-  staffList.forEach(st => {
-    st.assigned.forEach(a => {
-      // If 'a.slot' has more than one colon, it's probably HH:MM:SS
-      if ((a.slot.match(/:/g) || []).length > 1) {
-        console.warn(
-          `Staff ${st.staffID} has a slot '${a.slot}' with possible seconds. ` +
-          `Expected 'HH:MM' but got 'HH:MM:SS'?`
-        );
+   * DEBUGGING HELPERS
+   *******************************************************/
+  function debugLogAllAssignments(staffList) {
+    console.log("=== Debug: All Staff Assignments ===");
+    staffList.forEach(st => {
+      console.log(`Staff ${st.staffID} (${st.name}) -> assigned:`);
+      if (st.assigned.length === 0) {
+        console.log("   (none)");
+      } else {
+        st.assigned.forEach(a => {
+          console.log(`   Slot: '${a.slot}', Location: '${a.location}'`);
+        });
       }
     });
-  });
-  console.log("=== Done checking time formats ===");
-}
-
-// Checks for double‐assignments in the same slot, and consecutive‐hour assignments.
-function debugCheckForViolations(staffList) {
-  console.log("=== Debug: Checking for potential rule violations ===");
-
-  // 1) Double‐assignments in the same time slot
-  const slotMap = {};
-  staffList.forEach(st => {
-    st.assigned.forEach(a => {
-      const key = a.slot + "__" + st.staffID; 
-      if (!slotMap[key]) {
-        slotMap[key] = [];
-      }
-      slotMap[key].push(a.location);
-    });
-  });
-
-  for (let key in slotMap) {
-    if (slotMap[key].length > 1) {
-      console.warn(`Double assignment! Staff+slot = ${key}, multiple locations: ${slotMap[key].join(", ")}`);
-    }
+    console.log("=== End of Assignments ===");
   }
 
-  // 2) Consecutive hours at the same location
-  staffList.forEach(st => {
-    st.assigned.forEach(a => {
-      const prevHour = subtractOneHour(a.slot);
-      // Find if this staff has the same location at prevHour
-      const conflict = st.assigned.find(b => b.slot === prevHour && b.location === a.location);
-      if (conflict) {
-        console.warn(
-          `Consecutive hour violation for staff ${st.staffID} at location '${a.location}'. ` +
-          `Assigned at ${conflict.slot} and ${a.slot}.`
-        );
-      }
+  function debugCheckTimeFormat(staffList) {
+    console.log("=== Debug: Checking for :SS in time strings ===");
+    staffList.forEach(st => {
+      st.assigned.forEach(a => {
+        // If 'a.slot' has more than one colon, it's likely "HH:MM:SS"
+        if ((a.slot.match(/:/g) || []).length > 1) {
+          console.warn(
+            `Staff ${st.staffID} has a slot '${a.slot}' with possible seconds. ` +
+            `Expected 'HH:MM' but got 'HH:MM:SS'?`
+          );
+        }
+      });
     });
-  });
+    console.log("=== Done checking time formats ===");
+  }
 
-  console.log("=== Done checking for rule violations ===");
-}
+  function debugCheckForViolations(staffList) {
+    console.log("=== Debug: Checking for potential rule violations ===");
+    // 1) Double-assignments in the same slot
+    const slotMap = {};
+    staffList.forEach(st => {
+      st.assigned.forEach(a => {
+        const key = a.slot + "__" + st.staffID; 
+        if (!slotMap[key]) {
+          slotMap[key] = [];
+        }
+        slotMap[key].push(a.location);
+      });
+    });
+    for (let key in slotMap) {
+      if (slotMap[key].length > 1) {
+        console.warn(`Double assignment! Staff+slot = ${key}, multiple locations: ${slotMap[key].join(", ")}`);
+      }
+    }
+
+    // 2) Consecutive hours at the same location
+    staffList.forEach(st => {
+      st.assigned.forEach(a => {
+        const prevHour = subtractOneHour(a.slot);
+        const conflict = st.assigned.find(b => b.slot === prevHour && b.location === a.location);
+        if (conflict) {
+          console.warn(
+            `Consecutive hour violation for staff ${st.staffID} at location '${a.location}'. ` +
+            `Assigned at ${conflict.slot} and ${a.slot}.`
+          );
+        }
+      });
+    });
+    console.log("=== Done checking for rule violations ===");
+  }
 </script>
 </body>
 </html>
