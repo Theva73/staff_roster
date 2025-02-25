@@ -782,3 +782,31 @@
         const notesContainer = document.getElementById("notesContainer");
         if (!shortfalls.length) {
           notesContainer.innerHTML = `<div>No shortfalls detected.</div>`;
+        } else {
+          notesContainer.innerHTML = shortfalls.map(note => `<div class="shortfall-note">${note}</div>`).join("");
+        }
+      },
+
+      // Dummy functions for import, export, copyTSV, downloadRoster, and saveEditedRoster
+      importData: function() {
+        alert("Import functionality is not implemented in this example.");
+      },
+      exportData: function() {
+        alert("Export functionality is not implemented in this example.");
+      },
+      copyTSV: function() {
+        alert("Copy TSV functionality is not implemented in this example.");
+      },
+      downloadRoster: function(format) {
+        alert(`Download as ${format.toUpperCase()} is not implemented in this example.`);
+      },
+      saveEditedRoster: function() {
+        alert("Save edits functionality is not implemented in this example.");
+      }
+    };
+
+    // Initialize the roster system so all buttons work
+    rosterSystem.init();
+  </script>
+</body>
+</html>
