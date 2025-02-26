@@ -191,9 +191,9 @@
 
   <script>
     /************************************************************
-     * Roster System with Adjustable Gap Threshold,
-     * Auto-Generation on Slider Change, Critical Highlighting 
-     * (for locations with zero assignments), and Timestamping.
+     * Roster System with Enhanced Break Enforcement,
+     * Auto-Correction for Duplicates and Gaps,
+     * Critical Location Prioritization, and Timestamping.
      ************************************************************/
     
     // Core constants
@@ -411,15 +411,16 @@
       },
 
       /************************************************
-       * 4) Roster Generation with Two‑Phase Gap Policy
-       *     and Critical Check for Zero Assignments.
+       * 4) Roster Generation with Two‑Phase Gap Policy,
+       *    Auto-Correction for Duplicates, and Critical Checks
        ************************************************/
+
       // Validation function (gapThreshold in minutes)
       validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
         const conflicts = {};
-        const staffList = this.getCurrentStaffList(); // Fetch staff data for break times
+        const staffList = this.getCurrentStaffList();
 
         function addConflict(loc, slot, staffID, conflictType) {
           if (!conflicts[loc]) conflicts[loc] = {};
@@ -428,13 +429,12 @@
           conflicts[loc][slot][staffID].push(conflictType);
         }
 
-        // Double-booking and break check
+        // Check for duplicate assignments and break violations
         for (const loc in roster) {
           for (const slot in roster[loc]) {
             const staffListStr = roster[loc][slot];
             if (!staffListStr) continue;
             const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
-            // Check for duplicates within the same slot
             const uniqueStaffIDs = new Set(staffIDs);
             if (uniqueStaffIDs.size < staffIDs.length) {
               const duplicates = staffIDs.filter((id, index) => staffIDs.indexOf(id) !== index);
@@ -461,7 +461,7 @@
           }
         }
 
-        // Consecutive and gap check
+        // Check gap violations and consecutive assignments
         for (const staffID in staffAssignments) {
           const assignments = staffAssignments[staffID].sort((a, b) => 
             ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
@@ -496,7 +496,7 @@
         }
       },
 
-      // Auto-correction function using conflicts data
+      // Auto-correction: Remove duplicates and fill gaps with emergency staff
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
@@ -506,10 +506,14 @@
               let staff = staffList.find(s => s.staffID === staffID);
               if (staff) {
                 this.removeAssignment(roster, staff, slot, loc);
+                // Clean duplicates in the slot
+                let currentAssignments = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
+                let uniqueAssignments = [...new Set(currentAssignments)];
+                roster[loc][slot] = uniqueAssignments.join(", ");
                 let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot);
                 if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc)) {
                   roster[loc][slot] = roster[loc][slot]
-                    ? roster[loc][slot] + `, ${newStaff.staffID}`
+                    ? `${roster[loc][slot]}, ${newStaff.staffID}`
                     : newStaff.staffID;
                   newStaff.assigned.push({ slot, location: loc });
                   correctionsMade = true;
@@ -521,9 +525,22 @@
         return correctionsMade;
       },
 
+      // Enhanced conflict check: breaks, double-booking, and gap violations
       wouldCauseConflict: function(roster, staff, slot, loc) {
         if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
-        return false; // Add more checks if needed, e.g., gap violations
+        const assignments = staff.assigned.concat({ slot, location: loc });
+        assignments.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
+        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
+        for (let i = 0; i < assignments.length - 1; i++) {
+          if (assignments[i].location === loc) {
+            const currTime = this.timeToMinutes(assignments[i].slot);
+            const nextTime = this.timeToMinutes(assignments[i + 1].slot);
+            if (Math.abs(nextTime - currTime) < gapThreshold) {
+              return true;
+            }
+          }
+        }
+        return false;
       },
 
       timeToMinutes: function(timeStr) {
@@ -564,6 +581,7 @@
         return null;
       },
 
+      // Updated: Only return a staff member not on break and not double-booked.
       findEmergencyStaff: function(staffList, slot) {
         for (let st of staffList) {
           if (
@@ -574,15 +592,10 @@
             return st;
           }
         }
-        // Only select staff not on break, avoid double-booking unless no other option
-        for (let st of staffList) {
-          if (st.attendance === "Yes" && !this.isOnBreak(st, slot)) {
-            return st;
-          }
-        }
-        return null; // If no staff available, leave slot empty and report shortfall
+        return null;
       },
 
+      // Assign critical locations first
       assignCriticalLocations: function(roster, staffList, isWeekend, shortfalls) {
         for (const loc in CRITICAL_LOCATIONS) {
           if (loc === "Report Room" && isWeekend) continue;
@@ -605,7 +618,7 @@
             }
           }
         }
-        // NEW: For each location, if all applicable slots are empty, mark as critical
+        // If a location ends up with all empty slots, mark it as critical.
         for (const loc in roster) {
           let allEmpty = true;
           for (const slot in roster[loc]) {
@@ -621,7 +634,6 @@
       },
 
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
-        // Existing checks for mandatory slots...
         const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
         for (let vpTime of vpTimes) {
           if (!roster["Vertical Patrol"][vpTime] || roster["Vertical Patrol"][vpTime].length === 0) {
@@ -664,7 +676,6 @@
       },
       displayRoster: function(roster, conflicts = {}, creationTime) {
         const container = document.getElementById("rosterContainer");
-        // Include a header with the roster date and timestamp
         const rosterDate = document.getElementById("rosterDate").value;
         let headerHTML = `<div style="text-align:left; margin-bottom:10px; font-size:12px;">
           Roster Date: ${rosterDate} | Generated on: ${creationTime.toLocaleString()}
@@ -682,7 +693,6 @@
             let assignedStr = applies ? (roster[loc]?.[slot] || "") : "";
             let staffIDs = assignedStr.split(",").map(s => s.trim()).filter(Boolean);
             let cellCritical = false;
-            // Highlight cell as critical if the conflict is due to zero assignment
             if (applies && assignedStr.trim() === "") {
               cellCritical = true;
             }
@@ -706,7 +716,6 @@
       },
       displayNotes: function(shortfalls) {
         const notesContainer = document.getElementById("notesContainer");
-        // Summarize overall roster health
         if (!shortfalls.length) {
           notesContainer.innerHTML = `<div>Roster Health: All clear.</div>`;
         } else {
@@ -733,8 +742,8 @@
         return true;
       },
       /************************************************
-       * 5) Roster Generation with Two‑Phase Gap Policy
-       *     and Timestamping
+       * 5) Generate Roster with Critical Assignment First,
+       *    Auto-Correction, and Timestamping
        ************************************************/
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
@@ -748,7 +757,11 @@
         let roster = {};
         let shortfalls = [];
         PRIORITY.forEach(({location}) => { roster[location] = {}; });
+
+        // First, assign critical locations
         this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
+
+        // Then assign remaining locations
         for (let p of PRIORITY) {
           let loc = p.location;
           let needed = p.needed;
@@ -784,9 +797,9 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Get gap threshold from slider
+
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
-        let maxIterations = 10; // Increased from 5
+        let maxIterations = 10;
         let iteration = 0;
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         while (issues.length > 0 && iteration < maxIterations) {
@@ -811,7 +824,6 @@
           shortfalls.push(...issues);
         }
         this.saveAssignedToRows(staffList);
-        // Capture creation timestamp
         const creationTime = new Date();
         this.displayRoster(window.generatedRosterData, conflicts, creationTime);
         this.displayNotes(shortfalls);
@@ -883,7 +895,6 @@
       downloadAsPDF: function(rosterData, breakData) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('landscape', 'pt', 'a4');
-        // Get roster date and timestamp
         const rosterDate = document.getElementById("rosterDate").value;
         const creationTime = new Date().toLocaleString();
         doc.setFontSize(10);
