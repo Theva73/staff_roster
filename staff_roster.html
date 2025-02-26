@@ -271,6 +271,13 @@
       "06:00-08:00"
     ];
 
+    // Define critical locations that must be staffed
+    const CRITICAL_LOCATIONS = {
+      "Vertical Patrol": ["20:30", "23:00", "01:30", "06:00"],
+      "Report Room": ["20:00", "21:00"],  // weekdays only
+      "Tango Papa": ["07:30"]
+    };
+
     // -----------------------
     // Roster System
     // -----------------------
@@ -496,11 +503,6 @@
        * 6) Roster Generation
        ************************************************/
       generateRoster: function() {
-        // Note: We no longer shuffle inside generateRoster
-        // because we have a separate button. 
-        // If you still want to shuffle automatically, call:
-        // this.shuffleBreakTimes();
-
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
 
@@ -519,81 +521,54 @@
         let roster = {};
         let shortfalls = [];
 
-        // Initialize each location in the roster object
+        // Initialize roster object
         PRIORITY.forEach(({location}) => { roster[location] = {}; });
 
-        // Process each priority location
+        // STEP 1: ASSIGN CRITICAL LOCATIONS FIRST
+        this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
+
+        // STEP 2: Process remaining locations in priority order
         for (let p of PRIORITY) {
           let loc = p.location;
           let needed = p.needed;
           
           for (let slot of ROSTER_TIMES) {
+            // Skip slots that don't apply to this location
             if (!this.locationApplies(loc, slot, isWeekend)) continue;
-            if (!roster[loc][slot]) roster[loc][slot] = [];
-            let assignedCount = roster[loc][slot].length;
             
-            // Determine how many more staff are needed
+            // Initialize this slot if needed
+            if (!roster[loc][slot]) roster[loc][slot] = [];
+            
+            let assignedCount = roster[loc][slot].length;
             let stillNeeded = needed - assignedCount;
             
-            // Try multiple passes
-            for (let pass = 0; pass < 3; pass++) {
-              for (let i = 0; i < stillNeeded; i++) {
-                let chosen = null;
-                
-                if (pass === 0) {
-                  // Full rules
-                  chosen = this.pickStaffForSlot(staffList, slot, loc);
-                } else if (pass === 1) {
-                  // Relax back-to-back
-                  for (let st of staffList) {
-                    if (this.isStaffEligible(st, slot, loc, true)) {
-                      chosen = st;
-                      break;
-                    }
-                  }
-                } else {
-                  // Minimal checks
-                  for (let st of staffList) {
-                    if (
-                      st.attendance === "Yes" && 
-                      !this.isOnBreak(st, slot) && 
-                      !st.assigned.some(a => a.slot === slot) &&
-                      !(loc === "HHMD" && st.hhmdEligible !== "Yes")
-                    ) {
-                      chosen = st;
-                      break;
-                    }
-                  }
-                }
-                
-                if (chosen) {
-                  roster[loc][slot].push(chosen.staffID);
-                  chosen.assigned.push({ slot, location: loc });
-                  assignedCount++;
-                  stillNeeded--;
-                } else {
-                  // If we can't find anyone, break
-                  break;
-                }
-              }
-              if (stillNeeded === 0) break;
-            }
+            if (stillNeeded <= 0) continue; // Already fully staffed
             
-            // Check shortfall
-            if (assignedCount < needed) {
-              shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedCount}/${needed} staff`);
-              if ((loc === "Pass Counter" && assignedCount < 2) || 
-                  (loc === "HHMD" && assignedCount === 0)) {
-                shortfalls.push(`CRITICAL: ${loc} at ${slot} is understaffed!`);
+            // Try to fill the remaining positions
+            for (let i = 0; i < stillNeeded; i++) {
+              // Find available staff for this position
+              let availableStaff = this.findAvailableStaff(staffList, slot, loc);
+              
+              if (availableStaff) {
+                roster[loc][slot].push(availableStaff.staffID);
+                availableStaff.assigned.push({ slot, location: loc });
+              } else {
+                // Couldn't find anyone for this position
+                if (assignedCount + i === 0) {
+                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
+                } else {
+                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedCount + i}/${needed} staff`);
+                }
+                break; // No point trying to fill more positions if we can't find anyone
               }
             }
           }
         }
 
-        // Check mandatory slots
-        this.checkMandatorySlots(roster, shortfalls, isWeekend);
+        // Check for any remaining critical shortfalls
+        this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
 
-        // Save final assignment
+        // Save the generated roster
         window.generatedRosterData = {};
         OUTPUT_ORDER.forEach(loc => {
           window.generatedRosterData[loc] = {};
@@ -603,15 +578,91 @@
           });
         });
 
-        // Sync assigned data back to staff table rows
+        // Sync assignments back to staff table rows
         this.saveAssignedToRows(staffList);
 
-        // Display the final results (as an editable table)
+        // Display the results
         this.displayRoster(window.generatedRosterData);
         this.displayNotes(shortfalls);
-
-        // Also refresh the small break-time list
         this.displayBreakList();
+      },
+
+      assignCriticalLocations: function(roster, staffList, isWeekend, shortfalls) {
+        // Process each critical location
+        for (const loc in CRITICAL_LOCATIONS) {
+          // Skip Report Room on weekends
+          if (loc === "Report Room" && isWeekend) continue;
+          
+          for (const slot of CRITICAL_LOCATIONS[loc]) {
+            // Initialize this slot
+            if (!roster[loc][slot]) roster[loc][slot] = [];
+            
+            // Skip if this location doesn't apply at this time
+            if (!this.locationApplies(loc, slot, isWeekend)) continue;
+            
+            // Find someone for this critical position
+            let chosen = this.findAvailableStaff(staffList, slot, loc);
+            
+            if (chosen) {
+              // Assign this staff to the critical slot
+              roster[loc][slot].push(chosen.staffID);
+              chosen.assigned.push({ slot, location: loc });
+            } else {
+              // Emergency: Try with relaxed constraints
+              chosen = this.findEmergencyStaff(staffList, slot);
+              
+              if (chosen) {
+                roster[loc][slot].push(chosen.staffID);
+                chosen.assigned.push({ slot, location: loc });
+                shortfalls.push(`Emergency assignment: ${chosen.staffID} to ${loc} at ${slot} (relaxed rules)`);
+              } else {
+                shortfalls.push(`CRITICAL: Could not fill mandatory ${loc} at ${slot}`);
+              }
+            }
+          }
+        }
+      },
+
+      findAvailableStaff: function(staffList, slot, loc) {
+        // First try: Find best match with all rules
+        for (let st of staffList) {
+          if (
+            st.attendance === "Yes" && 
+            !this.isOnBreak(st, slot) &&
+            !this.isDoubleBooked(st, slot) &&
+            !(loc === "HHMD" && st.hhmdEligible !== "Yes")
+          ) {
+            return st;
+          }
+        }
+        
+        // No eligible staff found
+        return null;
+      },
+
+      findEmergencyStaff: function(staffList, slot) {
+        // Only check for break time and double booking - our most critical rules
+        for (let st of staffList) {
+          if (
+            st.attendance === "Yes" && 
+            !this.isOnBreak(st, slot) && 
+            !this.isDoubleBooked(st, slot)
+          ) {
+            return st;
+          }
+        }
+        
+        // If absolutely desperate, only check for break time
+        for (let st of staffList) {
+          if (
+            st.attendance === "Yes" && 
+            !this.isOnBreak(st, slot)
+          ) {
+            return st;
+          }
+        }
+        
+        return null;
       },
 
       checkMandatorySlots: function(roster, shortfalls, isWeekend) {
@@ -746,265 +797,7 @@
       },
       
       isOnBreak: function(st, slot) {
-        const [bStart, bEnd] = st.breakTime.split("-");
-        if (!bStart || !bEnd) return false;
+        // If break time is missing or malformed, assume not on break
+        if (!st.breakTime || !st.breakTime.includes("-")) return false;
         
-        const slotMinutes = this.timeToMinutes(slot);
-        const breakStartMinutes = this.timeToMinutes(bStart);
-        const breakEndMinutes = this.timeToMinutes(bEnd);
-        
-        return (slotMinutes >= breakStartMinutes && slotMinutes <= breakEndMinutes);
-      },
-      
-      isBackToBack: function(st, slot, loc) {
-        return st.assigned.some(a => {
-          if (a.location !== loc) return false;
-          const slotIndex = ROSTER_TIMES.indexOf(slot);
-          const assignedIndex = ROSTER_TIMES.indexOf(a.slot);
-          return Math.abs(slotIndex - assignedIndex) === 1;
-        });
-      },
-      
-      violates2HourGap: function(st, slot, loc) {
-        const slotMinutes = this.timeToMinutes(slot);
-        return st.assigned.some(a => {
-          if (a.location !== loc) return false;
-          const assignedMinutes = this.timeToMinutes(a.slot);
-          const timeDiff = Math.abs(slotMinutes - assignedMinutes);
-          return timeDiff < 120 && timeDiff > 0;
-        });
-      },
-      
-      isLobbyRepeat: function(st, slot) {
-        const idx = ROSTER_TIMES.indexOf(slot);
-        if (idx <= 0) return false;
-        const prevSlot = ROSTER_TIMES[idx - 1];
-        return st.assigned.some(a => a.slot === prevSlot && a.location === "Lobby");
-      },
-
-      isStaffEligible: function(st, slot, loc, relaxRules = false) {
-        if (st.attendance !== "Yes") return false;
-        if (st.locked && !this.alreadyAssignedSlot(st, slot, loc)) return false;
-        if (this.isOnBreak(st, slot)) return false;
-        if (st.assigned.some(a => a.slot === slot)) return false;
-        if (loc === "HHMD" && st.hhmdEligible !== "Yes") return false;
-        
-        if (!relaxRules) {
-          if (loc !== "Lobby" && this.isBackToBack(st, slot, loc)) return false;
-          if (this.violates2HourGap(st, slot, loc)) return false;
-        }
-        
-        return true;
-      },
-
-      alreadyAssignedSlot: function(st, slot, loc) {
-        return st.assigned.some(a => a.slot === slot && a.location === loc);
-      },
-
-      pickStaffForSlot: function(staffList, slot, loc) {
-        // 1) Strict
-        for (let st of staffList) {
-          if (!this.isStaffEligible(st, slot, loc, false)) continue;
-          if (loc === "Lobby" && this.isLobbyRepeat(st, slot)) continue;
-          return st;
-        }
-        // 2) Lobby repeat
-        if (loc === "Lobby") {
-          for (let st of staffList) {
-            if (!this.isStaffEligible(st, slot, loc, false)) continue;
-            return st;
-          }
-        }
-        // 3) Relax rules for certain locations
-        if (["Pass Counter", "HHMD", "Vertical Patrol"].includes(loc)) {
-          for (let st of staffList) {
-            if (!this.isStaffEligible(st, slot, loc, true)) continue;
-            return st;
-          }
-        }
-        return null;
-      },
-
-      /************************************************
-       * 10) Exporting the Generated Roster
-       ************************************************/
-      getEditableRosterData: function() {
-        const rosterTable = document.getElementById("editableRoster");
-        if (!rosterTable) return [];
-
-        const rows = rosterTable.querySelectorAll("tr");
-        let data = [];
-
-        rows.forEach((row) => {
-          let rowData = [];
-          row.querySelectorAll("th, td").forEach(cell => {
-            rowData.push(cell.innerText.trim());
-          });
-          data.push(rowData);
-        });
-        return data;
-      },
-
-      getStaffBreakData: function() {
-        const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        let data = [["Staff ID", "Name", "Break Time"]];
-        staffList.forEach(st => {
-          data.push([st.staffID, st.name, st.breakTime]);
-        });
-        return data;
-      },
-
-      downloadRoster: function(format) {
-        const rosterData = this.getEditableRosterData();
-        if (!rosterData.length) {
-          alert("No roster data found. Please generate the roster first.");
-          return;
-        }
-
-        const breakData = this.getStaffBreakData();
-
-        if (format === "csv") {
-          this.downloadAsCSV(rosterData, breakData);
-        } else if (format === "excel") {
-          this.downloadAsExcel(rosterData, breakData);
-        } else if (format === "pdf") {
-          this.downloadAsPDF(rosterData, breakData);
-        }
-      },
-
-      downloadAsCSV: function(rosterData, breakData) {
-        const convertToCSV = (arr) => {
-          return arr.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
-        };
-        const rosterCSV = convertToCSV(rosterData);
-        const breakCSV = convertToCSV(breakData);
-
-        const finalCSV = rosterCSV + "\n\nStaff Break Times:\n" + breakCSV;
-        const blob = new Blob([finalCSV], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", "Roster_with_Breaks.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      },
-
-      downloadAsExcel: function(rosterData, breakData) {
-        const wb = XLSX.utils.book_new();
-        const rosterSheet = XLSX.utils.aoa_to_sheet(rosterData);
-        XLSX.utils.book_append_sheet(wb, rosterSheet, "Roster");
-
-        const breakSheet = XLSX.utils.aoa_to_sheet(breakData);
-        XLSX.utils.book_append_sheet(wb, breakSheet, "Break Times");
-
-        XLSX.writeFile(wb, "Roster_with_Breaks.xlsx");
-      },
-
-      downloadAsPDF: function(rosterData, breakData) {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('landscape', 'pt', 'a4');
-
-        doc.text("Roster", 40, 30);
-        doc.autoTable({
-          startY: 40,
-          head: [rosterData[0]],
-          body: rosterData.slice(1),
-          margin: { left: 40 },
-          theme: 'grid',
-          styles: { fontSize: 8 }
-        });
-
-        const finalY = doc.autoTable.previous.finalY + 20;
-        doc.text("Staff Break Times", 40, finalY);
-
-        doc.autoTable({
-          startY: finalY + 10,
-          head: [breakData[0]],
-          body: breakData.slice(1),
-          margin: { left: 40 },
-          theme: 'grid',
-          styles: { fontSize: 8 }
-        });
-
-        doc.save("Roster_with_Breaks.pdf");
-      },
-
-      /************************************************
-       * 11) Import / Export (JSON)
-       ************************************************/
-      importData: function() {
-        const fileInput = document.getElementById('importFile');
-        fileInput.value = ""; // reset so it always triggers onchange
-        fileInput.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          try {
-            const text = await file.text();
-            const importedStaff = JSON.parse(text);
-            if (!Array.isArray(importedStaff)) {
-              alert("Invalid JSON structure. Must be an array of staff objects.");
-              return;
-            }
-            // Replace existing data with imported
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(importedStaff));
-            this.loadStaffList();
-            alert("Staff data imported successfully.");
-          } catch (err) {
-            alert("Error reading or parsing file: " + err);
-          }
-        };
-        fileInput.click();
-      },
-
-      exportData: function() {
-        const staffList = this.getCurrentStaffList();
-        const jsonStr = JSON.stringify(staffList, null, 2);
-        const blob = new Blob([jsonStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "staff_data.json";
-        link.click();
-
-        URL.revokeObjectURL(url);
-      },
-
-      /************************************************
-       * 12) Copy & Save Edits
-       ************************************************/
-      copyTSV: function() {
-        const rosterTable = document.getElementById("editableRoster");
-        if (!rosterTable) {
-          alert("No generated roster table found to copy.");
-          return;
-        }
-        let tsv = "";
-        const rows = rosterTable.querySelectorAll("tr");
-        rows.forEach((row) => {
-          const cells = row.querySelectorAll("th, td");
-          let rowData = [];
-          cells.forEach(cell => {
-            rowData.push(cell.textContent.trim());
-          });
-          tsv += rowData.join("\t") + "\n";
-        });
-        navigator.clipboard.writeText(tsv).then(() => {
-          alert("Roster copied as TSV!");
-        }).catch(err => {
-          console.error("Clipboard error:", err);
-          alert("Unable to copy to clipboard.");
-        });
-      },
-
-      saveEditedRoster: function() {
-        alert("Save edits functionality is not fully implemented. (Placeholder)");
-      }
-    };
-
-    // Initialize the roster system so all buttons work
-    rosterSystem.init();
-  </script>
-</body>
-</html>; 
+        const [bStart
