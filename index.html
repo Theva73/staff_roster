@@ -142,7 +142,7 @@
 <body>
   <h2>Staff Roster Management System</h2>
 
-  <!-- Date, Day, Staff count -->
+  <!-- Date, Day, Staff Count -->
   <div class="date-container">
     <div>
       <label for="rosterDate">Date:</label>
@@ -166,14 +166,12 @@
     </div>
   </div>
 
-  <!-- Gap Policy control -->
+  <!-- Gap Policy Control: Slider from 30 to 120 minutes -->
   <div class="gap-policy-container">
     <div>
-      <label for="gapThreshold">Gap Policy:</label>
-      <select id="gapThreshold">
-        <option value="120">Ideal (2 hours)</option>
-        <option value="60">Last Resort (1 hour)</option>
-      </select>
+      <label for="gapThreshold">Gap Threshold (minutes): </label>
+      <input type="range" id="gapThreshold" min="30" max="120" step="15" value="120">
+      <span id="gapThresholdValue">120</span>
     </div>
   </div>
 
@@ -235,7 +233,7 @@
   <script>
     /************************************************************
      * Roster System with Enhanced Validation, Two‑Phase Gap Policy,
-     * and Draggable/Togglable Break Time Note
+     * Configurable Gap Threshold (30–120 min), and Draggable/Toggable Break Note
      ************************************************************/
     
     // -----------------------
@@ -293,6 +291,12 @@
             const dayIndex = dateObj.getDay();
             document.getElementById('rosterDay').value = days[dayIndex];
           }
+        });
+        // Update gap threshold display on slider change
+        const gapSlider = document.getElementById("gapThreshold");
+        const gapDisplay = document.getElementById("gapThresholdValue");
+        gapSlider.addEventListener("input", function() {
+          gapDisplay.innerText = this.value;
         });
         // Button handlers
         document.getElementById('addStaffBtn').addEventListener('click', () => this.addStaff());
@@ -518,7 +522,6 @@
             }
           }
         }
-
         return { issues, conflicts };
       },
       // Remove a conflicting assignment from roster and staff record
@@ -786,7 +789,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read the user-selected gap policy from the dropdown
+        // Read gap threshold from user control (slider)
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -797,8 +800,8 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts remain and gap is still at 2 hours, relax to 1 hour as last resort
-        if (issues.length > 0 && gapThreshold === 120) {
+        // If conflicts remain and the gap is still high, relax to 1 hour
+        if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
           while (issues.length > 0 && attempts < maxAttempts) {
@@ -981,11 +984,7 @@
       // Toggle visibility of break note
       toggleBreakNote: function() {
         const note = document.getElementById("breakListContainer");
-        if (note.style.display === "none") {
-          note.style.display = "block";
-        } else {
-          note.style.display = "none";
-        }
+        note.style.display = note.style.display === "none" ? "block" : "none";
       },
       // Make an element draggable
       makeDraggable: function(el) {
@@ -994,7 +993,6 @@
           pos = {
             left: el.offsetLeft,
             top: el.offsetTop,
-            // Get the current mouse position
             x: e.clientX,
             y: e.clientY,
           };
@@ -1002,10 +1000,8 @@
           document.addEventListener('mouseup', mouseUpHandler);
         };
         const mouseMoveHandler = function(e) {
-          // How far the mouse has been moved
           const dx = e.clientX - pos.x;
           const dy = e.clientY - pos.y;
-          // Set the position of element
           el.style.left = pos.left + dx + 'px';
           el.style.top = pos.top + dy + 'px';
         };
@@ -1017,7 +1013,7 @@
       },
 
       /************************************************
-       * 9) Draggable Roster Generation with Two‑Phase Gap Policy
+       * 9) Roster Generation with Two‑Phase Gap Policy
        ************************************************/
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
@@ -1067,7 +1063,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read gap threshold from user control
+        // Read gap threshold from user control (slider)
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -1078,8 +1074,8 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts remain and the gap is still at 2 hours, relax to 1 hour
-        if (issues.length > 0 && gapThreshold === 120) {
+        // If conflicts remain and the gap is still high, relax to 1 hour as a last resort
+        if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
           while (issues.length > 0 && attempts < maxAttempts) {
