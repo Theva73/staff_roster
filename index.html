@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <style>
-    /* Basic page styling */
+    /* Basic styling */
     body { 
       font-family: Arial, sans-serif; 
       padding: 20px; 
@@ -20,12 +20,7 @@
       background-color: #f3f4f6;
       margin: 0; 
     }
-    h2 { 
-      color: #1a1a1a; 
-      margin-bottom: 25px; 
-    }
-    
-    /* Date/Day/Staff count and Gap Policy container */
+    h2 { color: #1a1a1a; margin-bottom: 25px; }
     .date-container, .gap-policy-container {
       margin: 20px 0;
       display: flex;
@@ -38,8 +33,6 @@
       align-items: center;
       gap: 8px;
     }
-    
-    /* Table styling */
     table { 
       width: 100%; 
       border-collapse: collapse; 
@@ -52,13 +45,7 @@
       text-align: center; 
     }
     th { background-color: #f4f4f4; }
-    input, select { 
-      padding: 4px; 
-      text-align: center;
-      font-size: 12px;
-    }
-    
-    /* Button container and styles */
+    input, select { padding: 4px; text-align: center; font-size: 12px; }
     .button-container {
       display: flex;
       flex-direction: column;
@@ -81,9 +68,7 @@
       border: none;
       cursor: pointer;
     }
-    .roster-btn:hover {
-      background-color: #4B5563;
-    }
+    .roster-btn:hover { background-color: #4B5563; }
     .remove-btn {
       background-color: #6B7280;
       color: white;
@@ -93,34 +78,11 @@
       border: none;
       cursor: pointer;
     }
-    
-    /* Misc styling for break time container and shortfall notes */
-    .break-time-container { 
-      display: flex; 
-      align-items: center; 
-      gap: 5px;
-    }
-    .shortfall-note {
-      color: red;
-      font-weight: bold;
-      font-size: 12px;
-    }
-    
-    /* Hide the file input for import */
-    #importFile {
-      display: none;
-    }
-    
-    /* Roster container scrolling */
-    #rosterContainer {
-      overflow-x: auto;
-    }
-    
-    /* Slightly smaller font for inputs */
-    .staff-input, .time-input, .staff-select {
-      font-size: 12px;
-    }
-
+    .break-time-container { display: flex; align-items: center; gap: 5px; }
+    .shortfall-note { color: red; font-weight: bold; font-size: 12px; }
+    #importFile { display: none; }
+    #rosterContainer { overflow-x: auto; }
+    .staff-input, .time-input, .staff-select { font-size: 12px; }
     /* Draggable floating break note */
     #breakListContainer {
       position: fixed;
@@ -166,7 +128,7 @@
     </div>
   </div>
 
-  <!-- Gap Policy Control: Slider from 30 to 120 minutes -->
+  <!-- Gap Policy: Slider from 30 to 120 minutes -->
   <div class="gap-policy-container">
     <div>
       <label for="gapThreshold">Gap Threshold (minutes): </label>
@@ -175,7 +137,7 @@
     </div>
   </div>
 
-  <!-- Staff Table: add/edit staff data -->
+  <!-- Staff Table -->
   <table id="staffTable">
     <thead>
       <tr>
@@ -191,21 +153,18 @@
     <tbody></tbody>
   </table>
 
-  <!-- Buttons for various actions -->
+  <!-- Action Buttons -->
   <div class="button-container">
-    <!-- Row 1 -->
     <div class="button-row">
       <button class="roster-btn" id="addStaffBtn">Add Staff</button>
       <button class="roster-btn" id="importDataBtn">Import Data</button>
       <button class="roster-btn" id="exportDataBtn">Export Data</button>
     </div>
-    <!-- Row 2 -->
     <div class="button-row">
       <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Breaks</button>
       <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
       <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
     </div>
-    <!-- Row 3 -->
     <div class="button-row">
       <button class="roster-btn" id="downloadExcelBtn">Excel</button>
       <button class="roster-btn" id="downloadCSVBtn">CSV</button>
@@ -221,8 +180,8 @@
   <h3>Generated Roster</h3>
   <div id="rosterContainer"></div>
 
-  <!-- Notes & Shortfalls Display -->
-  <h4>Notes & Shortfalls</h4>
+  <!-- Roster Health Summary -->
+  <h4>Roster Health</h4>
   <div id="notesContainer"></div>
 
   <!-- Floating Break Time Note (draggable) -->
@@ -232,13 +191,12 @@
 
   <script>
     /************************************************************
-     * Roster System with Enhanced Validation, Two‑Phase Gap Policy,
-     * Configurable Gap Threshold (30–120 min), and Draggable/Toggable Break Note
+     * Roster System with Adjustable Gap Threshold,
+     * Auto-Generation on Slider Change, Critical Highlighting,
+     * and Simplified Roster Health Summary.
      ************************************************************/
     
-    // -----------------------
-    // Core Constants
-    // -----------------------
+    // Core constants
     const STORAGE_KEY = 'staffListData';
     const ROSTER_TIMES = [
       "20:00", "20:30", "21:00", "22:00", "23:00",
@@ -270,33 +228,29 @@
       "Tango Papa": ["07:30"]
     };
     
-    // -----------------------
-    // Roster System Object
-    // -----------------------
+    // Roster system object
     const rosterSystem = {
-      /************************************************
-       * 1) Initialization
-       ************************************************/
       init: function() {
         // Pre-fill date & day
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('rosterDate').value = today;
         const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        const currentDay = days[new Date().getDay()];
-        document.getElementById('rosterDay').value = currentDay;
+        document.getElementById('rosterDay').value = days[new Date().getDay()];
         document.getElementById('rosterDate').addEventListener('change', () => {
           const dateValue = document.getElementById('rosterDate').value;
           const dateObj = new Date(dateValue + 'T00:00:00');
           if (!isNaN(dateObj.getTime())) {
-            const dayIndex = dateObj.getDay();
-            document.getElementById('rosterDay').value = days[dayIndex];
+            document.getElementById('rosterDay').value = days[dateObj.getDay()];
           }
         });
-        // Update gap threshold display on slider change
+        // Update slider display and auto-generate roster on change
         const gapSlider = document.getElementById("gapThreshold");
         const gapDisplay = document.getElementById("gapThresholdValue");
         gapSlider.addEventListener("input", function() {
           gapDisplay.innerText = this.value;
+        });
+        gapSlider.addEventListener("change", function() {
+          rosterSystem.generateRoster();
         });
         // Button handlers
         document.getElementById('addStaffBtn').addEventListener('click', () => this.addStaff());
@@ -309,15 +263,10 @@
         document.getElementById('downloadCSVBtn').addEventListener('click', () => this.downloadRoster('csv'));
         document.getElementById('downloadPDFBtn').addEventListener('click', () => this.downloadRoster('pdf'));
         document.getElementById('toggleBreakNoteBtn').addEventListener('click', this.toggleBreakNote);
-        // Enable dragging for the break note
         this.makeDraggable(document.getElementById('breakListContainer'));
-        // Load staff data
         this.loadStaffList();
       },
 
-      /************************************************
-       * 2) Loading & Saving Staff
-       ************************************************/
       loadStaffList: function() {
         const stored = localStorage.getItem(STORAGE_KEY);
         const tbody = document.getElementById("staffTable").querySelector("tbody");
@@ -358,9 +307,6 @@
         return staffList;
       },
 
-      /************************************************
-       * 3) Staff Table Row Generation
-       ************************************************/
       getStaffRowHTML: function(staff = {}) {
         let [startVal, endVal] = ["21:30", "23:30"];
         if (staff.breakTime && staff.breakTime.includes("-")) {
@@ -380,13 +326,13 @@
             <td>
               <select class="staff-select">
                 <option value="Yes" ${staff.hhmdEligible==="Yes"?"selected":""}>Yes</option>
-                <option value="No"  ${staff.hhmdEligible==="No" ?"selected":""}>No</option>
+                <option value="No" ${staff.hhmdEligible==="No"?"selected":""}>No</option>
               </select>
             </td>
             <td>
               <select class="staff-select">
                 <option value="Yes" ${staff.attendance==="Yes"?"selected":""}>Yes</option>
-                <option value="No"  ${staff.attendance==="No" ?"selected":""}>No</option>
+                <option value="No" ${staff.attendance==="No"?"selected":""}>No</option>
               </select>
             </td>
             <td>
@@ -467,19 +413,17 @@
       /************************************************
        * 4) Roster Generation with Two‑Phase Gap Policy
        ************************************************/
-      // Validation function accepts a dynamic gapThreshold (in minutes)
+      // Validation function (gapThreshold in minutes)
       validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
-        const conflicts = {}; 
-
+        const conflicts = {};
         function addConflict(loc, slot, staffID, conflictType) {
           if (!conflicts[loc]) conflicts[loc] = {};
           if (!conflicts[loc][slot]) conflicts[loc][slot] = {};
           if (!conflicts[loc][slot][staffID]) conflicts[loc][slot][staffID] = [];
           conflicts[loc][slot][staffID].push(conflictType);
         }
-
         // Double-booking check
         for (const loc in roster) {
           for (const slot in roster[loc]) {
@@ -498,8 +442,7 @@
             }
           }
         }
-
-        // Consecutive assignments and gap check (using gapThreshold)
+        // Consecutive assignments and gap check using gapThreshold
         for (const staffID in staffAssignments) {
           const assignments = staffAssignments[staffID].sort((a, b) => 
             ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
@@ -507,6 +450,7 @@
           for (let i = 0; i < assignments.length - 1; i++) {
             const curr = assignments[i];
             const next = assignments[i + 1];
+            // Consecutive conflict (we do not highlight these as critical)
             if (curr.location === next.location && 
                 Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
               issues.push(`Staff ${staffID} has consecutive assignments at ${curr.location}: ${curr.slot} and ${next.slot}`);
@@ -517,6 +461,7 @@
             const nextTime = this.timeToMinutes(next.slot);
             if (curr.location === next.location && Math.abs(nextTime - currTime) < gapThreshold) {
               issues.push(`Staff ${staffID} violates ${gapThreshold/60}-hour gap at ${curr.location}: ${curr.slot} and ${next.slot}`);
+              // Mark these as critical conflicts
               addConflict(curr.location, curr.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
               addConflict(next.location, next.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
             }
@@ -524,7 +469,7 @@
         }
         return { issues, conflicts };
       },
-      // Remove a conflicting assignment from roster and staff record
+      // Remove assignment helper
       removeAssignment: function(roster, staff, slot, loc) {
         staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
         if (roster[loc] && roster[loc][slot]) {
@@ -533,7 +478,7 @@
           roster[loc][slot] = ids.join(", ");
         }
       },
-      // Auto-correction function (uses conflicts data)
+      // Auto-correction function using conflicts data
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
@@ -623,7 +568,7 @@
               if (chosen) {
                 roster[loc][slot] += roster[loc][slot] ? `, ${chosen.staffID}` : chosen.staffID;
                 chosen.assigned.push({ slot, location: loc });
-                shortfalls.push(`Emergency assignment: ${chosen.staffID} to ${loc} at ${slot} (relaxed rules)`);
+                shortfalls.push(`Emergency assignment: ${chosen.staffID} to ${loc} at ${slot}`);
               } else {
                 shortfalls.push(`CRITICAL: Could not fill mandatory ${loc} at ${slot}`);
               }
@@ -686,17 +631,22 @@
             const applies = this.locationApplies(loc, slot, isWeekend);
             let assignedStr = applies ? (roster[loc]?.[slot] || "") : "";
             let staffIDs = assignedStr.split(",").map(s => s.trim()).filter(Boolean);
-            let cellHasConflict = false;
+            let cellHasCritical = false;
+            // Only mark as critical if any conflict for this cell is in the critical list
             for (const staffID of staffIDs) {
               if (conflicts[loc] && conflicts[loc][slot] && conflicts[loc][slot][staffID]) {
-                cellHasConflict = true;
-                break;
+                const critTypes = conflicts[loc][slot][staffID];
+                // Consider these as critical conflict types:
+                if (critTypes.includes("doubleBooked") || critTypes.includes("twoHourGap") || critTypes.includes("oneHourGap")) {
+                  cellHasCritical = true;
+                  break;
+                }
               }
             }
             let cellStyle = "";
             if (!applies) {
               cellStyle = "background-color:#f8f8f8;";
-            } else if (cellHasConflict) {
+            } else if (cellHasCritical) {
               cellStyle = "background-color:#ffcccc;";
             }
             tableHTML += `
@@ -713,10 +663,11 @@
       },
       displayNotes: function(shortfalls) {
         const notesContainer = document.getElementById("notesContainer");
+        // Summarize the roster health in one line.
         if (!shortfalls.length) {
-          notesContainer.innerHTML = `<div>No shortfalls detected.</div>`;
+          notesContainer.innerHTML = `<div>Roster Health: All clear.</div>`;
         } else {
-          notesContainer.innerHTML = shortfalls.map(note => `<div class="shortfall-note">${note}</div>`).join("");
+          notesContainer.innerHTML = `<div>Roster Health: ${shortfalls.length} critical issues detected.</div>`;
         }
       },
       displayBreakList: function() {
@@ -789,7 +740,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read gap threshold from user control (slider)
+        // Read gap threshold from slider
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -800,7 +751,7 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts remain and the gap is still high, relax to 1 hour
+        // If conflicts still remain and gap threshold is >60, relax to 60 minutes
         if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
@@ -916,7 +867,7 @@
         doc.save("Roster_with_Breaks.pdf");
       },
       /************************************************
-       * 7) Import / Export JSON and Copy TSV
+       * 7) Import/Export JSON and Copy TSV
        ************************************************/
       importData: function() {
         const fileInput = document.getElementById('importFile');
@@ -981,12 +932,10 @@
       /************************************************
        * 8) Draggable and Toggable Break Note Enhancement
        ************************************************/
-      // Toggle visibility of break note
       toggleBreakNote: function() {
         const note = document.getElementById("breakListContainer");
         note.style.display = note.style.display === "none" ? "block" : "none";
       },
-      // Make an element draggable
       makeDraggable: function(el) {
         let pos = { top: 0, left: 0, x: 0, y: 0 };
         const mouseDownHandler = function(e) {
@@ -1063,7 +1012,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read gap threshold from user control (slider)
+        // Read gap threshold from slider
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -1074,7 +1023,7 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts remain and the gap is still high, relax to 1 hour as a last resort
+        // If conflicts remain and gap threshold > 60, relax to 60 minutes
         if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
@@ -1091,11 +1040,12 @@
         }
         this.saveAssignedToRows(staffList);
         this.displayRoster(window.generatedRosterData, conflicts);
+        // Summarize roster health as a single note
         this.displayNotes(shortfalls);
       }
     };
 
-    // Initialize the roster system
+    // Initialize system
     rosterSystem.init();
   </script>
 </body>
