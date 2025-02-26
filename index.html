@@ -191,8 +191,8 @@
 
   <script>
     /************************************************************
-     * Roster System with Enhanced 07:30 Exclusivity for Tango Papa,
-     * Auto-Correction for Duplicates/Gaps, and Timestamping.
+     * Roster System with Enhanced Time Slot Exclusivity,
+     * Auto-Correction, and Timestamping.
      ************************************************************/
     
     // Core constants
@@ -222,7 +222,7 @@
       "05:00-07:00", "06:00-08:00"
     ];
     const CRITICAL_LOCATIONS = {
-      "Vertical Patrol": ["20:30", "23:00", "01:30", "06:00"],
+      "Vertical Patrol": ["20:30", "01:30"],
       "Report Room": ["20:00", "21:00"],
       "Tango Papa": ["07:30"]
     };
@@ -410,11 +410,12 @@
       },
 
       /************************************************
-       * Roster Generation with 07:30 Exclusivity, Gap Policy,
-       * Auto-Correction, and Critical Checks
+       * Roster Generation with Strict Time Slot Exclusivity,
+       * Gap Policy, Auto-Correction, and Critical Checks
        ************************************************/
 
-      // Updated generateRoster: Skip 07:30 assignments for non–Tango Papa locations.
+      // Updated generateRoster: For non–Vertical Patrol and non–Tango Papa locations,
+      // skip assignment at 20:30, 01:30, and 07:30 respectively.
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
@@ -428,15 +429,18 @@
         let shortfalls = [];
         PRIORITY.forEach(({location}) => { roster[location] = {}; });
 
-        // First, assign critical locations (Tango Papa gets 07:30 as needed)
+        // First, assign critical locations.
         this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
 
-        // Then assign remaining locations, excluding 07:30 for non–Tango Papa
+        // Then assign remaining locations.
         for (let p of PRIORITY) {
           let loc = p.location;
           let needed = p.needed;
           for (let slot of ROSTER_TIMES) {
-            // Skip 07:30 for all locations except Tango Papa
+            // Enforce exclusive slot rules:
+            // 20:30 and 01:30 only for Vertical Patrol,
+            // 07:30 only for Tango Papa.
+            if ((slot === "20:30" || slot === "01:30") && loc !== "Vertical Patrol") continue;
             if (slot === "07:30" && loc !== "Tango Papa") continue;
             if (!this.locationApplies(loc, slot, isWeekend)) continue;
             if (!roster[loc][slot]) roster[loc][slot] = "";
@@ -501,7 +505,8 @@
         this.displayNotes(shortfalls);
       },
 
-      // Updated validateRoster: Flag any 07:30 assignments in non–Tango Papa locations.
+      // Updated validateRoster: Flag any 20:30 or 01:30 assignments in non–Vertical Patrol and
+      // any 07:30 assignments in non–Tango Papa locations.
       validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
@@ -520,12 +525,20 @@
             const staffListStr = roster[loc][slot];
             if (!staffListStr) continue;
 
-            // Enforce 07:30 rule: only Tango Papa is allowed to have 07:30 assignments.
+            // Enforce exclusivity rules.
+            if ((slot === "20:30" || slot === "01:30") && loc !== "Vertical Patrol") {
+              const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
+              staffIDs.forEach(staffID => {
+                issues.push(`Staff ${staffID} assigned at ${loc} for ${slot}, which is reserved for Vertical Patrol only`);
+                addConflict(loc, slot, staffID, "invalidVertical");
+              });
+              continue;
+            }
             if (slot === "07:30" && loc !== "Tango Papa") {
               const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
               staffIDs.forEach(staffID => {
                 issues.push(`Staff ${staffID} assigned at ${loc} for 07:30, which is reserved for Tango Papa only`);
-                addConflict(loc, slot, staffID, "invalid0730");
+                addConflict(loc, slot, staffID, "invalidTango");
               });
               continue;
             }
@@ -581,7 +594,7 @@
         return { issues, conflicts };
       },
 
-      // Updated autoCorrectRoster: Remove invalid 07:30 assignments without reassigning.
+      // Updated autoCorrectRoster: Remove invalid exclusive assignments without reassigning.
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
@@ -591,13 +604,13 @@
               let staff = staffList.find(s => s.staffID === staffID);
               if (staff) {
                 this.removeAssignment(roster, staff, slot, loc);
-                // Clean duplicate assignments
+                // Clean duplicate assignments.
                 let currentAssignments = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
                 let uniqueAssignments = [...new Set(currentAssignments)];
                 roster[loc][slot] = uniqueAssignments.join(", ");
                 
-                // Only attempt reassignment if slot is not 07:30 or if location is Tango Papa
-                if (slot !== "07:30" || loc === "Tango Papa") {
+                // Only reassign if the slot is not one of the reserved ones.
+                if (!((slot === "20:30" || slot === "01:30") || slot === "07:30")) {
                   let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot);
                   if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc)) {
                     roster[loc][slot] = roster[loc][slot] ? `${roster[loc][slot]}, ${newStaff.staffID}` : newStaff.staffID;
@@ -605,7 +618,7 @@
                     correctionsMade = true;
                   }
                 } else {
-                  correctionsMade = true; // Removal is the only correction for invalid 07:30
+                  correctionsMade = true; // Removal is the correction.
                 }
               }
             }
@@ -624,7 +637,7 @@
         }
       },
 
-      // Enhanced conflict check: breaks, double-booking, and gap violations
+      // Enhanced conflict check: breaks, double-booking, and gap violations.
       wouldCauseConflict: function(roster, staff, slot, loc) {
         if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
         const assignments = staff.assigned.concat({ slot, location: loc });
@@ -694,9 +707,10 @@
         return null;
       },
 
-      // Assign critical locations first (Tango Papa gets 07:30 as required)
+      // Assign critical locations first.
       assignCriticalLocations: function(roster, staffList, isWeekend, shortfalls) {
         for (const loc in CRITICAL_LOCATIONS) {
+          // For Report Room skip on weekends.
           if (loc === "Report Room" && isWeekend) continue;
           for (const slot of CRITICAL_LOCATIONS[loc]) {
             if (!roster[loc][slot]) roster[loc][slot] = "";
@@ -733,7 +747,7 @@
       },
 
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
-        const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
+        const vpTimes = ["20:30", "01:30"];
         for (let vpTime of vpTimes) {
           if (!roster["Vertical Patrol"][vpTime] || roster["Vertical Patrol"][vpTime].length === 0) {
             shortfalls.push(`Missing required Vertical Patrol at ${vpTime}`);
@@ -751,7 +765,7 @@
           shortfalls.push(`Missing required Tango Papa at 07:30`);
         }
         for (const slot of ROSTER_TIMES) {
-          if (slot === "07:30") continue;
+          if (slot === "07:30" || slot === "20:30" || slot === "01:30") continue;
           if (!roster["Pass Counter"][slot] || roster["Pass Counter"][slot].split(",").filter(Boolean).length < 2) {
             const count = roster["Pass Counter"][slot] ? roster["Pass Counter"][slot].split(",").filter(Boolean).length : 0;
             shortfalls.push(`CRITICAL SHORTFALL: Pass Counter at ${slot} has only ${count}/2 staff`);
@@ -830,14 +844,20 @@
         });
         container.innerHTML = html;
       },
+      // Updated locationApplies: Enforce exclusive slot rules.
       locationApplies: function(loc, slot, isWeekend) {
+        // For Vertical Patrol: only allow 20:30 and 01:30.
+        if (loc === "Vertical Patrol") return slot === "20:30" || slot === "01:30";
+        // For Tango Papa: only allow 07:30.
         if (loc === "Tango Papa") return slot === "07:30";
-        if (loc === "Pass Counter" && slot === "07:30") return false;
-        if (loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "06:00"].includes(slot);
+        // For all other locations, disallow the reserved slots.
+        if (slot === "20:30" || slot === "01:30" || slot === "07:30") return false;
+        // For Report Room, if weekend then not applicable, else only 20:00 and 21:00.
         if (loc === "Report Room") {
           if (isWeekend) return false;
           return ["20:00", "21:00"].includes(slot);
         }
+        // Default: allow all other slots.
         return true;
       },
       /************************************************
