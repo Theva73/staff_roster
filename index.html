@@ -107,7 +107,7 @@
   <!-- Date, Day, Staff Count -->
   <div class="date-container">
     <div>
-      <label for="rosterDate">Date:</label>
+      <label for="rosterDate">Roster Date:</label>
       <input type="date" id="rosterDate">
     </div>
     <div>
@@ -192,8 +192,8 @@
   <script>
     /************************************************************
      * Roster System with Adjustable Gap Threshold,
-     * Auto-Generation on Slider Change, Critical Highlighting,
-     * and Simplified Roster Health Summary.
+     * Auto-Generation on Slider Change, Critical Highlighting 
+     * (for locations with zero assignments), and Timestamping.
      ************************************************************/
     
     // Core constants
@@ -231,7 +231,7 @@
     // Roster system object
     const rosterSystem = {
       init: function() {
-        // Pre-fill date & day
+        // Set default date and day
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('rosterDate').value = today;
         const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -412,6 +412,7 @@
 
       /************************************************
        * 4) Roster Generation with Two‑Phase Gap Policy
+       *     and Critical Check for Zero Assignments.
        ************************************************/
       // Validation function (gapThreshold in minutes)
       validateRoster: function(roster, gapThreshold = 120) {
@@ -450,8 +451,7 @@
           for (let i = 0; i < assignments.length - 1; i++) {
             const curr = assignments[i];
             const next = assignments[i + 1];
-            // Consecutive conflict (we do not highlight these as critical)
-            if (curr.location === next.location && 
+            if (curr.location === next.location &&
                 Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
               issues.push(`Staff ${staffID} has consecutive assignments at ${curr.location}: ${curr.slot} and ${next.slot}`);
               addConflict(curr.location, curr.slot, staffID, "consecutive");
@@ -461,7 +461,6 @@
             const nextTime = this.timeToMinutes(next.slot);
             if (curr.location === next.location && Math.abs(nextTime - currTime) < gapThreshold) {
               issues.push(`Staff ${staffID} violates ${gapThreshold/60}-hour gap at ${curr.location}: ${curr.slot} and ${next.slot}`);
-              // Mark these as critical conflicts
               addConflict(curr.location, curr.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
               addConflict(next.location, next.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
             }
@@ -575,8 +574,22 @@
             }
           }
         }
+        // NEW: For each location, if all applicable slots are empty, mark as critical
+        for (const loc in roster) {
+          let allEmpty = true;
+          for (const slot in roster[loc]) {
+            if (roster[loc][slot].trim() !== "") {
+              allEmpty = false;
+              break;
+            }
+          }
+          if (allEmpty) {
+            shortfalls.push(`CRITICAL: ${loc} has zero assignments.`);
+          }
+        }
       },
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
+        // Existing checks for mandatory slots...
         const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
         for (let vpTime of vpTimes) {
           if (!roster["Vertical Patrol"][vpTime] || roster["Vertical Patrol"][vpTime].length === 0) {
@@ -617,8 +630,13 @@
         }
         this.saveStaffList();
       },
-      displayRoster: function(roster, conflicts = {}) {
+      displayRoster: function(roster, conflicts = {}, creationTime) {
         const container = document.getElementById("rosterContainer");
+        // Include a header with the roster date and timestamp
+        const rosterDate = document.getElementById("rosterDate").value;
+        let headerHTML = `<div style="text-align:left; margin-bottom:10px; font-size:12px;">
+          Roster Date: ${rosterDate} | Generated on: ${creationTime.toLocaleString()}
+        </div>`;
         let tableHTML = `<table id="editableRoster"><thead><tr><th>Location</th>`;
         ROSTER_TIMES.forEach(slot => {
           tableHTML += `<th>${slot}</th>`;
@@ -631,22 +649,15 @@
             const applies = this.locationApplies(loc, slot, isWeekend);
             let assignedStr = applies ? (roster[loc]?.[slot] || "") : "";
             let staffIDs = assignedStr.split(",").map(s => s.trim()).filter(Boolean);
-            let cellHasCritical = false;
-            // Only mark as critical if any conflict for this cell is in the critical list
-            for (const staffID of staffIDs) {
-              if (conflicts[loc] && conflicts[loc][slot] && conflicts[loc][slot][staffID]) {
-                const critTypes = conflicts[loc][slot][staffID];
-                // Consider these as critical conflict types:
-                if (critTypes.includes("doubleBooked") || critTypes.includes("twoHourGap") || critTypes.includes("oneHourGap")) {
-                  cellHasCritical = true;
-                  break;
-                }
-              }
+            let cellCritical = false;
+            // Highlight cell as critical if the conflict is due to zero assignment
+            if (applies && assignedStr.trim() === "") {
+              cellCritical = true;
             }
             let cellStyle = "";
             if (!applies) {
               cellStyle = "background-color:#f8f8f8;";
-            } else if (cellHasCritical) {
+            } else if (cellCritical) {
               cellStyle = "background-color:#ffcccc;";
             }
             tableHTML += `
@@ -657,13 +668,13 @@
           tableHTML += `</tr>`;
         });
         tableHTML += `</tbody></table>`;
-        container.innerHTML = tableHTML;
+        container.innerHTML = headerHTML + tableHTML;
         container.insertAdjacentHTML("beforeend", `<button class="roster-btn" id="saveEditsBtn">Save Edits</button>`);
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
       },
       displayNotes: function(shortfalls) {
         const notesContainer = document.getElementById("notesContainer");
-        // Summarize the roster health in one line.
+        // Summarize overall roster health
         if (!shortfalls.length) {
           notesContainer.innerHTML = `<div>Roster Health: All clear.</div>`;
         } else {
@@ -691,6 +702,7 @@
       },
       /************************************************
        * 5) Roster Generation with Two‑Phase Gap Policy
+       *     and Timestamping
        ************************************************/
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
@@ -740,7 +752,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read gap threshold from slider
+        // Get the user-selected gap threshold from the slider
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -751,7 +763,7 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts still remain and gap threshold is >60, relax to 60 minutes
+        // If conflicts remain and gapThreshold is >60, relax to 60 minutes as a last resort
         if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
@@ -767,11 +779,13 @@
           shortfalls.push(...issues);
         }
         this.saveAssignedToRows(staffList);
-        this.displayRoster(window.generatedRosterData, conflicts);
+        // Capture creation timestamp
+        const creationTime = new Date();
+        this.displayRoster(window.generatedRosterData, conflicts, creationTime);
         this.displayNotes(shortfalls);
       },
       /************************************************
-       * 6) PDF & File Export Functions
+       * 6) PDF & File Export Functions with Timestamp
        ************************************************/
       getEditableRosterData: function() {
         const rosterTable = document.getElementById("editableRoster");
@@ -837,10 +851,14 @@
       downloadAsPDF: function(rosterData, breakData) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('landscape', 'pt', 'a4');
+        // Get roster date and timestamp
+        const rosterDate = document.getElementById("rosterDate").value;
+        const creationTime = new Date().toLocaleString();
         doc.setFontSize(10);
-        doc.text("Roster", 40, 30);
+        doc.text(`Roster Date: ${rosterDate} | Generated on: ${creationTime}`, 40, 20);
+        doc.text("Roster", 40, 40);
         doc.autoTable({
-          startY: 40,
+          startY: 50,
           head: [rosterData[0]],
           body: rosterData.slice(1),
           margin: { left: 40 },
@@ -962,7 +980,7 @@
       },
 
       /************************************************
-       * 9) Roster Generation with Two‑Phase Gap Policy
+       * 9) Roster Generation with Two‑Phase Gap Policy and Timestamping
        ************************************************/
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
@@ -1012,7 +1030,7 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Read gap threshold from slider
+        // Get gap threshold from slider
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
         let maxAttempts = 5, attempts = 0;
@@ -1023,7 +1041,7 @@
           conflicts = result.conflicts;
           attempts++;
         }
-        // If conflicts remain and gap threshold > 60, relax to 60 minutes
+        // If conflicts remain and gapThreshold > 60, relax to 60 minutes
         if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
           attempts = 0;
@@ -1039,13 +1057,14 @@
           shortfalls.push(...issues);
         }
         this.saveAssignedToRows(staffList);
-        this.displayRoster(window.generatedRosterData, conflicts);
-        // Summarize roster health as a single note
+        // Capture the creation timestamp
+        const creationTime = new Date();
+        this.displayRoster(window.generatedRosterData, conflicts, creationTime);
         this.displayNotes(shortfalls);
       }
     };
 
-    // Initialize system
+    // Initialize the roster system
     rosterSystem.init();
   </script>
 </body>
