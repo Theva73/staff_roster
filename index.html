@@ -191,9 +191,8 @@
 
   <script>
     /************************************************************
-     * Roster System with Enhanced Break Enforcement,
-     * Auto-Correction for Duplicates and Gaps,
-     * Critical Location Prioritization, and Timestamping.
+     * Roster System with Enhanced 07:30 Exclusivity for Tango Papa,
+     * Auto-Correction for Duplicates/Gaps, and Timestamping.
      ************************************************************/
     
     // Core constants
@@ -411,11 +410,98 @@
       },
 
       /************************************************
-       * 4) Roster Generation with Two‑Phase Gap Policy,
-       *    Auto-Correction for Duplicates, and Critical Checks
+       * Roster Generation with 07:30 Exclusivity, Gap Policy,
+       * Auto-Correction, and Critical Checks
        ************************************************/
 
-      // Validation function (gapThreshold in minutes)
+      // Updated generateRoster: Skip 07:30 assignments for non–Tango Papa locations.
+      generateRoster: function() {
+        const dayValue = document.getElementById("rosterDay").value;
+        const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
+        let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
+        if (staffList.length === 0) {
+          alert("Please add staff members before generating roster.");
+          return;
+        }
+        staffList.forEach(st => { if (!st.locked) st.assigned = []; });
+        let roster = {};
+        let shortfalls = [];
+        PRIORITY.forEach(({location}) => { roster[location] = {}; });
+
+        // First, assign critical locations (Tango Papa gets 07:30 as needed)
+        this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
+
+        // Then assign remaining locations, excluding 07:30 for non–Tango Papa
+        for (let p of PRIORITY) {
+          let loc = p.location;
+          let needed = p.needed;
+          for (let slot of ROSTER_TIMES) {
+            // Skip 07:30 for all locations except Tango Papa
+            if (slot === "07:30" && loc !== "Tango Papa") continue;
+            if (!this.locationApplies(loc, slot, isWeekend)) continue;
+            if (!roster[loc][slot]) roster[loc][slot] = "";
+            const assignedIDs = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
+            let assignedCount = assignedIDs.length;
+            let stillNeeded = needed - assignedCount;
+            if (stillNeeded <= 0) continue;
+            for (let i = 0; i < stillNeeded; i++) {
+              let availableStaff = this.findAvailableStaff(staffList, slot, loc);
+              if (availableStaff) {
+                roster[loc][slot] += roster[loc][slot] ? `, ${availableStaff.staffID}` : availableStaff.staffID;
+                availableStaff.assigned.push({ slot, location: loc });
+              } else {
+                if (assignedCount + i === 0) {
+                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
+                } else {
+                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedCount + i}/${needed} staff`);
+                }
+                break;
+              }
+            }
+          }
+        }
+        this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
+        window.generatedRosterData = {};
+        OUTPUT_ORDER.forEach(loc => {
+          window.generatedRosterData[loc] = {};
+          ROSTER_TIMES.forEach(slot => {
+            const assignedIDs = roster[loc][slot] ? roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean) : [];
+            window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
+          });
+        });
+
+        let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
+        let maxIterations = 10;
+        let iteration = 0;
+        let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
+        while (issues.length > 0 && iteration < maxIterations) {
+          if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
+          const result = this.validateRoster(window.generatedRosterData, gapThreshold);
+          issues = result.issues;
+          conflicts = result.conflicts;
+          iteration++;
+        }
+        if (issues.length > 0 && gapThreshold > 60) {
+          gapThreshold = 60;
+          iteration = 0;
+          while (issues.length > 0 && iteration < maxIterations) {
+            if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
+            const result = this.validateRoster(window.generatedRosterData, gapThreshold);
+            issues = result.issues;
+            conflicts = result.conflicts;
+            iteration++;
+          }
+        }
+        if (issues.length > 0) {
+          shortfalls.push(...issues);
+        }
+        this.saveAssignedToRows(staffList);
+        const creationTime = new Date();
+        this.displayRoster(window.generatedRosterData, conflicts, creationTime);
+        this.displayNotes(shortfalls);
+      },
+
+      // Updated validateRoster: Flag any 07:30 assignments in non–Tango Papa locations.
       validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
@@ -429,11 +515,21 @@
           conflicts[loc][slot][staffID].push(conflictType);
         }
 
-        // Check for duplicate assignments and break violations
         for (const loc in roster) {
           for (const slot in roster[loc]) {
             const staffListStr = roster[loc][slot];
             if (!staffListStr) continue;
+
+            // Enforce 07:30 rule: only Tango Papa is allowed to have 07:30 assignments.
+            if (slot === "07:30" && loc !== "Tango Papa") {
+              const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
+              staffIDs.forEach(staffID => {
+                issues.push(`Staff ${staffID} assigned at ${loc} for 07:30, which is reserved for Tango Papa only`);
+                addConflict(loc, slot, staffID, "invalid0730");
+              });
+              continue;
+            }
+
             const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
             const uniqueStaffIDs = new Set(staffIDs);
             if (uniqueStaffIDs.size < staffIDs.length) {
@@ -461,7 +557,6 @@
           }
         }
 
-        // Check gap violations and consecutive assignments
         for (const staffID in staffAssignments) {
           const assignments = staffAssignments[staffID].sort((a, b) => 
             ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
@@ -486,17 +581,7 @@
         return { issues, conflicts };
       },
 
-      // Remove assignment helper
-      removeAssignment: function(roster, staff, slot, loc) {
-        staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
-        if (roster[loc] && roster[loc][slot]) {
-          let ids = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
-          ids = ids.filter(id => id !== staff.staffID);
-          roster[loc][slot] = ids.join(", ");
-        }
-      },
-
-      // Auto-correction: Remove duplicates and fill gaps with emergency staff
+      // Updated autoCorrectRoster: Remove invalid 07:30 assignments without reassigning.
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
@@ -506,23 +591,37 @@
               let staff = staffList.find(s => s.staffID === staffID);
               if (staff) {
                 this.removeAssignment(roster, staff, slot, loc);
-                // Clean duplicates in the slot
+                // Clean duplicate assignments
                 let currentAssignments = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
                 let uniqueAssignments = [...new Set(currentAssignments)];
                 roster[loc][slot] = uniqueAssignments.join(", ");
-                let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot);
-                if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc)) {
-                  roster[loc][slot] = roster[loc][slot]
-                    ? `${roster[loc][slot]}, ${newStaff.staffID}`
-                    : newStaff.staffID;
-                  newStaff.assigned.push({ slot, location: loc });
-                  correctionsMade = true;
+                
+                // Only attempt reassignment if slot is not 07:30 or if location is Tango Papa
+                if (slot !== "07:30" || loc === "Tango Papa") {
+                  let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot);
+                  if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc)) {
+                    roster[loc][slot] = roster[loc][slot] ? `${roster[loc][slot]}, ${newStaff.staffID}` : newStaff.staffID;
+                    newStaff.assigned.push({ slot, location: loc });
+                    correctionsMade = true;
+                  }
+                } else {
+                  correctionsMade = true; // Removal is the only correction for invalid 07:30
                 }
               }
             }
           }
         }
         return correctionsMade;
+      },
+
+      // Remove assignment helper
+      removeAssignment: function(roster, staff, slot, loc) {
+        staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
+        if (roster[loc] && roster[loc][slot]) {
+          let ids = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
+          ids = ids.filter(id => id !== staff.staffID);
+          roster[loc][slot] = ids.join(", ");
+        }
       },
 
       // Enhanced conflict check: breaks, double-booking, and gap violations
@@ -581,7 +680,7 @@
         return null;
       },
 
-      // Updated: Only return a staff member not on break and not double-booked.
+      // Only return staff not on break and not double-booked.
       findEmergencyStaff: function(staffList, slot) {
         for (let st of staffList) {
           if (
@@ -595,7 +694,7 @@
         return null;
       },
 
-      // Assign critical locations first
+      // Assign critical locations first (Tango Papa gets 07:30 as required)
       assignCriticalLocations: function(roster, staffList, isWeekend, shortfalls) {
         for (const loc in CRITICAL_LOCATIONS) {
           if (loc === "Report Room" && isWeekend) continue;
@@ -618,7 +717,7 @@
             }
           }
         }
-        // If a location ends up with all empty slots, mark it as critical.
+        // Mark locations with no assignments as critical.
         for (const loc in roster) {
           let allEmpty = true;
           for (const slot in roster[loc]) {
@@ -742,94 +841,7 @@
         return true;
       },
       /************************************************
-       * 5) Generate Roster with Critical Assignment First,
-       *    Auto-Correction, and Timestamping
-       ************************************************/
-      generateRoster: function() {
-        const dayValue = document.getElementById("rosterDay").value;
-        const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-        let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        if (staffList.length === 0) {
-          alert("Please add staff members before generating roster.");
-          return;
-        }
-        staffList.forEach(st => { if (!st.locked) st.assigned = []; });
-        let roster = {};
-        let shortfalls = [];
-        PRIORITY.forEach(({location}) => { roster[location] = {}; });
-
-        // First, assign critical locations
-        this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
-
-        // Then assign remaining locations
-        for (let p of PRIORITY) {
-          let loc = p.location;
-          let needed = p.needed;
-          for (let slot of ROSTER_TIMES) {
-            if (!this.locationApplies(loc, slot, isWeekend)) continue;
-            if (!roster[loc][slot]) roster[loc][slot] = "";
-            const assignedIDs = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
-            let assignedCount = assignedIDs.length;
-            let stillNeeded = needed - assignedCount;
-            if (stillNeeded <= 0) continue;
-            for (let i = 0; i < stillNeeded; i++) {
-              let availableStaff = this.findAvailableStaff(staffList, slot, loc);
-              if (availableStaff) {
-                roster[loc][slot] += roster[loc][slot] ? `, ${availableStaff.staffID}` : availableStaff.staffID;
-                availableStaff.assigned.push({ slot, location: loc });
-              } else {
-                if (assignedCount + i === 0) {
-                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
-                } else {
-                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedCount + i}/${needed} staff`);
-                }
-                break;
-              }
-            }
-          }
-        }
-        this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
-        window.generatedRosterData = {};
-        OUTPUT_ORDER.forEach(loc => {
-          window.generatedRosterData[loc] = {};
-          ROSTER_TIMES.forEach(slot => {
-            const assignedIDs = roster[loc][slot] ? roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean) : [];
-            window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
-          });
-        });
-
-        let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
-        let maxIterations = 10;
-        let iteration = 0;
-        let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
-        while (issues.length > 0 && iteration < maxIterations) {
-          if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
-          const result = this.validateRoster(window.generatedRosterData, gapThreshold);
-          issues = result.issues;
-          conflicts = result.conflicts;
-          iteration++;
-        }
-        if (issues.length > 0 && gapThreshold > 60) {
-          gapThreshold = 60;
-          iteration = 0;
-          while (issues.length > 0 && iteration < maxIterations) {
-            if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
-            const result = this.validateRoster(window.generatedRosterData, gapThreshold);
-            issues = result.issues;
-            conflicts = result.conflicts;
-            iteration++;
-          }
-        }
-        if (issues.length > 0) {
-          shortfalls.push(...issues);
-        }
-        this.saveAssignedToRows(staffList);
-        const creationTime = new Date();
-        this.displayRoster(window.generatedRosterData, conflicts, creationTime);
-        this.displayNotes(shortfalls);
-      },
-      /************************************************
-       * 6) PDF & File Export Functions with Timestamp
+       * PDF & File Export Functions with Timestamp
        ************************************************/
       getEditableRosterData: function() {
         const rosterTable = document.getElementById("editableRoster");
@@ -928,7 +940,7 @@
         doc.save("Roster_with_Breaks.pdf");
       },
       /************************************************
-       * 7) Import/Export JSON and Copy TSV
+       * Import/Export JSON and Copy TSV
        ************************************************/
       importData: function() {
         const fileInput = document.getElementById('importFile');
@@ -990,7 +1002,7 @@
         alert("Save edits functionality is not fully implemented. (Placeholder)");
       },
       /************************************************
-       * 8) Draggable and Toggable Break Note Enhancement
+       * Draggable and Toggable Break Note Enhancement
        ************************************************/
       toggleBreakNote: function() {
         const note = document.getElementById("breakListContainer");
