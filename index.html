@@ -419,19 +419,36 @@
         const staffAssignments = {};
         const issues = [];
         const conflicts = {};
+        const staffList = this.getCurrentStaffList(); // Fetch staff data for break times
+
         function addConflict(loc, slot, staffID, conflictType) {
           if (!conflicts[loc]) conflicts[loc] = {};
           if (!conflicts[loc][slot]) conflicts[loc][slot] = {};
           if (!conflicts[loc][slot][staffID]) conflicts[loc][slot][staffID] = [];
           conflicts[loc][slot][staffID].push(conflictType);
         }
-        // Double-booking check
+
+        // Double-booking and break check
         for (const loc in roster) {
           for (const slot in roster[loc]) {
             const staffListStr = roster[loc][slot];
             if (!staffListStr) continue;
             const staffIDs = staffListStr.split(",").map(s => s.trim()).filter(Boolean);
+            // Check for duplicates within the same slot
+            const uniqueStaffIDs = new Set(staffIDs);
+            if (uniqueStaffIDs.size < staffIDs.length) {
+              const duplicates = staffIDs.filter((id, index) => staffIDs.indexOf(id) !== index);
+              duplicates.forEach(id => {
+                issues.push(`Staff ${id} listed multiple times at ${loc} for ${slot}`);
+                addConflict(loc, slot, id, "duplicateAssignment");
+              });
+            }
             for (const staffID of staffIDs) {
+              const staff = staffList.find(s => s.staffID === staffID);
+              if (staff && this.isOnBreak(staff, slot)) {
+                issues.push(`Staff ${staffID} assigned at ${loc} during break at ${slot}`);
+                addConflict(loc, slot, staffID, "breakViolation");
+              }
               if (!staffAssignments[staffID]) staffAssignments[staffID] = [];
               const existing = staffAssignments[staffID].find(a => a.slot === slot);
               if (existing) {
@@ -443,7 +460,8 @@
             }
           }
         }
-        // Consecutive assignments and gap check using gapThreshold
+
+        // Consecutive and gap check
         for (const staffID in staffAssignments) {
           const assignments = staffAssignments[staffID].sort((a, b) => 
             ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
@@ -451,8 +469,7 @@
           for (let i = 0; i < assignments.length - 1; i++) {
             const curr = assignments[i];
             const next = assignments[i + 1];
-            if (curr.location === next.location &&
-                Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
+            if (curr.location === next.location && Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
               issues.push(`Staff ${staffID} has consecutive assignments at ${curr.location}: ${curr.slot} and ${next.slot}`);
               addConflict(curr.location, curr.slot, staffID, "consecutive");
               addConflict(next.location, next.slot, staffID, "consecutive");
@@ -468,6 +485,7 @@
         }
         return { issues, conflicts };
       },
+
       // Remove assignment helper
       removeAssignment: function(roster, staff, slot, loc) {
         staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
@@ -477,35 +495,43 @@
           roster[loc][slot] = ids.join(", ");
         }
       },
+
       // Auto-correction function using conflicts data
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
           for (let slot in conflicts[loc]) {
-            let staffObj = conflicts[loc][slot]; 
+            let staffObj = conflicts[loc][slot];
             for (let staffID in staffObj) {
               let staff = staffList.find(s => s.staffID === staffID);
               if (staff) {
                 this.removeAssignment(roster, staff, slot, loc);
-                let newStaff = this.findEmergencyStaff(staffList, slot);
-                if (newStaff) {
+                let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot);
+                if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc)) {
                   roster[loc][slot] = roster[loc][slot]
                     ? roster[loc][slot] + `, ${newStaff.staffID}`
                     : newStaff.staffID;
                   newStaff.assigned.push({ slot, location: loc });
+                  correctionsMade = true;
                 }
-                correctionsMade = true;
               }
             }
           }
         }
         return correctionsMade;
       },
+
+      wouldCauseConflict: function(roster, staff, slot, loc) {
+        if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
+        return false; // Add more checks if needed, e.g., gap violations
+      },
+
       timeToMinutes: function(timeStr) {
         const [hours, minutes] = timeStr.split(":").map(Number);
         const adjustedHours = hours < 8 ? hours + 24 : hours;
         return (adjustedHours - 20) * 60 + minutes;
       },
+
       isOnBreak: function(st, slot) {
         if (!st.breakTime || !st.breakTime.includes("-")) return false;
         const [bStart, bEnd] = st.breakTime.split("-");
@@ -519,9 +545,11 @@
           return (slotTime >= breakStart || slotTime <= breakEnd);
         }
       },
+
       isDoubleBooked: function(st, slot) {
         return st.assigned.some(a => a.slot === slot);
       },
+
       findAvailableStaff: function(staffList, slot, loc) {
         for (let st of staffList) {
           if (
@@ -535,6 +563,7 @@
         }
         return null;
       },
+
       findEmergencyStaff: function(staffList, slot) {
         for (let st of staffList) {
           if (
@@ -545,13 +574,15 @@
             return st;
           }
         }
+        // Only select staff not on break, avoid double-booking unless no other option
         for (let st of staffList) {
           if (st.attendance === "Yes" && !this.isOnBreak(st, slot)) {
             return st;
           }
         }
-        return null;
+        return null; // If no staff available, leave slot empty and report shortfall
       },
+
       assignCriticalLocations: function(roster, staffList, isWeekend, shortfalls) {
         for (const loc in CRITICAL_LOCATIONS) {
           if (loc === "Report Room" && isWeekend) continue;
@@ -588,6 +619,7 @@
           }
         }
       },
+
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
         // Existing checks for mandatory slots...
         const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
@@ -752,27 +784,27 @@
             window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
           });
         });
-        // Get the user-selected gap threshold from the slider
+        // Get gap threshold from slider
         let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
+        let maxIterations = 10; // Increased from 5
+        let iteration = 0;
         let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
-        let maxAttempts = 5, attempts = 0;
-        while (issues.length > 0 && attempts < maxAttempts) {
+        while (issues.length > 0 && iteration < maxIterations) {
           if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
           const result = this.validateRoster(window.generatedRosterData, gapThreshold);
           issues = result.issues;
           conflicts = result.conflicts;
-          attempts++;
+          iteration++;
         }
-        // If conflicts remain and gapThreshold is >60, relax to 60 minutes as a last resort
         if (issues.length > 0 && gapThreshold > 60) {
           gapThreshold = 60;
-          attempts = 0;
-          while (issues.length > 0 && attempts < maxAttempts) {
+          iteration = 0;
+          while (issues.length > 0 && iteration < maxIterations) {
             if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
             const result = this.validateRoster(window.generatedRosterData, gapThreshold);
             issues = result.issues;
             conflicts = result.conflicts;
-            attempts++;
+            iteration++;
           }
         }
         if (issues.length > 0) {
@@ -946,7 +978,6 @@
       saveEditedRoster: function() {
         alert("Save edits functionality is not fully implemented. (Placeholder)");
       },
-
       /************************************************
        * 8) Draggable and Toggable Break Note Enhancement
        ************************************************/
@@ -977,90 +1008,6 @@
           document.removeEventListener('mouseup', mouseUpHandler);
         };
         el.addEventListener('mousedown', mouseDownHandler);
-      },
-
-      /************************************************
-       * 9) Roster Generation with Two‑Phase Gap Policy and Timestamping
-       ************************************************/
-      generateRoster: function() {
-        const dayValue = document.getElementById("rosterDay").value;
-        const isWeekend = (dayValue === "Saturday" || dayValue === "Sunday");
-        let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        if (staffList.length === 0) {
-          alert("Please add staff members before generating roster.");
-          return;
-        }
-        staffList.forEach(st => { if (!st.locked) st.assigned = []; });
-        let roster = {};
-        let shortfalls = [];
-        PRIORITY.forEach(({location}) => { roster[location] = {}; });
-        this.assignCriticalLocations(roster, staffList, isWeekend, shortfalls);
-        for (let p of PRIORITY) {
-          let loc = p.location;
-          let needed = p.needed;
-          for (let slot of ROSTER_TIMES) {
-            if (!this.locationApplies(loc, slot, isWeekend)) continue;
-            if (!roster[loc][slot]) roster[loc][slot] = "";
-            const assignedIDs = roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean);
-            let assignedCount = assignedIDs.length;
-            let stillNeeded = needed - assignedCount;
-            if (stillNeeded <= 0) continue;
-            for (let i = 0; i < stillNeeded; i++) {
-              let availableStaff = this.findAvailableStaff(staffList, slot, loc);
-              if (availableStaff) {
-                roster[loc][slot] += roster[loc][slot] ? `, ${availableStaff.staffID}` : availableStaff.staffID;
-                availableStaff.assigned.push({ slot, location: loc });
-              } else {
-                if (assignedCount + i === 0) {
-                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
-                } else {
-                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedCount + i}/${needed} staff`);
-                }
-                break;
-              }
-            }
-          }
-        }
-        this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
-        window.generatedRosterData = {};
-        OUTPUT_ORDER.forEach(loc => {
-          window.generatedRosterData[loc] = {};
-          ROSTER_TIMES.forEach(slot => {
-            const assignedIDs = roster[loc][slot] ? roster[loc][slot].split(",").map(s => s.trim()).filter(Boolean) : [];
-            window.generatedRosterData[loc][slot] = assignedIDs.join(", ");
-          });
-        });
-        // Get gap threshold from slider
-        let gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10);
-        let { issues, conflicts } = this.validateRoster(window.generatedRosterData, gapThreshold);
-        let maxAttempts = 5, attempts = 0;
-        while (issues.length > 0 && attempts < maxAttempts) {
-          if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
-          const result = this.validateRoster(window.generatedRosterData, gapThreshold);
-          issues = result.issues;
-          conflicts = result.conflicts;
-          attempts++;
-        }
-        // If conflicts remain and gapThreshold > 60, relax to 60 minutes
-        if (issues.length > 0 && gapThreshold > 60) {
-          gapThreshold = 60;
-          attempts = 0;
-          while (issues.length > 0 && attempts < maxAttempts) {
-            if (!this.autoCorrectRoster(window.generatedRosterData, staffList, conflicts)) break;
-            const result = this.validateRoster(window.generatedRosterData, gapThreshold);
-            issues = result.issues;
-            conflicts = result.conflicts;
-            attempts++;
-          }
-        }
-        if (issues.length > 0) {
-          shortfalls.push(...issues);
-        }
-        this.saveAssignedToRows(staffList);
-        // Capture the creation timestamp
-        const creationTime = new Date();
-        this.displayRoster(window.generatedRosterData, conflicts, creationTime);
-        this.displayNotes(shortfalls);
       }
     };
 
