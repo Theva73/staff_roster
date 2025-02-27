@@ -194,13 +194,13 @@
   <script>
     /************************************************************
      * Streamlined Roster System with Template Format, All Buttons,
-     * and Updated Priority Rules:
-     *  - Priority order on weekdays: HHMD, Guard House, Lobby, Report Room,
-     *    Vertical Patrol, Tango Papa.
-     *  - On weekends, Report Room is skipped.
-     *  - Pass Counter remains (appended last) if needed.
-     *  - In case of massive shortfalls (working staff less than 6), an HHMD‐eligible
-     *    staff member will cover the Lobby at the 20:00 slot.
+     * and Updated Priority & Preliminary Rules:
+     * 
+     * New Preliminary Rules:
+     * 1. No back-to-back assignments in the same location for at least 2 hours,
+     *    except for Lobby.
+     * 2. The same staff ID cannot be assigned in multiple locations for the same hour.
+     * 3. No assignment while the staff is on break.
      ************************************************************/
 
     // Core constants
@@ -210,10 +210,8 @@
       "00:00", "01:00", "01:30", "02:00", "03:00",
       "04:00", "05:00", "06:00", "07:00", "07:30"
     ];
-    // We'll build the roster using a priority order.
-    // On weekdays: HHMD, Guard House, Lobby, Report Room, Vertical Patrol, Tango Papa, Pass Counter.
+    // Priority order for weekdays: HHMD, Guard House, Lobby, Report Room, Vertical Patrol, Tango Papa, Pass Counter.
     // On weekends, Report Room is skipped.
-    // BREAK_TIME_POOL remains unchanged.
     const BREAK_TIME_POOL = [
       "20:00-21:30", "21:30-23:30", "22:00-00:00",
       "23:00-01:00", "00:00-02:00", "01:30-03:30",
@@ -221,7 +219,6 @@
       "05:00-07:00", "06:00-08:00"
     ];
 
-    // Roster system object
     const rosterSystem = {
       init: function() {
         console.log("Initializing roster system...");
@@ -438,9 +435,27 @@
         this.updateStaffCount();
       },
 
-      // Streamlined roster generation based on priority.
-      // New priority: On weekdays, use ["HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa", "Pass Counter"].
-      // On weekends, skip "Report Room".
+      // Helper: Check that staff can be assigned at the given location and slot.
+      // Rule 1: For locations other than Lobby, if staff already has an assignment at the same location
+      // within 2 hours, then they cannot be assigned.
+      canAssignStaffAtLocationAndTime: function(staff, loc, slot) {
+        if (loc !== "Lobby") {
+          for (let assign of staff.assigned) {
+            if (assign.location === loc) {
+              const diff = Math.abs(this.timeToMinutes(slot) - this.timeToMinutes(assign.slot));
+              if (diff < 120) { // less than 2 hours
+                return false;
+              }
+            }
+          }
+        }
+        return true;
+      },
+
+      // Generate roster with preliminary rules applied.
+      // Priority order for weekdays: ["HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa", "Pass Counter"].
+      // On weekends, Report Room is skipped.
+      // Also, if working staff < 6, force an HHMD-eligible staff member to cover Lobby at 20:00.
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
@@ -455,15 +470,19 @@
         if (dayValue !== "Saturday" && dayValue !== "Sunday") {
           priorityLocations.splice(3, 0, "Report Room"); // Insert Report Room at index 3 for weekdays.
         }
-        // Create a new roster object.
         let newRoster = {};
         priorityLocations.forEach(loc => {
           newRoster[loc] = {};
           ROSTER_TIMES.forEach(slot => {
             let assigned = "";
-            // For each slot, assign the first available staff (not on break and not double-booked).
+            // For each slot, select first available staff meeting all rules:
+            // - Not on break at the slot.
+            // - Not double-booked at the same slot (rule 2).
+            // - For non-Lobby locations: no assignment in same location within 2 hours (rule 1).
             for (let member of staffList) {
-              if (!this.isOnBreak(member, slot) && !this.isDoubleBooked(member, slot)) {
+              if (!this.isOnBreak(member, slot) &&
+                  !this.isDoubleBooked(member, slot) &&
+                  this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
                 assigned = member.staffID;
                 member.assigned.push({ slot, location: loc });
                 break;
@@ -472,9 +491,7 @@
             newRoster[loc][slot] = assigned;
           });
         });
-        window.generatedRosterData = newRoster;
-        // Check for massive shortfall: if working staff count is less than 6,
-        // then force an HHMD-eligible staff to cover Lobby at the 20:00 slot.
+        // Massive shortfall rule: If working staff count < 6, force an HHMD-eligible staff to cover Lobby at 20:00.
         if (staffList.length < 6) {
           if (newRoster["Lobby"] && newRoster["Lobby"]["20:00"] === "") {
             let hhmdStaff = staffList.find(s => s.hhmdEligible === "Yes");
@@ -485,6 +502,7 @@
             }
           }
         }
+        window.generatedRosterData = newRoster;
         const creationTime = new Date();
         this.displayRoster(newRoster, {}, creationTime);
         alert("Roster generated successfully.");
@@ -501,7 +519,7 @@
           tableHTML += `<th>${slot}</th>`;
         });
         tableHTML += `</tr></thead><tbody>`;
-        // Use the same priority order as in generateRoster.
+        // Use the same order as generated.
         let displayOrder = Object.keys(roster);
         displayOrder.forEach(loc => {
           tableHTML += `<tr data-loc="${loc}"><td>${loc}</td>`;
@@ -516,11 +534,11 @@
         tableHTML += `</tbody></table>`;
         container.innerHTML = headerHTML + tableHTML;
         
-        // Add Save Edits button (placeholder functionality)
+        // Add Save Edits button (placeholder)
         container.insertAdjacentHTML("beforeend", `<button class="roster-btn" id="saveEditsBtn">Save Edits</button>`);
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
         
-        // Attach click event to each editable cell to toggle selection for manual conflict review.
+        // Attach click event to toggle selection for manual review.
         document.querySelectorAll("#editableRoster td[contenteditable]").forEach(cell => {
           cell.addEventListener("click", function() {
             this.classList.toggle("selected");
@@ -538,7 +556,7 @@
         container.innerHTML = html;
       },
 
-      // Basic check: staff is on break if the slot falls within their break period.
+      // Check if staff is on break at the slot.
       isOnBreak: function(st, slot) {
         if (!st.breakTime) return false;
         const [bStart, bEnd] = st.breakTime.split("-");
@@ -769,7 +787,6 @@
             if (!staff) return;
             
             let conflictFound = false;
-            // Conflict: staff is on break at the slot.
             if (this.isOnBreak(staff, slot)) {
               conflictFound = true;
             } else {
@@ -879,7 +896,7 @@
 
     window.RosterApp = rosterSystem;
 
-    console.log("Starting script execution (Streamlined Roster System with Priority Rules)...");
+    console.log("Starting script execution (Updated with Preliminary Rules)...");
     try {
       rosterSystem.init();
       console.log("Roster system initialized successfully.");
