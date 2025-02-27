@@ -1,3 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Staff Roster Management System</title>
+  
+  <!-- External libraries (NO XLSX) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
+      text-align: center;
+      font-size: 14px;
+      background-color: #f3f4f6;
+      margin: 0; 
+    }
+    h2 { color: #1a1a1a; margin-bottom: 25px; }
+    .date-container, .gap-policy-container {
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .date-container > div, .gap-policy-container > div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin: 20px 0;
+      background: white;
+    }
+    th, td { 
+      border: 1px solid #ddd; 
+      padding: 8px; 
+      text-align: center; 
+    }
+    th { background-color: #f4f4f4; }
+    input, select { padding: 4px; text-align: center; font-size: 12px; }
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 12px 0;
+      align-items: center;
+    }
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .roster-btn {
+      background-color: #6B7280;
+      color: white;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+    }
+    .roster-btn:hover { background-color: #4B5563; }
+    .remove-btn {
+      background-color: #6B7280;
+      color: white;
+      padding: 1px 6px;
+      font-size: 11px;
+      border-radius: 3px;
+      border: none;
+      cursor: pointer;
+    }
+    .break-time-container { display: flex; align-items: center; gap: 5px; }
+    .shortfall-note { color: red; font-weight: bold; font-size: 12px; }
+    #importFile { display: none; }
+    #rosterContainer { overflow-x: auto; }
+    .staff-input, .time-input, .staff-select { font-size: 12px; }
+    #breakListContainer {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      width: 180px;
+      max-height: 300px;
+      overflow: auto;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      padding: 8px;
+      font-size: 12px;
+      text-align: left;
+      cursor: move;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Staff Roster Management System</h2>
+
+  <!-- Date, Day, Staff Count -->
+  <div class="date-container">
+    <div>
+      <label for="rosterDate">Roster Date:</label>
+      <input type="date" id="rosterDate">
+    </div>
+    <div>
+      <label for="rosterDay">Day:</label>
+      <select id="rosterDay">
+        <option value="Monday">Monday</option>
+        <option value="Tuesday">Tuesday</option>
+        <option value="Wednesday">Wednesday</option>
+        <option value="Thursday">Thursday</option>
+        <option value="Friday">Friday</option>
+        <option value="Saturday">Saturday</option>
+        <option value="Sunday">Sunday</option>
+      </select>
+    </div>
+    <div>
+      <label>Working Staff:</label>
+      <span id="staffCount">0</span>
+    </div>
+  </div>
+
+  <!-- Gap Policy: Slider from 30 to 120 minutes -->
+  <div class="gap-policy-container">
+    <div>
+      <label for="gapThreshold">Gap Threshold (minutes): </label>
+      <input type="range" id="gapThreshold" min="30" max="120" step="15" value="120">
+      <span id="gapThresholdValue">120</span>
+    </div>
+  </div>
+
+  <!-- Staff Table -->
+  <table id="staffTable">
+    <thead>
+      <tr>
+        <th>Staff ID</th>
+        <th>Name</th>
+        <th>Break Time</th>
+        <th>HHMD Eligible</th>
+        <th>Attendance</th>
+        <th>Lock</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Action Buttons -->
+  <div class="button-container">
+    <div class="button-row">
+      <button class="roster-btn" id="addStaffBtn">Add Staff</button>
+      <button class="roster-btn" id="importDataBtn">Import Data</button>
+      <button class="roster-btn" id="exportDataBtn">Export Data</button>
+    </div>
+    <div class="button-row">
+      <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Breaks</button>
+      <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
+      <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
+    </div>
+    <div class="button-row">
+      <button class="roster-btn" id="downloadCSVBtn">CSV</button>
+      <button class="roster-btn" id="downloadPDFBtn">PDF</button>
+      <button class="roster-btn" id="toggleBreakNoteBtn">Toggle Break Note</button>
+    </div>
+  </div>
+
+  <!-- Hidden file input for importData() -->
+  <input type="file" id="importFile" accept=".json" />
+
+  <!-- Generated Roster Display -->
+  <h3>Generated Roster</h3>
+  <div id="rosterContainer"></div>
+
+  <!-- Roster Health Summary -->
+  <h4>Roster Health</h4>
+  <div id="notesContainer"></div>
+
+  <!-- Floating Break Time Note (draggable) -->
+  <div id="breakListContainer">
+    <strong>Staff Break Times</strong><br><br>
+  </div>
+
   <script>
     /************************************************************
      * Roster System WITHOUT XLSX. We removed all references to
@@ -120,7 +307,6 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
       },
 
-      // Updated getCurrentStaffList using the new time normalization logic
       getCurrentStaffList: function() {
         const rows = document.getElementById("staffTable").querySelector("tbody").rows;
         const staffList = [];
@@ -350,7 +536,7 @@
         return (adjustedHours - 20) * 60 + minutes;
       },
 
-      // Updated isOnBreak using normalized break time and handling overnight breaks
+      // Updated isOnBreak to normalize break time & handle overnight breaks
       isOnBreak: function(st, slot) {
         if (!st.breakTime) return false;
         
@@ -546,7 +732,6 @@
         this.displayNotes(shortfalls);
       },
 
-      // Updated validateRoster with enhanced consecutive assignment checking
       validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
@@ -601,7 +786,7 @@
           }
         }
 
-        // New: Check for consecutive assignments with less than 1-hour gap
+        // Check consecutive assignments with <1 hour gap
         for (const staffID in staffAssignments) {
           const assignments = staffAssignments[staffID].sort((a, b) =>
             this.timeToMinutes(a.slot) - this.timeToMinutes(b.slot)
@@ -619,6 +804,7 @@
             }
           }
         }
+
         return { issues, conflicts };
       },
 
@@ -717,7 +903,6 @@
         return data;
       },
 
-      // Only CSV and PDF remain
       downloadRoster: function(format) {
         const rosterData = this.getEditableRosterData();
         if (!rosterData.length) {
@@ -907,3 +1092,5 @@
       console.error("Failed to initialize roster system:", e);
     }
   </script>
+</body>
+</html>
