@@ -194,23 +194,22 @@
     /************************************************************
      * This implementation splits roster generation into two phases:
      *
-     * Phase 1: Critical hours – e.g. from 20:00 to 02:00. In this phase,
-     *   we strictly cover all critical areas using our core rules.
+     * Phase 1 (Critical Phase): Cover key hours (e.g., 20:00–02:00)
+     *   with strict rules to ensure that all critical areas are staffed.
      *
-     * Phase 2: Secondary hours – the remaining slots. A secondary strategy
-     *   is applied here.
+     * Phase 2 (Secondary Phase): Cover the remaining slots.
      *
-     * Both phases are merged into one unified roster display.
+     * Then merge both phases into a single roster display.
      *
-     * Additionally, the following strict slot rules apply:
-     * - Vertical Patrol: Only assign at 20:30 and 01:30.
+     * Special Slot Rules:
+     * - Vertical Patrol: Only assign at 20:30 and 01:30 (20:30 MUST be assigned).
      * - Tango Papa: Only assign at 07:30.
-     * - Lobby: Requires 2 staff assignments per slot (shown as "ID / ID").
+     * - Lobby: Requires two staff per slot (displayed as "ID / ID").
      *
-     * Core preliminary rules are enforced:
+     * Preliminary Rules (applied in both phases):
      * 1. For non-Lobby locations, no re-assignment in the same location within 2 hours.
-     * 2. A staff member cannot be assigned in multiple locations in the same hour.
-     * 3. No assignment during a staff member's break.
+     * 2. A staff member cannot be assigned in multiple locations during the same hour.
+     * 3. No assignment while the staff is on break.
      ************************************************************/
   
     const STORAGE_KEY = 'staffListData';
@@ -219,7 +218,6 @@
       "00:00", "01:00", "01:30", "02:00", "03:00",
       "04:00", "05:00", "06:00", "07:00", "07:30"
     ];
-    // For this example, priority order remains as before.
     const BREAK_TIME_POOL = [
       "20:00-21:30", "21:30-23:30", "22:00-00:00",
       "23:00-01:00", "00:00-02:00", "01:30-03:30",
@@ -227,11 +225,10 @@
       "05:00-07:00", "06:00-08:00"
     ];
   
-    // Define critical phase slots and secondary phase slots.
+    // Define phase slot arrays.
     const criticalPhaseSlots = ROSTER_TIMES.filter(t => {
-      // Critical: from 20:00 to 02:00 inclusive.
-      return t === "20:00" || t === "20:30" || t === "21:00" || t === "22:00" ||
-             t === "23:00" || t === "00:00" || t === "01:00" || t === "01:30" || t === "02:00";
+      // Critical phase: 20:00 to 02:00 (inclusive).
+      return ["20:00","20:30","21:00","22:00","23:00","00:00","01:00","01:30","02:00"].includes(t);
     });
     const secondaryPhaseSlots = ROSTER_TIMES.filter(t => !criticalPhaseSlots.includes(t));
   
@@ -248,9 +245,7 @@
           ];
           let missingElements = [];
           requiredElements.forEach(id => {
-            if (!document.getElementById(id)) {
-              missingElements.push(id);
-            }
+            if (!document.getElementById(id)) missingElements.push(id);
           });
           if (missingElements.length > 0) {
             console.error("Missing HTML elements:", missingElements);
@@ -265,15 +260,11 @@
           document.getElementById('rosterDate').value = today;
           const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
           document.getElementById('rosterDay').value = days[new Date().getDay()];
-          
+  
           const gapSlider = document.getElementById("gapThreshold");
           const gapDisplay = document.getElementById("gapThresholdValue");
-          gapSlider.addEventListener("input", function() {
-            gapDisplay.innerText = this.value;
-          });
-          gapSlider.addEventListener("change", () => {
-            rosterSystem.generateRoster();
-          });
+          gapSlider.addEventListener("input", function() { gapDisplay.innerText = this.value; });
+          gapSlider.addEventListener("change", () => { rosterSystem.generateRoster(); });
   
           document.getElementById('addStaffBtn').addEventListener('click', () => this.addStaff());
           document.getElementById('importDataBtn').addEventListener('click', () => this.importData());
@@ -284,9 +275,7 @@
           document.getElementById('downloadCSVBtn').addEventListener('click', () => this.downloadRoster('csv'));
           document.getElementById('downloadPDFBtn').addEventListener('click', () => this.downloadRoster('pdf'));
           document.getElementById('toggleBreakNoteBtn').addEventListener('click', this.toggleBreakNote);
-          document.getElementById('reviewConflictsBtn').addEventListener('click', () => {
-            rosterSystem.reviewSelectedConflicts();
-          });
+          document.getElementById('reviewConflictsBtn').addEventListener('click', () => { rosterSystem.reviewSelectedConflicts(); });
   
           this.makeDraggable(document.getElementById('breakListContainer'));
           this.loadStaffList();
@@ -302,9 +291,7 @@
         if (stored) {
           const staffList = JSON.parse(stored);
           tbody.innerHTML = "";
-          staffList.forEach(staff => {
-            tbody.innerHTML += this.getStaffRowHTML(staff);
-          });
+          staffList.forEach(staff => { tbody.innerHTML += this.getStaffRowHTML(staff); });
         } else {
           this.addStaff();
         }
@@ -411,9 +398,7 @@
         const removeButtons = tbody.querySelectorAll(".remove-btn");
         removeButtons.forEach(btn => {
           btn.removeEventListener("click", btn._clickHandler);
-          btn._clickHandler = function() {
-            self.removeRow(this);
-          };
+          btn._clickHandler = function() { self.removeRow(this); };
           btn.addEventListener("click", btn._clickHandler);
         });
       },
@@ -448,16 +433,15 @@
         this.updateStaffCount();
       },
   
-      // --- Helper functions for assignment rules ---
-      // Rule 1: For non-Lobby locations, a staff member cannot be assigned in the same location within 2 hours.
+      // --- Preliminary Rule Helpers ---
+  
+      // Rule 1: For non-Lobby locations, no assignment within 2 hours in the same location.
       canAssignStaffAtLocationAndTime: function(staff, loc, slot) {
         if (loc !== "Lobby") {
           for (let assign of staff.assigned) {
             if (assign.location === loc) {
               const diff = Math.abs(this.timeToMinutes(slot) - this.timeToMinutes(assign.slot));
-              if (diff < 120) {
-                return false;
-              }
+              if (diff < 120) return false;
             }
           }
         }
@@ -470,13 +454,13 @@
         return staff.assigned.some(a => a.slot.split(":")[0] === newHour);
       },
   
+      // Rule 3: No assignment while on break.
       isOnBreak: function(staff, slot) {
         if (!staff.breakTime) return false;
         const [bStart, bEnd] = staff.breakTime.split("-");
         return (slot >= bStart && slot < bEnd);
       },
   
-      // Convert time string to minutes from 20:00.
       timeToMinutes: function(timeStr) {
         if (!timeStr || typeof timeStr !== "string" || !timeStr.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
           console.warn(`Invalid time format: ${timeStr}`);
@@ -487,33 +471,70 @@
         return (adjustedHours - 20) * 60 + minutes;
       },
   
-      // --- Phase Generation Functions ---
+      // --- Phase Generation ---
   
       // Generate assignments for a given set of slots.
-      // This function is reused for both Phase 1 and Phase 2.
+      // This helper is used for both Phase 1 (critical) and Phase 2 (secondary).
       generateForSlots: function(slots, staffList, rosterTemplate) {
-        // Iterate over each priority location.
-        // For simplicity, we use the same priority array as before.
+        // Use a fixed priority order.
         let priorityLocations = ["HHMD", "Guard House", "Lobby", "Vertical Patrol", "Tango Papa", "Pass Counter"];
-        // Insert Report Room for weekdays.
         if (document.getElementById("rosterDay").value !== "Saturday" && document.getElementById("rosterDay").value !== "Sunday") {
           priorityLocations.splice(3, 0, "Report Room");
         }
-        // For each location, create assignments for the given slots.
         priorityLocations.forEach(loc => {
           if (!rosterTemplate[loc]) rosterTemplate[loc] = {};
           slots.forEach(slot => {
-            // Special slot restrictions:
-            if (loc === "Vertical Patrol" && slot !== "20:30" && slot !== "01:30") {
-              rosterTemplate[loc][slot] = "";
-              return;
+            // Enforce special slot rules:
+            if (loc === "Vertical Patrol") {
+              if (slot === "20:30" || slot === "01:30") {
+                // Assign candidate for Vertical Patrol.
+                let assigned = "";
+                for (let member of staffList) {
+                  if (!this.isOnBreak(member, slot) &&
+                      !this.isDoubleBooked(member, slot) &&
+                      this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
+                    assigned = member.staffID;
+                    member.assigned.push({slot, location: loc});
+                    break;
+                  }
+                }
+                // Force emergency assignment if still blank.
+                if (!assigned) {
+                  let emergency = this.findEmergencyStaff(staffList, slot);
+                  if (emergency) { assigned = emergency.staffID; emergency.assigned.push({slot, location: loc}); }
+                }
+                rosterTemplate[loc][slot] = assigned;
+                return;
+              } else {
+                rosterTemplate[loc][slot] = "";
+                return;
+              }
             }
-            if (loc === "Tango Papa" && slot !== "07:30") {
-              rosterTemplate[loc][slot] = "";
-              return;
+            if (loc === "Tango Papa") {
+              if (slot === "07:30") {
+                let assigned = "";
+                for (let member of staffList) {
+                  if (!this.isOnBreak(member, slot) &&
+                      !this.isDoubleBooked(member, slot) &&
+                      this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
+                    assigned = member.staffID;
+                    member.assigned.push({slot, location: loc});
+                    break;
+                  }
+                }
+                if (!assigned) {
+                  let emergency = this.findEmergencyStaff(staffList, slot);
+                  if (emergency) { assigned = emergency.staffID; emergency.assigned.push({slot, location: loc}); }
+                }
+                rosterTemplate[loc][slot] = assigned;
+                return;
+              } else {
+                rosterTemplate[loc][slot] = "";
+                return;
+              }
             }
             if (loc === "Lobby") {
-              // For Lobby, assign two distinct staff.
+              // For Lobby, assign TWO staff per slot.
               let candidate1 = "";
               let candidate2 = "";
               for (let member of staffList) {
@@ -521,7 +542,7 @@
                     !this.isDoubleBooked(member, slot) &&
                     this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
                   candidate1 = member.staffID;
-                  member.assigned.push({ slot, location: loc });
+                  member.assigned.push({slot, location: loc});
                   break;
                 }
               }
@@ -531,21 +552,22 @@
                     !this.isDoubleBooked(member, slot) &&
                     this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
                   candidate2 = member.staffID;
-                  member.assigned.push({ slot, location: loc });
+                  member.assigned.push({slot, location: loc});
                   break;
                 }
               }
-              rosterTemplate[loc][slot] = candidate1 && candidate2 ? candidate1 + " / " + candidate2 : candidate1;
+              let assigned = candidate1 && candidate2 ? candidate1 + " / " + candidate2 : candidate1;
+              rosterTemplate[loc][slot] = assigned;
               return;
             }
-            // For other locations, normal assignment.
+            // For all other locations, assign normally.
             let assigned = "";
             for (let member of staffList) {
               if (!this.isOnBreak(member, slot) &&
                   !this.isDoubleBooked(member, slot) &&
                   this.canAssignStaffAtLocationAndTime(member, loc, slot)) {
                 assigned = member.staffID;
-                member.assigned.push({ slot, location: loc });
+                member.assigned.push({slot, location: loc});
                 break;
               }
             }
@@ -554,7 +576,7 @@
         });
       },
   
-      // Generate the roster in two phases and merge them.
+      // Generate roster in two phases (critical then secondary) and merge.
       generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
@@ -566,19 +588,18 @@
         staffList.forEach(st => { st.assigned = []; });
   
         let newRoster = {};
-        // Phase 1: Critical hours (20:00 to 02:00).
+        // Phase 1: Critical hours.
         this.generateForSlots(criticalPhaseSlots, staffList, newRoster);
-  
         // Phase 2: Secondary hours.
         this.generateForSlots(secondaryPhaseSlots, staffList, newRoster);
   
-        // Massive shortfall rule: If working staff count < 6, force an HHMD-eligible staff to cover Lobby at 20:00.
+        // Massive shortfall rule for Lobby: If working staff count < 6, force an HHMD-eligible staff to cover 20:00.
         if (staffList.length < 6) {
           if (newRoster["Lobby"] && newRoster["Lobby"]["20:00"] === "") {
             let hhmdStaff = staffList.find(s => s.hhmdEligible === "Yes");
             if (hhmdStaff) {
               newRoster["Lobby"]["20:00"] = hhmdStaff.staffID + " / " + hhmdStaff.staffID;
-              hhmdStaff.assigned.push({ slot: "20:00", location: "Lobby" });
+              hhmdStaff.assigned.push({slot: "20:00", location: "Lobby"});
               console.log("Massive shortfall: HHMD covers Lobby at 20:00");
             }
           }
@@ -597,12 +618,9 @@
           Roster Date: ${rosterDate} | Generated on: ${creationTime.toLocaleString()}
         </div>`;
         let tableHTML = `<table id="editableRoster"><thead><tr><th>Location</th>`;
-        ROSTER_TIMES.forEach(slot => {
-          tableHTML += `<th>${slot}</th>`;
-        });
+        ROSTER_TIMES.forEach(slot => { tableHTML += `<th>${slot}</th>`; });
         tableHTML += `</tr></thead><tbody>`;
-        let displayOrder = Object.keys(roster);
-        displayOrder.forEach(loc => {
+        Object.keys(roster).forEach(loc => {
           tableHTML += `<tr data-loc="${loc}"><td>${loc}</td>`;
           ROSTER_TIMES.forEach(slot => {
             tableHTML += `
@@ -614,14 +632,12 @@
         });
         tableHTML += `</tbody></table>`;
         container.innerHTML = headerHTML + tableHTML;
-        
+  
         container.insertAdjacentHTML("beforeend", `<button class="roster-btn" id="saveEditsBtn">Save Edits</button>`);
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
-        
+  
         document.querySelectorAll("#editableRoster td[contenteditable]").forEach(cell => {
-          cell.addEventListener("click", function() {
-            this.classList.toggle("selected");
-          });
+          cell.addEventListener("click", function() { this.classList.toggle("selected"); });
         });
       },
   
@@ -629,9 +645,7 @@
         const container = document.getElementById("breakListContainer");
         const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
         let html = "<strong>Staff Break Times</strong><br><br>";
-        staffList.forEach(st => {
-          html += `${st.staffID || "??"} (${st.name || "??"}): ${st.breakTime}<br>`;
-        });
+        staffList.forEach(st => { html += `${st.staffID || "??"} (${st.name || "??"}): ${st.breakTime}<br>`; });
         container.innerHTML = html;
       },
   
@@ -650,9 +664,7 @@
       },
   
       downloadAsCSV: function(rosterData, breakData) {
-        const convertToCSV = (arr) => {
-          return arr.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
-        };
+        const convertToCSV = (arr) => { return arr.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n"); };
         const rosterCSV = convertToCSV(rosterData);
         const breakCSV = convertToCSV(breakData);
         const finalCSV = rosterCSV + "\n\nStaff Break Times:\n" + breakCSV;
@@ -668,9 +680,7 @@
   
       downloadAsPDF: function(rosterData, breakData) {
         const formattedBreakData = breakData.map(row => {
-          if (row[2]) {
-            row[2] = row[2].replace(/(\d{2}:\d{2})-(\d{2}:\d{2})/, "$1 to $2");
-          }
+          if (row[2]) { row[2] = row[2].replace(/(\d{2}:\d{2})-(\d{2}:\d{2})/, "$1 to $2"); }
           return row;
         });
         const { jsPDF } = window.jspdf;
@@ -702,11 +712,7 @@
           margin: { left: 40 },
           theme: 'striped',
           styles: { fontSize: 8, cellPadding: 4 },
-          columnStyles: {
-            0: { cellWidth: 80 },
-            1: { cellWidth: 100 },
-            2: { cellWidth: 80 }
-          },
+          columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 100 }, 2: { cellWidth: 80 } },
           headStyles: { fillColor: [52, 152, 219] }
         });
         doc.save("Roster_with_Breaks.pdf");
@@ -763,9 +769,7 @@
         rows.forEach((row) => {
           const cells = row.querySelectorAll("th, td");
           let rowData = [];
-          cells.forEach(cell => {
-            rowData.push(cell.textContent.trim());
-          });
+          cells.forEach(cell => { rowData.push(cell.textContent.trim()); });
           tsv += rowData.join("\t") + "\n";
         });
         navigator.clipboard.writeText(tsv).then(() => {
@@ -816,19 +820,19 @@
           alert("No cells selected. Please click on the cells with conflicts to review.");
           return;
         }
-        
+  
         const roster = window.generatedRosterData;
         const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        
+  
         selectedCells.forEach(cell => {
           const slot = cell.getAttribute("data-slot");
           const loc = cell.parentElement.getAttribute("data-loc");
           let cellAssignments = cell.textContent.split(",").map(s => s.trim()).filter(Boolean);
-          
+  
           cellAssignments.forEach(staffID => {
             const staff = staffList.find(s => s.staffID === staffID);
             if (!staff) return;
-            
+  
             let conflictFound = false;
             if (this.isOnBreak(staff, slot)) {
               conflictFound = true;
@@ -841,15 +845,12 @@
                 for (let assign of staff.assigned) {
                   if (assign.location === loc) {
                     const diff = Math.abs(this.timeToMinutes(slot) - this.timeToMinutes(assign.slot));
-                    if (diff < 120) {
-                      conflictFound = true;
-                      break;
-                    }
+                    if (diff < 120) { conflictFound = true; break; }
                   }
                 }
               }
             }
-            
+  
             if (conflictFound) {
               console.log(`Conflict for staff ${staffID} at ${loc} during ${slot}`);
               this.removeAssignment(roster, staff, slot, loc);
@@ -865,7 +866,7 @@
               }
             }
           });
-          
+  
           if (cellAssignments.length === 1) {
             const extraStaff = this.findAvailableStaff(staffList, slot, loc);
             if (extraStaff && !this.isDoubleBooked(extraStaff, slot) && !this.isOnBreak(extraStaff, slot)) {
@@ -874,12 +875,12 @@
               console.log(`Added extra staff ${extraStaff.staffID} at ${loc} during ${slot}`);
             }
           }
-          
+  
           roster[loc][slot] = cellAssignments.join(", ");
           cell.textContent = roster[loc][slot];
           cell.classList.remove("selected");
         });
-        
+  
         this.displayRoster(roster, {}, new Date());
         alert("Selected conflicts reviewed and updated where possible.");
       },
@@ -893,9 +894,7 @@
           const currTime = this.timeToMinutes(assignments[i].slot);
           const nextTime = this.timeToMinutes(assignments[i + 1].slot);
           if (assignments[i].location === loc || assignments[i + 1].location === loc) {
-            if (Math.abs(nextTime - currTime) < gapThreshold) {
-              return true;
-            }
+            if (Math.abs(nextTime - currTime) < gapThreshold) return true;
           }
         }
         return false;
@@ -907,7 +906,7 @@
             return st;
           }
         }
-        return null; 
+        return null;
       },
   
       findAvailableStaff: function(staffList, slot, loc) {
@@ -921,7 +920,7 @@
     };
   
     window.RosterApp = rosterSystem;
-    console.log("Starting script execution (Phased Roster Generation)...");
+    console.log("Starting script execution (Phased Roster Generation with Strict Slot Rules)...");
     try {
       rosterSystem.init();
       console.log("Roster system initialized successfully.");
