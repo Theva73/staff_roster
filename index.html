@@ -223,7 +223,17 @@
       "02:00-04:00", "03:00-05:00", "04:00-06:00",
       "05:00-07:00", "06:00-08:00"
     ];
+// For a two-phase approach, define which slots are “critical” vs. “secondary”.
+const criticalPhaseSlots = [
+  "20:00", "20:30", "21:00", "22:00", "23:00",
+  "00:00", "01:00", "01:30", "02:00"
+];
+
+const secondaryPhaseSlots = [
+  "03:00", "04:00", "05:00", "06:00", "07:00", "07:30"
+];
   
+      
     // (Optional) Priority and critical rules remain as before.
     // For this revision, we retain the assignment rules regarding special slots.
   
