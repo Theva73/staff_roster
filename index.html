@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Transposed Roster (Lobby Split + Buffer Staff + Multiple IDs + Table Slider)</title>
+  <title>Transposed Roster (Single Lobby w/ 2 Staff + Buffer + Slider)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -120,7 +120,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <h1>Transposed Roster (Lobby Split + Buffer Staff + Multiple IDs + Table Slider)</h1>
+  <h1>Transposed Roster (Single Lobby w/ 2 Staff + Buffer + Slider)</h1>
 
   <!-- Staff Dashboard Table -->
   <table id="staffTable">
@@ -312,22 +312,22 @@
     /***********************************************************************
      * D. Roster Generation (Rule-Based, Transposed)
      *
-     * We define separate positions for "Lobby 1" and "Lobby 2" so each staff
-     * gets its own cell. We also have a "Pass Counter (Buffer)" that's hidden.
-     * If your logic assigns multiple staff to a single position/slot, 
-     * they will appear joined by " | ".
+     * Single "Lobby" with required=2 => both staff appear in the same cell,
+     * joined by " | ". Also a hidden "Pass Counter (Buffer)" for your
+     * "invisible" staff. Time slots have half-hour increments.
      ***********************************************************************/
-    // Example time slots from 20:00 to 00:00
+    // Example time slots from 20:00 to 00:00 (expand to 07:00 if needed)
     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
 
-    // Each position requires 1 staff. "Lobby 1" & "Lobby 2" avoid slash, "Pass Counter (Buffer)" is hidden.
+    // Positions
+    // "Lobby" requires 2 staff => same cell, multiple IDs
+    // "Pass Counter (Buffer)" is hidden in final table
     const positions = {
       "Pass Counter":           { required: 1, visible: true },
       "Pass Counter (Buffer)":  { required: 1, visible: false },
       "Guard House":            { required: 1, visible: true },
       "HHMD":                   { required: 1, visible: true },
-      "Lobby 1":                { required: 1, visible: true },
-      "Lobby 2":                { required: 1, visible: true }
+      "Lobby":                  { required: 2, visible: true }
     };
 
     function generateRoster() {
@@ -420,9 +420,9 @@
     /***********************************************************************
      * E. Display Transposed Roster
      * 
-     *  - Skips positions with visible=false
-     *  - Joins multiple staff IDs with " | "
-     *  - Wraps the table in #rosterTableWrapper for horizontal scrolling
+     *  - Skips positions with visible=false (the buffer).
+     *  - Joins multiple staff IDs with " | ".
+     *  - Wraps the table in #rosterTableWrapper for horizontal scrolling.
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
