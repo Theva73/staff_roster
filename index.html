@@ -2,169 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Staff Roster</title>
+  <title>Staff Details Dashboard</title>
   <style>
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #999; padding: 0.5rem; text-align: center; }
-    th { background-color: #eee; }
-    .note { font-size: 0.9em; color: #555; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .filter { margin-bottom: 15px; }
   </style>
 </head>
 <body>
-  <h1>Staff Roster (20:00–07:00)</h1>
-  <p class="note">
-    Note: Times are shown as column headers. Report Room assignments appear only at 20:00 and 21:00 (assumed weekday); Tango Papa only at 07:00.
-    Vertical Patrol is assigned at 20:30, 01:30, 04:00 and 06:30. Lobby assignments are displayed in “ID1/ID2” format.
-  </p>
+  <h1>Staff Details Dashboard</h1>
+  
+  <div class="filter">
+    <label for="attendance">Attendance:</label>
+    <select id="attendance">
+      <option value="all">All</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+    
+    <label for="hhmd">HHMD Eligible:</label>
+    <select id="hhmd">
+      <option value="all">All</option>
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+  </div>
+  
   <table>
     <thead>
       <tr>
-        <th>Location</th>
-        <th>20:00</th>
-        <th>20:30</th>
-        <th>21:00</th>
-        <th>22:00</th>
-        <th>23:00</th>
-        <th>00:00</th>
-        <th>01:00</th>
-        <th>01:30</th>
-        <th>02:00</th>
-        <th>03:00</th>
-        <th>04:00</th>
-        <th>05:00</th>
-        <th>06:00</th>
-        <th>06:30</th>
-        <th>07:00</th>
+        <th>Name</th>
+        <th>Staff ID</th>
+        <th>HHMD Eligible</th>
+        <th>Break Time</th>
+        <th>Attendance</th>
       </tr>
     </thead>
     <tbody>
+      <!-- Example staff data -->
       <tr>
-        <td>Pass Counter</td>
+        <td>John Doe</td>
         <td>4511</td>
-        <td>–</td>
-        <td>7481</td>
-        <td>7114</td>
+        <td>Yes</td>
+        <td>21:30-23:30</td>
+        <td>Yes</td>
+      </tr>
+      <tr>
+        <td>Jane Smith</td>
         <td>6288</td>
-        <td>7481</td>
-        <td>6399</td>
-        <td>–</td>
-        <td>6288</td>
-        <td>7416</td>
+        <td>No</td>
+        <td>22:00-00:00</td>
+        <td>Yes</td>
+      </tr>
+      <tr>
+        <td>Bob Johnson</td>
         <td>6347</td>
-        <td>4511</td>
-        <td>7114</td>
-        <td>–</td>
-        <td>–</td>
+        <td>Yes</td>
+        <td>00:00-02:00</td>
+        <td>Yes</td>
       </tr>
-      <tr>
-        <td>Guard House</td>
-        <td>6288</td>
-        <td>–</td>
-        <td>4511</td>
-        <td>7416</td>
-        <td>6347</td>
-        <td>4511</td>
-        <td>7114</td>
-        <td>–</td>
-        <td>6347</td>
-        <td>7481</td>
-        <td>6399</td>
-        <td>6288</td>
-        <td>7416</td>
-        <td>–</td>
-        <td>–</td>
-      </tr>
-      <tr>
-        <td>HHMD</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-      </tr>
-      <tr>
-        <td>Report Room</td>
-        <td>6347</td>
-        <td>–</td>
-        <td>6288</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-      </tr>
-      <tr>
-        <td>Lobby (ID1/ID2)</td>
-        <td>6399/7114</td>
-        <td>–</td>
-        <td>6347/6399</td>
-        <td>7481/4511</td>
-        <td>6399/7114</td>
-        <td>6288/6347</td>
-        <td>7416/7481</td>
-        <td>–</td>
-        <td>6399/7114</td>
-        <td>4511/6288</td>
-        <td>7114/7416</td>
-        <td>6347/6399</td>
-        <td>7481/4511</td>
-        <td>–</td>
-        <td>–</td>
-      </tr>
-      <tr>
-        <td>Vertical Patrol</td>
-        <td>–</td>
-        <td>7416</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>4511</td>
-        <td>–</td>
-        <td>–</td>
-        <td>7481</td>
-        <td>–</td>
-        <td>–</td>
-        <td>6288</td>
-        <td>–</td>
-      </tr>
-      <tr>
-        <td>Tango Papa</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>–</td>
-        <td>6347</td>
-      </tr>
+      <!-- More rows as needed -->
     </tbody>
   </table>
+  
+  <!-- Optionally, add a button to generate the roster -->
+  <button onclick="generateRoster()">Generate Roster</button>
+  
+  <script>
+    function generateRoster() {
+      // Your scheduling algorithm would process the table data to create the roster.
+      alert('Roster generation initiated based on current staff data!');
+    }
+  </script>
 </body>
 </html>
