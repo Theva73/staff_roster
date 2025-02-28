@@ -153,7 +153,6 @@
   </style>
 </head>
 <body>
-  <!-- HTML structure remains unchanged -->
   <h1>Staff Dashboard (Time Pickers + Shuffle Break Times)</h1>
 
   <table id="staffTable">
@@ -181,9 +180,176 @@
     <button onclick="shuffleBreakTimes()">Shuffle Break Times</button>
   </div>
 
-  <!-- JavaScript remains unchanged -->
   <script>
-    // ... (original JavaScript code unchanged)
+    /***********************************************************************
+     * 1. Local Storage & Initialization
+     ***********************************************************************/
+    // We'll store staff data in localStorage under 'staffData'.
+    // On page load, populate the table if data is present.
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromLocalStorage();
+    });
+
+    function loadFromLocalStorage() {
+      const savedData = localStorage.getItem('staffData');
+      if (savedData) {
+        const staffArray = JSON.parse(savedData);
+        staffArray.forEach(staff => addStaff(staff));
+      }
+    }
+
+    function saveToLocalStorage() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      const data = [];
+      rows.forEach(row => {
+        const staffId = row.querySelector('td:nth-child(1) input[type="text"]').value;
+        const name = row.querySelector('td:nth-child(2) input[type="text"]').value;
+        const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
+        const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
+        const hhmd = row.querySelector('td:nth-child(4) select').value;
+        const attendance = row.querySelector('td:nth-child(5) select').value;
+        const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+
+        data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
+      });
+      localStorage.setItem('staffData', JSON.stringify(data));
+    }
+
+    /***********************************************************************
+     * 2. Table Row Management
+     ***********************************************************************/
+    function addStaff(staff = {}) {
+      const tbody = document.querySelector('#staffTable tbody');
+      const row = document.createElement('tr');
+      
+      // Destructure or set default values
+      const {
+        staffId    = "",
+        name       = "",
+        breakStart = "00:00",
+        breakEnd   = "02:00",
+        hhmd       = "No",
+        attendance = "Yes",
+        locked     = false
+      } = staff;
+
+      row.innerHTML = `
+        <td>
+          <input type="text" value="${staffId}" oninput="saveToLocalStorage()" />
+        </td>
+        <td>
+          <input type="text" value="${name}" oninput="saveToLocalStorage()" />
+        </td>
+        <td>
+          <input type="time" value="${breakStart}" step="1800" oninput="saveToLocalStorage()" />
+          -
+          <input type="time" value="${breakEnd}" step="1800" oninput="saveToLocalStorage()" />
+        </td>
+        <td>
+          <select onchange="saveToLocalStorage()">
+            <option value="No"  ${hhmd === "No"  ? "selected" : ""}>No</option>
+            <option value="Yes" ${hhmd === "Yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </td>
+        <td>
+          <select onchange="saveToLocalStorage()">
+            <option value="No"  ${attendance === "No"  ? "selected" : ""}>No</option>
+            <option value="Yes" ${attendance === "Yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </td>
+        <td>
+          <input type="checkbox" class="checkbox-lock" ${locked ? "checked" : ""} onchange="saveToLocalStorage()" />
+        </td>
+        <td>
+          <button class="btn-remove" onclick="removeRow(this)">Remove</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+      saveToLocalStorage();
+    }
+
+    function removeRow(button) {
+      const row = button.closest('tr');
+      row.parentNode.removeChild(row);
+      saveToLocalStorage();
+    }
+
+    /***********************************************************************
+     * 3. Shuffle Break Times
+     ***********************************************************************/
+    // We'll define some sample break time pairs to shuffle from.
+    // For example, each pair is [start, end].
+    const PREDEFINED_BREAKS = [
+      ["04:00","06:00"],
+      ["22:00","00:00"],
+      ["06:00","08:00"],
+      ["02:00","04:00"],
+      ["05:00","07:00"],
+      ["00:00","02:00"],
+      ["01:00","03:00"],
+      ["03:00","05:00"]
+    ];
+
+    function shuffleBreakTimes() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      rows.forEach(row => {
+        const lockCheckbox = row.querySelector('td:nth-child(6) input[type="checkbox"]');
+        if (!lockCheckbox.checked) {
+          // If not locked, shuffle
+          const breakStartInput = row.querySelector('td:nth-child(3) input[type="time"]:first-child');
+          const breakEndInput   = row.querySelector('td:nth-child(3) input[type="time"]:last-child');
+          const [start, end] = PREDEFINED_BREAKS[Math.floor(Math.random() * PREDEFINED_BREAKS.length)];
+          breakStartInput.value = start;
+          breakEndInput.value   = end;
+        }
+      });
+      saveToLocalStorage();
+    }
+
+    /***********************************************************************
+     * 4. Import / Export JSON
+     ***********************************************************************/
+    function importStaffData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          // Clear current table
+          document.querySelector('#staffTable tbody').innerHTML = "";
+          // Populate with imported data
+          importedData.forEach(staff => addStaff(staff));
+        } catch (err) {
+          alert("Invalid JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportStaffData() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      const data = [];
+      rows.forEach(row => {
+        const staffId    = row.querySelector('td:nth-child(1) input[type="text"]').value;
+        const name       = row.querySelector('td:nth-child(2) input[type="text"]').value;
+        const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
+        const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
+        const hhmd       = row.querySelector('td:nth-child(4) select').value;
+        const attendance = row.querySelector('td:nth-child(5) select').value;
+        const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+        data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
+      });
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "staffData.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   </script>
 </body>
 </html>
