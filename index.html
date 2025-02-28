@@ -1,16 +1,236 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Solver Test</title>
+  <title>Mobile Roster Management System</title>
+  <!-- Load javascript-lp-solver from a CDN -->
   <script src="https://unpkg.com/javascript-lp-solver@0.4.24/dist/solver.js"></script>
+  <!-- Load jsPDF (for PDF export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { margin-bottom: 10px; }
+    #rosterTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    #rosterTable th, #rosterTable td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    #rosterTable th { background-color: #f0f0f0; }
+    .btn {
+      display: inline-block;
+      background-color: #888;
+      color: #fff;
+      padding: 10px 15px;
+      margin: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 140px;
+      text-align: center;
+    }
+    .btn:hover { background-color: #666; }
+    #exportButtons { margin-top: 20px; text-align: center; }
+  </style>
 </head>
 <body>
+  <h1>Mobile Roster Management System</h1>
+  <div id="output">
+    <!-- The roster will be displayed here -->
+  </div>
+  <div id="exportButtons">
+    <button class="btn" onclick="exportPDF()">Export as PDF</button>
+    <button class="btn" onclick="exportTSV()">Export as TSV</button>
+  </div>
+
   <script>
-    if (typeof solver !== "undefined") {
-      document.write("<p>Solver loaded successfully!</p>");
-    } else {
-      document.write("<p>Solver is NOT defined.</p>");
+    /***********************************************************************
+     * STEP 1: Define Data
+     ***********************************************************************/
+    // Sample staff data.
+    // Each staff member: unique ID, name, attendance ("Yes" means available),
+    // HHMD eligibility ("Yes" or "No"), and breakSlots: time slots during which they are not available.
+    const staff = {
+      '4511': { name: "Alice",   attendance: "Yes", hhmd: "Yes", breakSlots: ["21:00", "22:00"] },
+      '6288': { name: "Bob",     attendance: "Yes", hhmd: "No",  breakSlots: ["23:00"] },
+      '6347': { name: "Charlie", attendance: "Yes", hhmd: "Yes", breakSlots: [] }
+      // Add more staff as needed.
+    };
+
+    // Define time slots. (For demonstration, a short list is used.)
+    // In your full roster, include all hours (20:00 to 07:00) and additional half-hour slots.
+    const timeSlots = ["20:00", "20:30", "21:00", "22:00", "23:00", "00:00", "01:00"];
+
+    // Define positions and required staff per slot.
+    // For each position, list the slots when it's active.
+    const positions = {
+      "Pass Counter":    { required: 1, activeSlots: timeSlots },
+      "Guard House":     { required: 1, activeSlots: timeSlots },
+      "HHMD":            { required: 1, activeSlots: timeSlots },
+      "Report Room":     { required: 1, activeSlots: ["20:00", "21:00"] },
+      "Lobby":           { required: 2, activeSlots: timeSlots },
+      "Vertical Patrol": { required: 1, activeSlots: ["20:30", "01:30", "04:00", "06:30"] },
+      "Tango Papa":      { required: 1, activeSlots: ["07:00"] }
+    };
+
+    /***********************************************************************
+     * STEP 2: Build ILP Model Using javascript-lp-solver
+     ***********************************************************************/
+    let model = {
+      "optimize": "dummy",  // Dummy objective; we only need feasibility.
+      "opType": "min",
+      "constraints": {},
+      "variables": {},
+      "ints": {}
+    };
+
+    // 2a. Create coverage constraints.
+    // For every active slot for each position, the sum of assignments must equal the required number.
+    timeSlots.forEach(slot => {
+      Object.keys(positions).forEach(pos => {
+        if (positions[pos].activeSlots.includes(slot)) {
+          let conName = `C_${slot}_${pos.replace(/ /g, "_")}`;
+          model.constraints[conName] = { "equal": positions[pos].required };
+        }
+      });
+    });
+
+    // 2b. Create no-double-booking constraints.
+    // For each staff and time slot, they can be assigned to at most one position.
+    Object.keys(staff).forEach(sid => {
+      timeSlots.forEach(slot => {
+        let conName = `Double_${sid}_${slot.replace(/:/g, "")}`;
+        model.constraints[conName] = { "max": 1 };
+      });
+    });
+
+    // 2c. Create decision variables for valid assignments.
+    // For each staff, time slot, and position (if active and if eligible), create a variable.
+    Object.keys(staff).forEach(sid => {
+      const sData = staff[sid];
+      if (sData.attendance !== "Yes") return; // Skip unavailable staff.
+      timeSlots.forEach(slot => {
+        Object.keys(positions).forEach(pos => {
+          // Only create variable if the position is active at this slot.
+          if (!positions[pos].activeSlots.includes(slot)) return;
+          // For HHMD, only eligible staff.
+          if (pos === "HHMD" && sData.hhmd !== "Yes") return;
+          // Skip slot if staff is on break.
+          if (sData.breakSlots.includes(slot)) return;
+
+          // Variable name: x_{staff}_{slot}_{position} (remove colons/spaces)
+          let varName = `x_${sid}_${slot.replace(":", "")}_${pos.replace(/ /g, "_")}`;
+          model.variables[varName] = { "dummy": 1 };
+
+          // Add coverage constraint coefficient.
+          let covCon = `C_${slot}_${pos.replace(/ /g, "_")}`;
+          model.variables[varName][covCon] = 1;
+
+          // Add no-double-booking coefficient.
+          let dblCon = `Double_${sid}_${slot.replace(/:/g, "")}`;
+          model.variables[varName][dblCon] = 1;
+
+          // Mark variable as integer (0 or 1).
+          model.ints[varName] = 1;
+        });
+      });
+    });
+
+    /***********************************************************************
+     * STEP 3: Solve the ILP Model
+     ***********************************************************************/
+    const results = solver.Solve(model);
+    console.log("Solver Results:", results);
+
+    /***********************************************************************
+     * STEP 4: Process the Results and Build the Roster Object
+     ***********************************************************************/
+    // Roster will be structured as: roster[slot][position] = array of staff IDs.
+    let roster = {};
+    timeSlots.forEach(slot => {
+      roster[slot] = {};
+      Object.keys(positions).forEach(pos => {
+        if (positions[pos].activeSlots.includes(slot)) {
+          roster[slot][pos] = [];
+        }
+      });
+    });
+
+    // For each variable that is assigned (value == 1), add the staff to the appropriate slot/position.
+    for (let varName in results) {
+      if (varName.startsWith("x_") && results[varName] === 1) {
+        // Expected format: x_{staff}_{slot}_{position}
+        let parts = varName.split("_");
+        let sid = parts[1];
+        let slotKey = parts[2].slice(0, 2) + ":" + parts[2].slice(2); // Reinsert colon.
+        let pos = parts.slice(3).join(" ").replace(/ +/g, " ");
+        if (roster[slotKey] && roster[slotKey][pos]) {
+          roster[slotKey][pos].push(sid);
+        }
+      }
+    }
+
+    /***********************************************************************
+     * STEP 5: Display the Roster in an HTML Table
+     ***********************************************************************/
+    function displayRoster(roster) {
+      let html = "<h2>Generated Roster</h2>";
+      html += "<table id='rosterTable'><thead><tr><th>Time Slot</th>";
+      // Get all positions that appear (based on our positions object)
+      Object.keys(positions).forEach(pos => {
+        html += `<th>${pos}</th>`;
+      });
+      html += "</tr></thead><tbody>";
+      // For each time slot, list assigned staff per position.
+      Object.keys(roster).forEach(slot => {
+        html += `<tr><td>${slot}</td>`;
+        Object.keys(positions).forEach(pos => {
+          if (roster[slot][pos] !== undefined) {
+            // Join staff IDs with a slash
+            let cell = roster[slot][pos].join(" / ");
+            html += `<td>${cell}</td>`;
+          } else {
+            html += `<td>-</td>`;
+          }
+        });
+        html += "</tr>";
+      });
+      html += "</tbody></table>";
+      document.getElementById("output").innerHTML = html;
+    }
+    displayRoster(roster);
+
+    /***********************************************************************
+     * STEP 6: Export Functions (PDF and TSV)
+     ***********************************************************************/
+    // Export as PDF using jsPDF and its html method.
+    function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      // Use the HTML content of the roster (the output div)
+      doc.html(document.getElementById('output'), {
+        callback: function (doc) {
+          doc.save('roster.pdf');
+        },
+        x: 10,
+        y: 10
+      });
+    }
+
+    // Export as TSV
+    function exportTSV() {
+      let tsv = "Time Slot\tPosition\tStaff IDs\n";
+      Object.keys(roster).forEach(slot => {
+        Object.keys(roster[slot]).forEach(pos => {
+          const staffIDs = roster[slot][pos].join(" / ");
+          tsv += `${slot}\t${pos}\t${staffIDs}\n`;
+        });
+      });
+      const blob = new Blob([tsv], { type: "text/tab-separated-values" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "roster.tsv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   </script>
 </body>
