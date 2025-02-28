@@ -109,7 +109,7 @@
     }
   </style>
 
-  <!-- For PDF export (remove if you don't need PDF) -->
+  <!-- For PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
@@ -151,32 +151,46 @@
      * A. Staff Dashboard
      ***********************************************************************/
     // On page load, retrieve staff data from localStorage.
-    window.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
       loadFromLocalStorage();
+      // Add at least one row if none exists
+      if (document.querySelectorAll('#staffTable tbody tr').length === 0) {
+        addStaff();
+      }
     });
 
     function loadFromLocalStorage() {
-      const savedData = localStorage.getItem('staffData');
-      if (savedData) {
-        const staffArray = JSON.parse(savedData);
-        staffArray.forEach(staff => addStaff(staff));
+      try {
+        const savedData = localStorage.getItem('staffData');
+        if (savedData) {
+          const staffArray = JSON.parse(savedData);
+          staffArray.forEach(staff => addStaff(staff));
+        }
+      } catch (e) {
+        console.error("Error loading from localStorage:", e);
+        // Reset storage if corrupted
+        localStorage.removeItem('staffData');
       }
     }
 
     function saveToLocalStorage() {
-      const rows = document.querySelectorAll('#staffTable tbody tr');
-      const data = [];
-      rows.forEach(row => {
-        const staffId = row.querySelector('td:nth-child(1) input[type="text"]').value;
-        const name = row.querySelector('td:nth-child(2) input[type="text"]').value;
-        const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
-        const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
-        const hhmd = row.querySelector('td:nth-child(4) select').value;
-        const attendance = row.querySelector('td:nth-child(5) select').value;
-        const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
-        data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
-      });
-      localStorage.setItem('staffData', JSON.stringify(data));
+      try {
+        const rows = document.querySelectorAll('#staffTable tbody tr');
+        const data = [];
+        rows.forEach(row => {
+          const staffId = row.querySelector('td:nth-child(1) input[type="text"]').value;
+          const name = row.querySelector('td:nth-child(2) input[type="text"]').value;
+          const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
+          const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
+          const hhmd = row.querySelector('td:nth-child(4) select').value;
+          const attendance = row.querySelector('td:nth-child(5) select').value;
+          const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+          data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
+        });
+        localStorage.setItem('staffData', JSON.stringify(data));
+      } catch (e) {
+        console.error("Error saving to localStorage:", e);
+      }
     }
 
     function addStaff(staff = {}) {
@@ -266,57 +280,66 @@
     function importStaffData(event) {
       const file = event.target.files[0];
       if (!file) return;
+      
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const importedData = JSON.parse(e.target.result);
+          // Clear existing rows
           document.querySelector('#staffTable tbody').innerHTML = "";
+          // Add imported staff
           importedData.forEach(staff => addStaff(staff));
+          // Reset file input to allow reimporting the same file
+          document.getElementById('importFile').value = "";
         } catch (err) {
-          alert("Invalid JSON file.");
+          console.error("Import error:", err);
+          alert("Invalid JSON file. Please check file format.");
         }
+      };
+      reader.onerror = (e) => {
+        console.error("File reading error:", e);
+        alert("Error reading file. Please try again.");
       };
       reader.readAsText(file);
     }
 
     function exportStaffData() {
-      const rows = document.querySelectorAll('#staffTable tbody tr');
-      const data = [];
-      rows.forEach(row => {
-        const staffId    = row.querySelector('td:nth-child(1) input[type="text"]').value;
-        const name       = row.querySelector('td:nth-child(2) input[type="text"]').value;
-        const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
-        const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
-        const hhmd       = row.querySelector('td:nth-child(4) select').value;
-        const attendance = row.querySelector('td:nth-child(5) select').value;
-        const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
-        data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
-      });
-      const jsonString = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonString], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "staffData.json";
-      link.click();
-      URL.revokeObjectURL(url);
+      try {
+        const rows = document.querySelectorAll('#staffTable tbody tr');
+        const data = [];
+        rows.forEach(row => {
+          const staffId    = row.querySelector('td:nth-child(1) input[type="text"]').value;
+          const name       = row.querySelector('td:nth-child(2) input[type="text"]').value;
+          const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
+          const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
+          const hhmd       = row.querySelector('td:nth-child(4) select').value;
+          const attendance = row.querySelector('td:nth-child(5) select').value;
+          const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+          data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
+        });
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "staffData.json";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error("Export error:", e);
+        alert("Error exporting data. Please try again.");
+      }
     }
 
     /***********************************************************************
      * D. Roster Generation (Rule-Based, Transposed)
-     *
-     * We define separate positions for "Lobby 1" and "Lobby 2" so each staff
-     * appears in its own cell (no "/").
-     *
-     * We also define "Pass Counter (Buffer)" with required=1 but we skip
-     * displaying it in the final transposed table. It's assigned behind the scenes.
      ***********************************************************************/
     // Example time slots from 20:00 to 00:00
     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
 
     // Positions, each requiring 1 staff
-    // We have "Lobby 1" and "Lobby 2" instead of a single Lobby with 2 staff.
-    // "Pass Counter (Buffer)" is assigned but hidden in the final display.
     const positions = {
       "Pass Counter":       { required: 1, visible: true },
       "Pass Counter (Buffer)": { required: 1, visible: false },
@@ -328,6 +351,12 @@
 
     function generateRoster() {
       const staff = getStaffList();
+      // Check if we have staff before generating
+      if (Object.keys(staff).length === 0) {
+        alert("Please add staff members before generating a roster.");
+        return;
+      }
+      
       // Build roster[pos][slot] = []
       let roster = {};
       Object.keys(positions).forEach(pos => {
@@ -415,9 +444,6 @@
 
     /***********************************************************************
      * E. Display Transposed Roster
-     *
-     * We'll skip positions that have "visible: false"
-     * so "Pass Counter (Buffer)" is assigned but not displayed.
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
@@ -438,7 +464,7 @@
           let cell = assignedStaff.length ? assignedStaff.join(" / ") : "-";
           html += `<td>${cell}</td>`;
         });
-        html += "</tr>`;
+        html += "</tr>";
       });
       html += "</tbody></table>";
 
@@ -457,37 +483,47 @@
      * F. Export Roster (PDF, TSV)
      ***********************************************************************/
     function exportRosterPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.html(document.getElementById('rosterOutput'), {
-        callback: function (doc) {
-          doc.save('roster-transposed.pdf');
-        },
-        x: 10,
-        y: 10
-      });
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.html(document.getElementById('rosterOutput'), {
+          callback: function (doc) {
+            doc.save('roster-transposed.pdf');
+          },
+          x: 10,
+          y: 10
+        });
+      } catch (e) {
+        console.error("PDF export error:", e);
+        alert("Error exporting PDF. Make sure jsPDF is loaded correctly.");
+      }
     }
 
     function exportRosterTSV() {
-      const table = document.getElementById('rosterTable');
-      if (!table) return;
-      let tsv = "";
-      for (let r = 0; r < table.rows.length; r++) {
-        let rowData = [];
-        for (let c = 0; c < table.rows[r].cells.length; c++) {
-          rowData.push(table.rows[r].cells[c].innerText);
+      try {
+        const table = document.getElementById('rosterTable');
+        if (!table) return;
+        let tsv = "";
+        for (let r = 0; r < table.rows.length; r++) {
+          let rowData = [];
+          for (let c = 0; c < table.rows[r].cells.length; c++) {
+            rowData.push(table.rows[r].cells[c].innerText);
+          }
+          tsv += rowData.join("\t") + "\n";
         }
-        tsv += rowData.join("\t") + "\n";
+        const blob = new Blob([tsv], { type: "text/tab-separated-values" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "roster-transposed.tsv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error("TSV export error:", e);
+        alert("Error exporting TSV file. Please try again.");
       }
-      const blob = new Blob([tsv], { type: "text/tab-separated-values" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "roster-transposed.tsv";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     }
   </script>
 </body>
