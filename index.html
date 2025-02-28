@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Integrated Dashboard & Roster Generator (Rule-Based)</title>
+  <title>Transposed Roster (Location on Left, Time on Top)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,6 +12,7 @@
     h1 {
       margin-bottom: 10px;
     }
+    /* Staff Table (Dashboard) */
     #staffTable {
       width: 100%;
       border-collapse: collapse;
@@ -30,7 +31,6 @@
     #staffTable tr:nth-child(even) {
       background-color: #f8f9fa;
     }
-    /* Time pickers for break times */
     input[type="time"] {
       width: 80px;
       padding: 5px;
@@ -52,30 +52,36 @@
       height: 16px;
       cursor: pointer;
     }
-    /* Bottom controls styling */
+
+    /* Unified button style */
+    .btn {
+      display: inline-block;
+      background-color: #888;
+      color: #fff;
+      padding: 8px 12px;
+      margin: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 160px; /* Fixed width */
+      text-align: center;
+    }
+    .btn:hover {
+      background-color: #666;
+    }
+
+    /* Hide file input; label acts as button */
+    #importFile {
+      display: none;
+    }
+
+    /* Bottom controls */
     .bottom-controls {
       margin-top: 20px;
       text-align: center;
     }
-    .bottom-controls button,
-    .bottom-controls label {
-      background-color: #888;
-      color: #fff;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 5px;
-      width: 160px; /* fixed width for uniformity */
-      text-align: center;
-    }
-    .bottom-controls button:hover,
-    .bottom-controls label:hover {
-      background-color: #666;
-    }
-    #importFile {
-      display: none; /* hide file input, label acts as button */
-    }
+
+    /* Roster Output Table (Transposed) */
     #rosterOutput {
       margin-top: 30px;
     }
@@ -95,27 +101,20 @@
     }
     .export-buttons {
       margin-top: 10px;
+      text-align: center;
     }
-    .export-buttons button {
+    .export-buttons .btn {
       margin: 5px;
-      background-color: #888;
-      color: #fff;
-      padding: 6px 10px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .export-buttons button:hover {
-      background-color: #666;
     }
   </style>
+
   <!-- For PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <h1>Integrated Dashboard & Roster Generator (Rule-Based)</h1>
-  
-  <!-- Staff Table -->
+  <h1>Transposed Roster (Location on Left, Time on Top)</h1>
+
+  <!-- Staff Dashboard Table -->
   <table id="staffTable">
     <thead>
       <tr>
@@ -133,28 +132,29 @@
     </tbody>
   </table>
 
-  <!-- Bottom controls -->
+  <!-- Bottom controls (all buttons) -->
   <div class="bottom-controls">
-    <button onclick="addStaff()">Add Staff</button>
-    <label for="importFile">Import JSON</label>
+    <button class="btn" onclick="addStaff()">Add Staff</button>
+    
+    <label class="btn" for="importFile">Import JSON</label>
     <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" />
-    <button onclick="exportStaffData()">Export JSON</button>
-    <button onclick="shuffleBreakTimes()">Shuffle Break Times</button>
-    <button onclick="generateRoster()">Generate Roster</button>
+    
+    <button class="btn" onclick="exportStaffData()">Export JSON</button>
+    <button class="btn" onclick="shuffleBreakTimes()">Shuffle Break Times</button>
+    <button class="btn" onclick="generateRoster()">Generate Roster</button>
   </div>
 
-  <!-- Roster Output -->
+  <!-- Roster Output (Transposed) -->
   <div id="rosterOutput"></div>
 
   <script>
     /***********************************************************************
-     * A. Staff Data Management (Dashboard)
+     * A. Staff Dashboard
      ***********************************************************************/
-
-    // Load data when the page is loaded
-    window.onload = function() {
+    // On page load, retrieve staff data from localStorage.
+    window.addEventListener('DOMContentLoaded', () => {
       loadFromLocalStorage();
-    };
+    });
 
     function loadFromLocalStorage() {
       const savedData = localStorage.getItem('staffData');
@@ -195,12 +195,8 @@
       } = staff;
 
       row.innerHTML = `
-        <td>
-          <input type="text" value="${staffId}" oninput="saveToLocalStorage()" />
-        </td>
-        <td>
-          <input type="text" value="${name}" oninput="saveToLocalStorage()" />
-        </td>
+        <td><input type="text" value="${staffId}" oninput="saveToLocalStorage()" /></td>
+        <td><input type="text" value="${name}" oninput="saveToLocalStorage()" /></td>
         <td>
           <input type="time" value="${breakStart}" step="1800" oninput="saveToLocalStorage()" />
           -
@@ -238,7 +234,7 @@
     /***********************************************************************
      * B. Shuffle Break Times
      ***********************************************************************/
-    // A set of random break intervals for demonstration.
+    // Example break intervals. Adjust or expand as needed.
     const PREDEFINED_BREAKS = [
       ["04:00","06:00"],
       ["22:00","00:00"],
@@ -255,7 +251,6 @@
       rows.forEach(row => {
         const lockCheckbox = row.querySelector('td:nth-child(6) input[type="checkbox"]');
         if (!lockCheckbox.checked) {
-          // Not locked => shuffle
           const breakStartInput = row.querySelector('td:nth-child(3) input[type="time"]:first-child');
           const breakEndInput   = row.querySelector('td:nth-child(3) input[type="time"]:last-child');
           const [start, end] = PREDEFINED_BREAKS[Math.floor(Math.random() * PREDEFINED_BREAKS.length)];
@@ -309,12 +304,12 @@
     }
 
     /***********************************************************************
-     * D. Simple Rule-Based Roster Generation
+     * D. Roster Generation (Rule-Based)
      ***********************************************************************/
-    // For demonstration, define time slots from 20:00 to 00:00.
-    // You can expand to 07:00 or beyond.
+    // Define time slots & positions. We'll do a short example from 20:00 to 00:00.
+    // Expand or adjust as needed (e.g., 07:00, half-hour increments, etc.).
     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
-    // Positions with how many staff needed
+    // Positions with required staff count
     const positions = {
       "Pass Counter": { required: 1 },
       "Guard House":  { required: 1 },
@@ -323,41 +318,45 @@
     };
 
     function generateRoster() {
-      // Gather staff from table
+      // Gather staff from the table
       const staff = getStaffList();
-      // Build empty roster
+
+      // Build a structure roster[pos][slot] = []
+      // so we can transpose easily (pos as rows, slots as columns).
       let roster = {};
-      timeSlots.forEach(slot => {
-        roster[slot] = {};
-        Object.keys(positions).forEach(pos => {
-          roster[slot][pos] = [];
+      Object.keys(positions).forEach(pos => {
+        roster[pos] = {};
+        timeSlots.forEach(slot => {
+          roster[pos][slot] = [];
         });
       });
-      // Keep track if a staff is assigned at a given slot
-      let assignedMap = {}; // assignedMap[staffId][slot] = true if assigned
-      Object.keys(staff).forEach(sid => assignedMap[sid] = {});
 
-      // For each time slot and position, pick staff who meets constraints
+      // Keep track if staff is assigned in a given slot
+      let assignedMap = {};
+      Object.keys(staff).forEach(sid => { assignedMap[sid] = {}; });
+
+      // For each slot & position, assign staff who meets constraints
       timeSlots.forEach(slot => {
         Object.keys(positions).forEach(pos => {
           let needed = positions[pos].required;
-          for (let i=0; i<needed; i++) {
-            // find first staff who is eligible
+          for (let i = 0; i < needed; i++) {
+            // find the first staff who is eligible
             let found = false;
             for (let sid in staff) {
-              if (isEligibleForSlot(staff[sid], pos, slot) && !assignedMap[sid][slot]) {
-                roster[slot][pos].push(sid);
+              if (!assignedMap[sid][slot] && isEligible(staff[sid], pos, slot)) {
+                roster[pos][slot].push(sid);
                 assignedMap[sid][slot] = true;
                 found = true;
                 break;
               }
             }
-            // If none found, that slot remains partially unfilled
+            // if no staff found, that position remains partially unfilled
           }
         });
       });
 
-      displayRoster(roster);
+      // Display the transposed roster
+      displayRosterTransposed(roster);
     }
 
     function getStaffList() {
@@ -365,7 +364,7 @@
       let staffObj = {};
       rows.forEach(row => {
         const staffId = row.querySelector('td:nth-child(1) input[type="text"]').value.trim();
-        if (!staffId) return; // skip blank ID
+        if (!staffId) return;
         const name = row.querySelector('td:nth-child(2) input[type="text"]').value;
         const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
         const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
@@ -373,81 +372,74 @@
         const attendance = row.querySelector('td:nth-child(5) select').value;
         const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
 
-        staffObj[staffId] = {
-          name, hhmd, attendance, locked,
-          breakStart, breakEnd
-        };
+        staffObj[staffId] = { name, hhmd, attendance, locked, breakStart, breakEnd };
       });
       return staffObj;
     }
 
-    // Check if a staff is eligible for a given position/time slot
-    function isEligibleForSlot(s, pos, slot) {
+    function isEligible(s, pos, slot) {
       // Must have attendance "Yes"
       if (s.attendance !== "Yes") return false;
-      // If pos=HHMD => must have hhmd="Yes"
+      // If HHMD, staff must be "Yes"
       if (pos === "HHMD" && s.hhmd !== "Yes") return false;
-      // Check if the slot is within the staff's break time
+      // Check if slot is within break
       if (isWithinBreak(slot, s.breakStart, s.breakEnd)) return false;
       return true;
     }
 
-    // A simple function to check if 'slot' is within [breakStart, breakEnd].
-    // This handles times on the same day. If your schedule crosses midnight, 
-    // you'll need a more robust approach to handle wrap-around.
-    function isWithinBreak(slot, breakStart, breakEnd) {
-      // If breakStart < breakEnd, normal range check
-      // If breakStart > breakEnd, it means it wraps past midnight 
-      // (like 22:00 to 01:00). We do a two-part check.
+    // Check if a given slot is within the staff's break time range.
+    function isWithinBreak(slot, start, end) {
       const slotMins  = toMinutes(slot);
-      const startMins = toMinutes(breakStart);
-      const endMins   = toMinutes(breakEnd);
+      const startMins = toMinutes(start);
+      const endMins   = toMinutes(end);
 
       if (startMins < endMins) {
-        // normal case
-        return (slotMins >= startMins && slotMins < endMins);
+        // normal range
+        return slotMins >= startMins && slotMins < endMins;
       } else if (startMins > endMins) {
-        // wrap-around
-        // slot is in break if it's >= startMins or < endMins
-        return (slotMins >= startMins || slotMins < endMins);
+        // wrap-around midnight
+        return slotMins >= startMins || slotMins < endMins;
       } else {
-        // breakStart == breakEnd => no break or 24h break
+        // start == end => no break or 24h break
         return false;
       }
     }
 
     function toMinutes(hhmm) {
-      // "22:30" => [22, 30]
       let [h,m] = hhmm.split(":").map(Number);
       return h*60 + m;
     }
 
-    // Display the generated roster
-    function displayRoster(roster) {
-      let html = "<h2>Generated Roster</h2>";
-      html += "<table id='rosterTable'><thead><tr><th>Time Slot</th>";
-      const posKeys = Object.keys(positions);
-      posKeys.forEach(pos => {
-        html += `<th>${pos}</th>`;
+    /***********************************************************************
+     * E. Display Transposed Roster (Positions on Left, Time on Top)
+     ***********************************************************************/
+    function displayRosterTransposed(roster) {
+      let html = "<h2>Generated Roster (Transposed)</h2>";
+      html += "<table id='rosterTable'><thead><tr><th>Location</th>";
+
+      // Header columns = timeSlots
+      timeSlots.forEach(slot => {
+        html += `<th>${slot}</th>`;
       });
       html += "</tr></thead><tbody>";
 
-      Object.keys(roster).forEach(slot => {
-        html += `<tr><td>${slot}</td>`;
-        posKeys.forEach(pos => {
-          let assigned = roster[slot][pos];
-          let cell = assigned.length ? assigned.join(" / ") : "-";
+      // Rows = positions
+      Object.keys(roster).forEach(pos => {
+        html += `<tr><td>${pos}</td>`;
+        timeSlots.forEach(slot => {
+          let assignedStaff = roster[pos][slot];
+          let cell = assignedStaff.length ? assignedStaff.join(" / ") : "-";
           html += `<td>${cell}</td>`;
         });
-        html += "</tr>";
+        html += "</tr>`;
       });
       html += "</tbody></table>";
 
-      // Export buttons
+      // Add export buttons
       html += `
         <div class="export-buttons">
-          <button onclick="exportRosterPDF()">Export Roster PDF</button>
-          <button onclick="exportRosterTSV()">Export Roster TSV</button>
+          <button class="btn" onclick="exportRosterPDF()">Export Roster PDF</button>
+          <button class="btn" onclick="exportRosterTSV()">Export Roster TSV</button>
         </div>
       `;
 
@@ -455,14 +447,14 @@
     }
 
     /***********************************************************************
-     * E. Export Roster (PDF/TSV)
+     * F. Export Roster (PDF, TSV)
      ***********************************************************************/
     function exportRosterPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.html(document.getElementById('rosterOutput'), {
         callback: function (doc) {
-          doc.save('roster.pdf');
+          doc.save('roster-transposed.pdf');
         },
         x: 10,
         y: 10
@@ -484,7 +476,8 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "roster.tsv";
+      a.download = "roster-transposed.tsv";
+      document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
