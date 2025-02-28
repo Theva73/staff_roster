@@ -150,9 +150,11 @@
     /***********************************************************************
      * A. Staff Data Management (Dashboard)
      ***********************************************************************/
-    window.addEventListener('DOMContentLoaded', () => {
+
+    // Load data when the page is loaded
+    window.onload = function() {
       loadFromLocalStorage();
-    });
+    };
 
     function loadFromLocalStorage() {
       const savedData = localStorage.getItem('staffData');
@@ -437,7 +439,7 @@
           let cell = assigned.length ? assigned.join(" / ") : "-";
           html += `<td>${cell}</td>`;
         });
-        html += "</tr>`;
+        html += "</tr>";
       });
       html += "</tbody></table>";
 
