@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Staff Dashboard & Roster Generator (Rule-Based)</title>
+  
+  <!-- For PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+    }
+    h1, h2 {
+      margin-bottom: 10px;
+    }
+    .controls {
+      margin-bottom: 10px;
+    }
+    .controls button, .controls label {
+      background-color: #888;
+      color: #fff;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    .controls button:hover, .controls label:hover {
+      background-color: #666;
+    }
+    #importFile {
+      display: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    thead {
+      background-color: #e9ecef;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #dee2e6;
+      white-space: nowrap;
+    }
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    input[type="text"],
+    select {
+      width: 90%;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+    .btn-remove {
+      background-color: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 5px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .btn-remove:hover {
+      background-color: #c82333;
+    }
+    .checkbox-lock {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .export-buttons {
+      margin-top: 10px;
+    }
+    .export-buttons button {
+      margin: 5px;
+      background-color: #888;
+      color: #fff;
+      padding: 6px 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .export-buttons button:hover {
+      background-color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>Staff Dashboard & Roster Generator (Rule-Based)</h1>
+
+  <!-- Staff Dashboard Section -->
+  <h2>Staff Dashboard</h2>
+  <div class="controls">
+    <button onclick="addStaff()">Add Staff</button>
+    <label for="importFile">Import JSON</label>
+    <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" />
+    <button onclick="exportStaffData()">Export JSON</button>
+    <button onclick="generateRoster()">Generate Roster</button>
+  </div>
+  <table id="staffTable">
+    <thead>
+      <tr>
+        <th>Staff ID</th>
+        <th>Name</th>
+        <th>HHMD Eligible</th>
+        <th>Break Times</th>
+        <th>Attendance</th>
+        <th>Lock</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Staff rows will be inserted here -->
+    </tbody>
+  </table>
+
+  <!-- Roster Output Section -->
+  <div id="rosterOutput"></div>
+
+  <script>
+    /***********************************************************************
+     * A. Staff Dashboard Logic
+     ***********************************************************************/
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromLocalStorage();
+    });
+
+    function loadFromLocalStorage() {
+      const savedData = localStorage.getItem('staffData');
+      if (savedData) {
+        const staffArray = JSON.parse(savedData);
+        staffArray.forEach(s => addStaff(s));
+      }
+    }
+
+    function saveToLocalStorage() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      const data = [];
+      rows.forEach(row => {
+        const staffId    = row.querySelector('td:nth-child(1) input').value;
+        const name       = row.querySelector('td:nth-child(2) input').value;
+        const hhmd       = row.querySelector('td:nth-child(3) select').value;
+        const breakTimes = row.querySelector('td:nth-child(4) input').value;
+        const attendance = row.querySelector('td:nth-child(5) select').value;
+        const locked     = row.querySelector('td:nth-child(6) input').checked;
+        data.push({ staffId, name, hhmd, breakTimes, attendance, locked });
+      });
+      localStorage.setItem('staffData', JSON.stringify(data));
+    }
+
+    function addStaff(staff = {}) {
+      const tbody = document.querySelector('#staffTable tbody');
+      const row = document.createElement('tr');
+      const {
+        staffId = "",
+        name = "",
+        hhmd = "No",
+        breakTimes = "",
+        attendance = "Yes",
+        locked = false
+      } = staff;
+      row.innerHTML = `
+        <td><input type="text" value="${staffId}" oninput="saveToLocalStorage()" /></td>
+        <td><input type="text" value="${name}" oninput="saveToLocalStorage()" /></td>
+        <td>
+          <select onchange="saveToLocalStorage()">
+            <option value="No" ${hhmd==="No"?"selected":""}>No</option>
+            <option value="Yes" ${hhmd==="Yes"?"selected":""}>Yes</option>
+          </select>
+        </td>
+        <td><input type="text" value="${breakTimes}" oninput="saveToLocalStorage()" placeholder="e.g., 21:00-23:00" /></td>
+        <td>
+          <select onchange="saveToLocalStorage()">
+            <option value="No" ${attendance==="No"?"selected":""}>No</option>
+            <option value="Yes" ${attendance==="Yes"?"selected":""}>Yes</option>
+          </select>
+        </td>
+        <td>
+          <input type="checkbox" class="checkbox-lock" ${locked?"checked":""} onchange="saveToLocalStorage()" />
+        </td>
+        <td><button class="btn-remove" onclick="removeRow(this)">Remove</button></td>
+      `;
+      tbody.appendChild(row);
+      saveToLocalStorage();
+    }
+
+    function removeRow(button) {
+      const row = button.closest('tr');
+      row.remove();
+      saveToLocalStorage();
+    }
+
+    function importStaffData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          document.querySelector('#staffTable tbody').innerHTML = "";
+          importedData.forEach(s => addStaff(s));
+        } catch (err) {
+          alert("Invalid JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportStaffData() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      const data = [];
+      rows.forEach(row => {
+        const staffId    = row.querySelector('td:nth-child(1) input').value;
+        const name       = row.querySelector('td:nth-child(2) input').value;
+        const hhmd       = row.querySelector('td:nth-child(3) select').value;
+        const breakTimes = row.querySelector('td:nth-child(4) input').value;
+        const attendance = row.querySelector('td:nth-child(5) select').value;
+        const locked     = row.querySelector('td:nth-child(6) input').checked;
+        data.push({ staffId, name, hhmd, breakTimes, attendance, locked });
+      });
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "staffData.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /***********************************************************************
+     * B. Rule-Based Roster Generation Logic
+     ***********************************************************************/
+    // Define time slots and positions.
+    // (Adjust these as needed for your full schedule.)
+    const timeSlots = ["20:00", "20:30", "21:00", "22:00", "23:00", "00:00"];
+    const positions = {
+      "Pass Counter":    { required: 1 },
+      "Guard House":     { required: 1 },
+      "HHMD":            { required: 1 },
+      "Lobby":           { required: 2 }
+    };
+
+    // A simple rule-based assignment:
+    // For each time slot and for each position, assign the first available staff (by staffId)
+    // who is eligible (attendance "Yes", if HHMD then hhmd "Yes", not on break, and not already assigned at that time).
+    function generateRoster() {
+      // Get the current staff list.
+      const staffObj = getStaffFromTable();
+      
+      // Prepare roster: roster[slot][position] = array of assigned staff IDs.
+      let roster = {};
+      timeSlots.forEach(slot => {
+        roster[slot] = {};
+        Object.keys(positions).forEach(pos => {
+          roster[slot][pos] = [];
+        });
+      });
+      
+      // Keep track of assignments for each staff by time slot to prevent double-booking.
+      let staffAssigned = {};
+      Object.keys(staffObj).forEach(sid => { staffAssigned[sid] = {}; });
+      
+      // For each time slot and position, assign staff based on rules.
+      timeSlots.forEach(slot => {
+        Object.keys(positions).forEach(pos => {
+          let required = positions[pos].required;
+          for (let i = 0; i < required; i++) {
+            let assigned = false;
+            for (let sid in staffObj) {
+              const s = staffObj[sid];
+              // Check eligibility:
+              if (s.attendance !== "Yes") continue;
+              if (pos === "HHMD" && s.hhmd !== "Yes") continue;
+              // Check break times: simple check if slot is in breakTimes string.
+              if (s.breakTimes.includes(slot)) continue;
+              // Check if already assigned in this slot
+              if (staffAssigned[sid][slot]) continue;
+              // Assign this staff member
+              roster[slot][pos].push(sid);
+              staffAssigned[sid][slot] = true;
+              assigned = true;
+              break;
+            }
+            // If no eligible staff is found, leave cell empty.
+          }
+        });
+      });
+      
+      displayRoster(roster);
+    }
+
+    // Get staff data from dashboard table (as an object keyed by staffId).
+    function getStaffFromTable() {
+      const rows = document.querySelectorAll('#staffTable tbody tr');
+      let staffObj = {};
+      rows.forEach(row => {
+        const staffId = row.querySelector('td:nth-child(1) input').value;
+        const name = row.querySelector('td:nth-child(2) input').value;
+        const hhmd = row.querySelector('td:nth-child(3) select').value;
+        const breakTimes = row.querySelector('td:nth-child(4) input').value;
+        const attendance = row.querySelector('td:nth-child(5) select').value;
+        const locked = row.querySelector('td:nth-child(6) input').checked;
+        if (!staffId) return;
+        // For simplicity, store breakTimes as a string and use .includes()
+        staffObj[staffId] = { name, hhmd, breakTimes, attendance, locked };
+      });
+      return staffObj;
+    }
+
+    // Display roster in a table
+    function displayRoster(roster) {
+      let html = "<h2>Generated Roster</h2>";
+      html += "<table id='rosterTable'><thead><tr><th>Time Slot</th>";
+      Object.keys(positions).forEach(pos => {
+        html += `<th>${pos}</th>`;
+      });
+      html += "</tr></thead><tbody>";
+      
+      timeSlots.forEach(slot => {
+        html += `<tr><td>${slot}</td>`;
+        Object.keys(positions).forEach(pos => {
+          let cell = roster[slot][pos].join(" / ") || "-";
+          html += `<td>${cell}</td>`;
+        });
+        html += "</tr>";
+      });
+      
+      html += "</tbody></table>";
+      // Add export buttons for roster.
+      html += `
+        <div class="export-buttons">
+          <button onclick="exportRosterPDF()">Export Roster PDF</button>
+          <button onclick="exportRosterTSV()">Export Roster TSV</button>
+        </div>
+      `;
+      document.getElementById("rosterOutput").innerHTML = html;
+    }
+
+    /***********************************************************************
+     * C. Roster Export Functions
+     ***********************************************************************/
+    function exportRosterPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.html(document.getElementById('rosterOutput'), {
+        callback: function (doc) {
+          doc.save('roster.pdf');
+        },
+        x: 10,
+        y: 10
+      });
+    }
+
+    function exportRosterTSV() {
+      const table = document.getElementById('rosterTable');
+      let tsv = "";
+      for (let r = 0; r < table.rows.length; r++) {
+        let rowData = [];
+        for (let c = 0; c < table.rows[r].cells.length; c++) {
+          rowData.push(table.rows[r].cells[c].innerText);
+        }
+        tsv += rowData.join("\t") + "\n";
+      }
+      const blob = new Blob([tsv], { type: "text/tab-separated-values" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "roster.tsv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
