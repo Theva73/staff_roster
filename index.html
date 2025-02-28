@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Roster with Drag & Drop, Validation & 1-Hour Intervals</title>
+  <title>Transposed Roster with Validation & Drag-and-Drop</title>
   <!-- Include SortableJS for drag & drop support -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <!-- For PDF export -->
@@ -72,7 +72,7 @@
     .btn:hover {
       background-color: #666;
     }
-    /* Hide file input; label acts as a button */
+    /* Hide file input; label acts as button */
     #importFile {
       display: none;
     }
@@ -122,26 +122,23 @@
     /* Draggable items styling */
     .draggable-cell {
       min-height: 30px;
-      /* Default background transparent */
     }
     .draggable-item {
       padding: 3px 6px;
       margin: 2px;
-      background-color: rgba(224, 224, 224, 0.8);
-      border: 1px solid #bbb;
-      border-radius: 4px;
+      background-color: transparent; /* removed gray background */
+      border: none;
       cursor: grab;
       transition: box-shadow 0.2s, opacity 0.2s;
     }
-    /* Glow effect while dragging */
     .dragging {
-      box-shadow: 0 0 10px rgba(0, 200, 0, 0.8);
+      box-shadow: 0 0 10px rgba(0,200,0,0.8);
       opacity: 0.8;
     }
   </style>
 </head>
 <body>
-  <h1>Roster (1-Hour Intervals + 20:30 &amp; 01:30 Extra) with Drag & Drop</h1>
+  <h1>Transposed Roster (1-Hour Intervals + 20:30 &amp; 01:30 Extra)</h1>
 
   <!-- Staff Dashboard Table -->
   <table id="staffTable">
@@ -157,11 +154,11 @@
       </tr>
     </thead>
     <tbody>
-      <!-- Staff rows inserted here dynamically -->
+      <!-- Rows are added dynamically -->
     </tbody>
   </table>
 
-  <!-- Bottom Controls -->
+  <!-- Bottom controls -->
   <div class="bottom-controls">
     <button class="btn" onclick="addStaff()">Add Staff</button>
     <label class="btn" for="importFile">Import JSON</label>
@@ -171,8 +168,9 @@
     <button class="btn" onclick="generateRoster()">Generate Roster</button>
   </div>
 
-  <!-- Validation & Roster Output -->
+  <!-- Validation Output -->
   <div id="validationOutput"></div>
+  <!-- Roster Output -->
   <div id="rosterOutput"></div>
 
   <script>
@@ -329,29 +327,23 @@
     }
 
     /***********************************************************************
-     * D. Time Slots
-     * 
-     * We revert to a one‑hour interval table, with extra columns for 20:30 and 01:30.
+     * D. Time Slots (20:00 to 07:00 with 1-hour intervals and extra 20:30, 01:30)
      ***********************************************************************/
-    // Create an array for every hour from 20:00 to 07:00, then insert extra columns.
-    const masterHourSlots = ["20:00","21:00","22:00","23:00","00:00","01:00","02:00","03:00","04:00","05:00","06:00","07:00"];
-    // Insert extra columns: 20:30 after 20:00 and 01:30 after 01:00.
+    const masterHourSlots = ["20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"];
     const timeSlots = [];
     masterHourSlots.forEach(slot => {
       timeSlots.push(slot);
       if (slot === "20:00") timeSlots.push("20:30");
       if (slot === "01:00") timeSlots.push("01:30");
     });
-    // The final timeSlots array will be: 
-    // ["20:00", "20:30", "21:00", "22:00", "23:00", "00:00", "01:00", "01:30", "02:00", ..., "07:00"]
 
     /***********************************************************************
      * E. Positions
      *
-     *  - "Vertical Patrol": only active at 20:30, 01:30, 04:00, 06:30.
-     *  - "Tango Papa": only active at 07:00.
-     *  - "Lobby": requires 2 staff.
-     *  - "Pass Counter (Buffer)" is hidden.
+     * - "Vertical Patrol": active only at 20:30, 01:30, 04:00, 06:30.
+     * - "Tango Papa": active only at 07:00.
+     * - "Lobby": requires 2 staff (appear in the same cell, each as a draggable item).
+     * - "Pass Counter (Buffer)" is hidden.
      ***********************************************************************/
     const positions = {
       "Pass Counter":          { required: 1, visible: true,  activeSlots: timeSlots },
@@ -364,7 +356,7 @@
     };
 
     /***********************************************************************
-     * F. Generate Roster (with Validation)
+     * F. Generate Roster (Rule-Based with Global Validation)
      ***********************************************************************/
     function generateRoster() {
       const staffObj = getStaffList();
@@ -379,7 +371,7 @@
         validationOutput.textContent = "";
       }
 
-      // Build roster structure: roster[pos][slot] = []
+      // Build roster: roster[pos][slot] = array of staff IDs
       let roster = {};
       Object.keys(positions).forEach(pos => {
         roster[pos] = {};
@@ -388,11 +380,11 @@
         });
       });
 
-      // Track assignments (to prevent double-booking)
+      // Track assignments to prevent double-booking
       let assignedMap = {};
       Object.keys(staffObj).forEach(sid => { assignedMap[sid] = {}; });
 
-      // For each position, for each active slot, fill the required number
+      // For each position and active slot, fill the required number
       Object.keys(positions).forEach(pos => {
         const pInfo = positions[pos];
         pInfo.activeSlots.forEach(slot => {
@@ -407,16 +399,25 @@
                 break;
               }
             }
-            // If not found, leave cell partially unfilled
           }
         });
       });
+
+      // Global validation: check for back-to-back usage in the same position
+      const consecutiveErrors = validateNoConsecutiveUsage(roster, timeSlots);
+      if (consecutiveErrors.length > 0) {
+        validationOutput.textContent = consecutiveErrors.join("\n");
+        document.getElementById('rosterOutput').innerHTML = "";
+        return;
+      } else {
+        validationOutput.textContent = "";
+      }
 
       displayRosterTransposed(roster);
     }
 
     /***********************************************************************
-     * G. Validate Staff Data
+     * G. Validate Staff Data (basic checks)
      ***********************************************************************/
     function validateStaffData(staffObj) {
       let errors = [];
@@ -436,7 +437,33 @@
     }
 
     /***********************************************************************
-     * H. Get Staff List
+     * H. Global Back-to-Back Validation for Same Location
+     ***********************************************************************/
+    function validateNoConsecutiveUsage(roster, sortedSlots) {
+      let errors = [];
+      // For each visible position, check its active slots in order
+      Object.keys(roster).forEach(pos => {
+        if (!positions[pos].visible) return;
+        let prevAssigned = null;
+        // Only consider slots active for this position
+        const activeSlots = positions[pos].activeSlots.slice().sort((a, b) => toMinutes(a) - toMinutes(b));
+        activeSlots.forEach(slot => {
+          const current = roster[pos][slot] || [];
+          if (prevAssigned) {
+            current.forEach(staffID => {
+              if (prevAssigned.includes(staffID)) {
+                errors.push(`Staff ${staffID} is booked back-to-back at ${pos} (in consecutive slots).`);
+              }
+            });
+          }
+          prevAssigned = current;
+        });
+      });
+      return errors;
+    }
+
+    /***********************************************************************
+     * I. Get Staff List
      ***********************************************************************/
     function getStaffList() {
       const rows = document.querySelectorAll('#staffTable tbody tr');
@@ -456,7 +483,7 @@
     }
 
     /***********************************************************************
-     * I. isEligible Check
+     * J. isEligible Check
      ***********************************************************************/
     function isEligible(s, pos, slot) {
       if (s.attendance !== "Yes") return false;
@@ -491,19 +518,19 @@
       html += '<div id="rosterTableWrapper">';
       html += '<table id="rosterTable"><thead><tr><th>Location</th>';
 
-      // Use the master timeSlots (which includes hourly slots with extra 20:30 and 01:30)
-      const sortedSlots = timeSlots;
+      // Use the master timeSlots array for columns
+      const sortedSlots = timeSlots; // already in order
 
       sortedSlots.forEach(slot => {
         html += `<th>${slot}</th>`;
       });
       html += "</tr></thead><tbody>";
 
+      // Rows: for each visible position
       Object.keys(roster).forEach(pos => {
         if (!positions[pos].visible) return;
         html += `<tr><td>${pos}</td>`;
         sortedSlots.forEach(slot => {
-          // If position isn't active at this slot, show blank
           if (!positions[pos].activeSlots.includes(slot)) {
             html += "<td>-</td>";
             return;
@@ -512,7 +539,7 @@
           if (assignedStaff.length === 0) {
             html += "<td>-</td>";
           } else {
-            // Wrap each staff ID in a draggable div.
+            // Wrap each staff ID in its own draggable div
             html += `<td data-pos="${pos}" data-slot="${slot}"><div class="draggable-cell">`;
             assignedStaff.forEach(id => {
               html += `<div class="draggable-item">${id}</div>`;
@@ -523,9 +550,9 @@
         html += "</tr>";
       });
       html += "</tbody></table>";
-      html += "</div>"; // end of wrapper
+      html += "</div>"; // close wrapper
 
-      // Export buttons for roster
+      // Export buttons
       html += `
         <div class="export-buttons">
           <button class="btn" onclick="exportRosterPDF()">Export Roster PDF</button>
@@ -537,46 +564,41 @@
     }
 
     /***********************************************************************
-     * K. Initialize Drag-and-Drop with Validation and Haptic Delay
+     * K. Initialize Drag-and-Drop with Haptic Delay & Validation on Drop
      ***********************************************************************/
     function initDragAndDrop() {
       document.querySelectorAll('.draggable-cell').forEach(cell => {
         Sortable.create(cell, {
           group: 'rosterGroup',
           animation: 150,
-          delay: 500,               // 500ms delay (simulate haptic long press)
-          delayOnTouchOnly: true,   // apply delay only on touch
+          delay: 500,             // 500ms delay to simulate long press
+          delayOnTouchOnly: true, // apply delay only for touch events
           onStart: function(evt) {
-            // Store original order in cell's dataset
             const items = Array.from(evt.from.children).map(item => item.innerText);
             evt.from.dataset.originalOrder = JSON.stringify(items);
-            // Add glow effect to cell
             evt.from.classList.add("dragging");
           },
           onEnd: function(evt) {
             const cell = evt.from;
             cell.classList.remove("dragging");
             const originalOrder = JSON.parse(cell.dataset.originalOrder || "[]");
-            // Get new order from cell
             const newOrder = Array.from(cell.children).map(item => item.innerText);
-            // Get position and slot from cell's parent <td>
             const td = cell.parentElement;
             const pos = td.getAttribute("data-pos");
             const slot = td.getAttribute("data-slot");
-            // Validate new order for this cell
             if (!validateCellDrop(pos, slot, newOrder)) {
-              // If invalid, revert to original order
+              // If invalid, revert the change
               Sortable.get(cell).sort(originalOrder);
-              alert("Invalid move! Drop denied due to violation of core rules.");
+              alert("Invalid drop! This move violates core rules.");
             }
           }
         });
       });
     }
 
-    // Validate cell drop: for each staff in newOrder, check eligibility
     function validateCellDrop(pos, slot, newOrder) {
       const staffObj = getStaffList();
+      // For each staff in the new order, check if they are eligible for this pos/slot.
       for (let id of newOrder) {
         if (!isEligible(staffObj[id], pos, slot)) {
           return false;
