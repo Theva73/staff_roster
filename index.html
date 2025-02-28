@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Transposed Roster (Single Lobby w/ 2 Staff + Buffer + Slider)</title>
+  <title>Transposed Roster (Lobby, Vertical Patrol, Tango Papa, Buffer, Validation)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -83,6 +83,14 @@
       text-align: center;
     }
 
+    /* Validation messages */
+    #validationOutput {
+      margin-top: 10px;
+      color: red;
+      font-weight: bold;
+      white-space: pre-wrap;
+    }
+
     /* Roster Output Table (Transposed) */
     #rosterOutput {
       margin-top: 30px;
@@ -96,7 +104,7 @@
     }
     #rosterTable {
       border-collapse: collapse;
-      min-width: 800px; /* so there's something to scroll horizontally if needed */
+      min-width: 1200px; /* so there's something to scroll horizontally if needed */
     }
     #rosterTable th, #rosterTable td {
       border: 1px solid #ccc;
@@ -120,7 +128,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <h1>Transposed Roster (Single Lobby w/ 2 Staff + Buffer + Slider)</h1>
+  <h1>Transposed Roster (Lobby, Vertical Patrol, Tango Papa, Buffer, Validation)</h1>
 
   <!-- Staff Dashboard Table -->
   <table id="staffTable">
@@ -150,7 +158,8 @@
     <button class="btn" onclick="generateRoster()">Generate Roster</button>
   </div>
 
-  <!-- Roster Output (Transposed) -->
+  <!-- Validation & Roster Output -->
+  <div id="validationOutput"></div>
   <div id="rosterOutput"></div>
 
   <script>
@@ -173,13 +182,13 @@
       const rows = document.querySelectorAll('#staffTable tbody tr');
       const data = [];
       rows.forEach(row => {
-        const staffId = row.querySelector('td:nth-child(1) input[type="text"]').value;
-        const name = row.querySelector('td:nth-child(2) input[type="text"]').value;
+        const staffId    = row.querySelector('td:nth-child(1) input[type="text"]').value;
+        const name       = row.querySelector('td:nth-child(2) input[type="text"]').value;
         const breakStart = row.querySelector('td:nth-child(3) input[type="time"]:first-child').value;
         const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
-        const hhmd = row.querySelector('td:nth-child(4) select').value;
+        const hhmd       = row.querySelector('td:nth-child(4) select').value;
         const attendance = row.querySelector('td:nth-child(5) select').value;
-        const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+        const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]')?.checked;
         data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
       });
       localStorage.setItem('staffData', JSON.stringify(data));
@@ -239,7 +248,6 @@
     /***********************************************************************
      * B. Shuffle Break Times
      ***********************************************************************/
-    // Example break intervals. Adjust or expand as needed.
     const PREDEFINED_BREAKS = [
       ["04:00","06:00"],
       ["22:00","00:00"],
@@ -295,7 +303,7 @@
         const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
         const hhmd       = row.querySelector('td:nth-child(4) select').value;
         const attendance = row.querySelector('td:nth-child(5) select').value;
-        const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+        const locked     = row.querySelector('td:nth-child(6) input[type="checkbox"]')?.checked;
         data.push({ staffId, name, breakStart, breakEnd, hhmd, attendance, locked });
       });
       const jsonString = JSON.stringify(data, null, 2);
@@ -310,56 +318,81 @@
     }
 
     /***********************************************************************
-     * D. Roster Generation (Rule-Based, Transposed)
-     *
-     * Single "Lobby" with required=2 => both staff appear in the same cell,
-     * joined by " | ". Also a hidden "Pass Counter (Buffer)" for your
-     * "invisible" staff. Time slots have half-hour increments.
+     * D. Time Slots (20:00 to 07:00 in half-hour increments)
      ***********************************************************************/
-    // Example time slots from 20:00 to 00:00 (expand to 07:00 if needed)
-    const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
+    const timeSlots = [
+      "20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30",
+      "00:00","00:30","01:00","01:30","02:00","02:30","03:00","03:30",
+      "04:00","04:30","05:00","05:30","06:00","06:30","07:00"
+    ];
 
-    // Positions
-    // "Lobby" requires 2 staff => same cell, multiple IDs
-    // "Pass Counter (Buffer)" is hidden in final table
+    /***********************************************************************
+     * E. Positions
+     *
+     *  - Single “Lobby” with required=2 => 2 staff in same cell
+     *  - “Vertical Patrol” only at 20:30, 01:30, 04:00, 06:30
+     *  - “Tango Papa” only at 07:00
+     *  - “Pass Counter (Buffer)” is hidden
+     ***********************************************************************/
     const positions = {
-      "Pass Counter":           { required: 1, visible: true },
-      "Pass Counter (Buffer)":  { required: 1, visible: false },
-      "Guard House":            { required: 1, visible: true },
-      "HHMD":                   { required: 1, visible: true },
-      "Lobby":                  { required: 2, visible: true }
+      "Pass Counter":          { required: 1, visible: true,  activeSlots: timeSlots },
+      "Pass Counter (Buffer)": { required: 1, visible: false, activeSlots: timeSlots },
+      "Guard House":           { required: 1, visible: true,  activeSlots: timeSlots },
+      "HHMD":                  { required: 1, visible: true,  activeSlots: timeSlots },
+      "Lobby":                 { required: 2, visible: true,  activeSlots: timeSlots },
+      "Vertical Patrol":       { required: 1, visible: true,  activeSlots: ["20:30","01:30","04:00","06:30"] },
+      "Tango Papa":            { required: 1, visible: true,  activeSlots: ["07:00"] }
     };
 
+    /***********************************************************************
+     * F. Generate Roster
+     *  1) Validate staff data
+     *  2) If no errors, assign staff
+     *  3) Display transposed table
+     ***********************************************************************/
     function generateRoster() {
-      const staff = getStaffList();
-      // Build roster[pos][slot] = arrayOfStaffIDs
+      const staffObj = getStaffList();
+      const errors = validateStaffData(staffObj);
+      const validationOutput = document.getElementById('validationOutput');
+
+      if (errors.length > 0) {
+        // Show errors, do not proceed with assignment
+        validationOutput.textContent = errors.join("\n");
+        document.getElementById('rosterOutput').innerHTML = "";
+        return;
+      } else {
+        validationOutput.textContent = "";
+      }
+
+      // Build the roster structure
       let roster = {};
       Object.keys(positions).forEach(pos => {
         roster[pos] = {};
-        timeSlots.forEach(slot => {
+        positions[pos].activeSlots.forEach(slot => {
           roster[pos][slot] = [];
         });
       });
 
-      // Keep track if staff is assigned at a slot
+      // Keep track of staff assignments
       let assignedMap = {};
-      Object.keys(staff).forEach(sid => { assignedMap[sid] = {}; });
+      Object.keys(staffObj).forEach(sid => { assignedMap[sid] = {}; });
 
-      // For each slot & position, assign staff who meet constraints
-      timeSlots.forEach(slot => {
-        Object.keys(positions).forEach(pos => {
-          let needed = positions[pos].required;
-          for (let i = 0; i < needed; i++) {
+      // For each position, fill the required staff at each active slot
+      Object.keys(positions).forEach(pos => {
+        const pInfo = positions[pos];
+        pInfo.activeSlots.forEach(slot => {
+          let needed = pInfo.required;
+          for (let i=0; i<needed; i++) {
             let found = false;
-            for (let sid in staff) {
-              if (!assignedMap[sid][slot] && isEligible(staff[sid], pos, slot)) {
+            for (let sid in staffObj) {
+              if (!assignedMap[sid][slot] && isEligible(staffObj[sid], pos, slot)) {
                 roster[pos][slot].push(sid);
                 assignedMap[sid][slot] = true;
                 found = true;
                 break;
               }
             }
-            // If no staff found, that position remains partially unfilled
+            // If not found, that slot is partially unfilled
           }
         });
       });
@@ -367,6 +400,32 @@
       displayRosterTransposed(roster);
     }
 
+    /***********************************************************************
+     * G. Validate Staff Data
+     *  - Check for missing or duplicate IDs
+     ***********************************************************************/
+    function validateStaffData(staffObj) {
+      let errors = [];
+      const seenIDs = new Set();
+
+      for (let sid in staffObj) {
+        if (!sid) {
+          errors.push("A staff row has a blank ID.");
+          continue;
+        }
+        if (seenIDs.has(sid)) {
+          errors.push(`Duplicate Staff ID: ${sid}`);
+        } else {
+          seenIDs.add(sid);
+        }
+        // Additional checks can go here...
+      }
+      return errors;
+    }
+
+    /***********************************************************************
+     * H. Get Staff List
+     ***********************************************************************/
     function getStaffList() {
       const rows = document.querySelectorAll('#staffTable tbody tr');
       let staffObj = {};
@@ -378,13 +437,16 @@
         const breakEnd   = row.querySelector('td:nth-child(3) input[type="time"]:last-child').value;
         const hhmd = row.querySelector('td:nth-child(4) select').value;
         const attendance = row.querySelector('td:nth-child(5) select').value;
-        const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]').checked;
+        const locked = row.querySelector('td:nth-child(6) input[type="checkbox"]')?.checked;
 
         staffObj[staffId] = { name, hhmd, attendance, locked, breakStart, breakEnd };
       });
       return staffObj;
     }
 
+    /***********************************************************************
+     * I. isEligible Check
+     ***********************************************************************/
     function isEligible(s, pos, slot) {
       // Must have attendance "Yes"
       if (s.attendance !== "Yes") return false;
@@ -418,19 +480,24 @@
     }
 
     /***********************************************************************
-     * E. Display Transposed Roster
+     * J. Display Transposed Roster
      * 
-     *  - Skips positions with visible=false (the buffer).
-     *  - Joins multiple staff IDs with " | ".
-     *  - Wraps the table in #rosterTableWrapper for horizontal scrolling.
+     *  - Skips positions with visible=false
+     *  - Joins multiple staff IDs with " | "
+     *  - Wraps the table in #rosterTableWrapper for horizontal scrolling
+     *  - Only shows assigned times from each position’s activeSlots
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
       html += '<div id="rosterTableWrapper">';
       html += '<table id="rosterTable"><thead><tr><th>Location</th>';
 
-      // Header columns = timeSlots
-      timeSlots.forEach(slot => {
+      // We’ll just use the master timeSlots array for columns
+      // so we see 20:00..07:00 (including half-hours).
+      const sortedSlots = timeSlots; // already in ascending order
+
+      // Table header
+      sortedSlots.forEach(slot => {
         html += `<th>${slot}</th>`;
       });
       html += "</tr></thead><tbody>";
@@ -439,9 +506,13 @@
       Object.keys(roster).forEach(pos => {
         if (!positions[pos].visible) return; // skip hidden positions
         html += `<tr><td>${pos}</td>`;
-        timeSlots.forEach(slot => {
-          let assignedStaff = roster[pos][slot];
-          // If multiple staff, join with " | "
+        sortedSlots.forEach(slot => {
+          // If position doesn't have this slot active, show blank
+          if (!positions[pos].activeSlots.includes(slot)) {
+            html += "<td>-</td>";
+            return;
+          }
+          let assignedStaff = roster[pos][slot] || [];
           if (assignedStaff.length === 0) {
             html += "<td>-</td>";
           } else {
@@ -462,11 +533,11 @@
         </div>
       `;
 
-      document.getElementById("rosterOutput").innerHTML = html;
+      document.getElementById('rosterOutput').innerHTML = html;
     }
 
     /***********************************************************************
-     * F. Export Roster (PDF, TSV)
+     * K. Export Roster (PDF, TSV)
      ***********************************************************************/
     function exportRosterPDF() {
       const { jsPDF } = window.jspdf;
