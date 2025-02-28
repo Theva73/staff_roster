@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Transposed Roster (Location on Left, Time on Top)</title>
+  <title>Transposed Roster (Lobby Split + Buffer Staff)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -31,6 +31,7 @@
     #staffTable tr:nth-child(even) {
       background-color: #f8f9fa;
     }
+    /* Time pickers for break times */
     input[type="time"] {
       width: 80px;
       padding: 5px;
@@ -63,7 +64,7 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      width: 160px; /* Fixed width */
+      width: 160px; /* fixed width */
       text-align: center;
     }
     .btn:hover {
@@ -108,11 +109,11 @@
     }
   </style>
 
-  <!-- For PDF export -->
+  <!-- For PDF export (remove if you don't need PDF) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <h1>Transposed Roster (Location on Left, Time on Top)</h1>
+  <h1>Transposed Roster (Lobby Split + Buffer Staff)</h1>
 
   <!-- Staff Dashboard Table -->
   <table id="staffTable">
@@ -135,10 +136,8 @@
   <!-- Bottom controls (all buttons) -->
   <div class="bottom-controls">
     <button class="btn" onclick="addStaff()">Add Staff</button>
-    
     <label class="btn" for="importFile">Import JSON</label>
     <input type="file" id="importFile" accept=".json" onchange="importStaffData(event)" />
-    
     <button class="btn" onclick="exportStaffData()">Export JSON</button>
     <button class="btn" onclick="shuffleBreakTimes()">Shuffle Break Times</button>
     <button class="btn" onclick="generateRoster()">Generate Roster</button>
@@ -304,25 +303,32 @@
     }
 
     /***********************************************************************
-     * D. Roster Generation (Rule-Based)
+     * D. Roster Generation (Rule-Based, Transposed)
+     *
+     * We define separate positions for "Lobby 1" and "Lobby 2" so each staff
+     * appears in its own cell (no "/").
+     *
+     * We also define "Pass Counter (Buffer)" with required=1 but we skip
+     * displaying it in the final transposed table. It's assigned behind the scenes.
      ***********************************************************************/
-    // Define time slots & positions. We'll do a short example from 20:00 to 00:00.
-    // Expand or adjust as needed (e.g., 07:00, half-hour increments, etc.).
+    // Example time slots from 20:00 to 00:00
     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
-    // Positions with required staff count
+
+    // Positions, each requiring 1 staff
+    // We have "Lobby 1" and "Lobby 2" instead of a single Lobby with 2 staff.
+    // "Pass Counter (Buffer)" is assigned but hidden in the final display.
     const positions = {
-      "Pass Counter": { required: 1 },
-      "Guard House":  { required: 1 },
-      "HHMD":         { required: 1 },
-      "Lobby":        { required: 2 }
+      "Pass Counter":       { required: 1, visible: true },
+      "Pass Counter (Buffer)": { required: 1, visible: false },
+      "Guard House":        { required: 1, visible: true },
+      "HHMD":               { required: 1, visible: true },
+      "Lobby 1":            { required: 1, visible: true },
+      "Lobby 2":            { required: 1, visible: true }
     };
 
     function generateRoster() {
-      // Gather staff from the table
       const staff = getStaffList();
-
-      // Build a structure roster[pos][slot] = []
-      // so we can transpose easily (pos as rows, slots as columns).
+      // Build roster[pos][slot] = []
       let roster = {};
       Object.keys(positions).forEach(pos => {
         roster[pos] = {};
@@ -331,7 +337,7 @@
         });
       });
 
-      // Keep track if staff is assigned in a given slot
+      // Track if staff is assigned at a slot
       let assignedMap = {};
       Object.keys(staff).forEach(sid => { assignedMap[sid] = {}; });
 
@@ -340,7 +346,6 @@
         Object.keys(positions).forEach(pos => {
           let needed = positions[pos].required;
           for (let i = 0; i < needed; i++) {
-            // find the first staff who is eligible
             let found = false;
             for (let sid in staff) {
               if (!assignedMap[sid][slot] && isEligible(staff[sid], pos, slot)) {
@@ -355,7 +360,6 @@
         });
       });
 
-      // Display the transposed roster
       displayRosterTransposed(roster);
     }
 
@@ -387,7 +391,6 @@
       return true;
     }
 
-    // Check if a given slot is within the staff's break time range.
     function isWithinBreak(slot, start, end) {
       const slotMins  = toMinutes(slot);
       const startMins = toMinutes(start);
@@ -411,7 +414,10 @@
     }
 
     /***********************************************************************
-     * E. Display Transposed Roster (Positions on Left, Time on Top)
+     * E. Display Transposed Roster
+     *
+     * We'll skip positions that have "visible: false"
+     * so "Pass Counter (Buffer)" is assigned but not displayed.
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
@@ -425,6 +431,7 @@
 
       // Rows = positions
       Object.keys(roster).forEach(pos => {
+        if (!positions[pos].visible) return; // skip hidden positions
         html += `<tr><td>${pos}</td>`;
         timeSlots.forEach(slot => {
           let assignedStaff = roster[pos][slot];
