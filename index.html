@@ -86,16 +86,22 @@
     #rosterOutput {
       margin-top: 30px;
     }
+    /* Wrapper for horizontal scrolling */
+    #rosterTableWrapper {
+      width: 100%;
+      overflow-x: auto;    /* enable horizontal scroll */
+      white-space: nowrap; /* keep columns from wrapping */
+      margin-top: 10px;
+    }
     #rosterTable {
       border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
+      min-width: 800px; /* minimum width to ensure proper display */
     }
     #rosterTable th, #rosterTable td {
       border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
-      white-space: nowrap;
+      vertical-align: middle;
     }
     #rosterTable th {
       background-color: #f0f0f0;
@@ -421,6 +427,9 @@
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
+      
+      // Add a wrapper for horizontal scrolling
+      html += '<div id="rosterTableWrapper">';
       html += "<table id='rosterTable'><thead><tr><th>Location</th>";
 
       // Header columns = timeSlots
@@ -435,12 +444,21 @@
         html += `<tr><td>${pos}</td>`;
         timeSlots.forEach(slot => {
           let assignedStaff = roster[pos][slot];
-          let cell = assignedStaff.length ? assignedStaff.join(" / ") : "-";
-          html += `<td>${cell}</td>`;
+          
+          // Improved handling of empty arrays and display format
+          if (assignedStaff.length === 0) {
+            html += "<td>-</td>";
+          } else {
+            // Join with " | " separator instead of " / "
+            let cell = assignedStaff.join(" | ");
+            html += `<td>${cell}</td>`;
+          }
         });
-        html += "</tr>`;
+        html += "</tr>";
       });
+      
       html += "</tbody></table>";
+      html += "</div>"; // Close the horizontal scroll wrapper
 
       // Add export buttons
       html += `
@@ -492,4 +510,3 @@
   </script>
 </body>
 </html>
-<!DOCTYPE html> <html lang="en"> <head>   <meta charset="UTF-8">   <title>Transposed Roster with Multiple IDs per Cell & Scrolling</title>   <style>     body {       font-family: Arial, sans-serif;       margin: 20px;     }     /* Wrapper for horizontal scrolling */     #rosterTableWrapper {       width: 100%;       overflow-x: auto;    /* enable horizontal scroll */       white-space: nowrap; /* keep columns from wrapping */       margin-top: 10px;     }     #rosterTable {       border-collapse: collapse;       min-width: 800px; /* or whatever width you prefer */     }     #rosterTable th, #rosterTable td {       border: 1px solid #ccc;       padding: 8px;       text-align: center;       vertical-align: middle;     }     #rosterTable th {       background-color: #f0f0f0;     }   </style> </head> <body>   <h1>Transposed Roster</h1>      <!-- The final roster output goes here -->   <div id="rosterOutput"></div>    <script>     // Example data structure: roster[pos][slot] = array of staff IDs     // We'll just simulate something for demonstration.     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];     const positions = ["Pass Counter", "Guard House", "HHMD", "Lobby 1", "Lobby 2"];      // Example "roster" for demonstration     const sampleRoster = {       "Pass Counter": {         "20:00": ["9087"], "20:30": ["9087"], "21:00": ["3551"], "22:00": ["3381"], "23:00": ["2790"], "00:00": ["2206","5419"]       },       "Guard House": {         "20:00": ["3551"], "20:30": ["3551"], "21:00": ["3551"], "22:00": ["3381"], "23:00": ["-"],    "00:00": ["2206"]       },       "HHMD": {         "20:00": ["5041"], "20:30": ["5041"], "21:00": ["5041"], "22:00": ["5041"], "23:00": ["5041"], "00:00": ["5041"]       },       "Lobby 1": {         "20:00": ["5770","6419"], "20:30": ["6419"], "21:00": ["6419"], "22:00": ["6419"], "23:00": ["6419"], "00:00": []       },       "Lobby 2": {         "20:00": ["-"],    "20:30": ["-"],    "21:00": ["-"],    "22:00": ["-"],    "23:00": ["-"],    "00:00": []       }     };      // Function to display the transposed roster with multiple IDs per cell     function displayRosterTransposed(roster) {       let html = "<h2>Generated Roster (Transposed)</h2>";       html += '<div id="rosterTableWrapper">';       html += '<table id="rosterTable"><thead><tr><th>Location</th>';        // Header columns = timeSlots       timeSlots.forEach(slot => {         html += `<th>${slot}</th>`;       });       html += "</tr></thead><tbody>";        // Rows = positions       Object.keys(roster).forEach(pos => {         html += `<tr><td>${pos}</td>`;         timeSlots.forEach(slot => {           let assignedStaff = roster[pos][slot];           // If it's an array, join with " | "           // If it's a single string like "-", just display it as-is           if (Array.isArray(assignedStaff)) {             if (assignedStaff.length === 0) {               html += "<td>-</td>";             } else {               let cell = assignedStaff.join(" | ");               html += `<td>${cell}</td>`;             }           } else {             // If it's a string like "-", just display it             html += `<td>${assignedStaff}</td>`;           }         });         html += "</tr>";       });        html += "</tbody></table>";       html += "</div>"; // close #rosterTableWrapper        document.getElementById("rosterOutput").innerHTML = html;     }      // For demonstration, just call display with sampleRoster     displayRosterTransposed(sampleRoster);   </script> </body> </html>
