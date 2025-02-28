@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Transposed Roster (Lobby Split + Buffer Staff)</title>
+  <title>Transposed Roster (Lobby Split + Buffer Staff + Multiple IDs + Table Slider)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,6 +12,7 @@
     h1 {
       margin-bottom: 10px;
     }
+
     /* Staff Table (Dashboard) */
     #staffTable {
       width: 100%;
@@ -64,7 +65,7 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      width: 160px; /* fixed width */
+      width: 160px; /* fixed width for uniformity */
       text-align: center;
     }
     .btn:hover {
@@ -86,22 +87,22 @@
     #rosterOutput {
       margin-top: 30px;
     }
-    /* Wrapper for horizontal scrolling */
+    /* A wrapper to allow horizontal scrolling if needed */
     #rosterTableWrapper {
       width: 100%;
       overflow-x: auto;    /* enable horizontal scroll */
-      white-space: nowrap; /* keep columns from wrapping */
+      white-space: nowrap; /* prevent columns from wrapping */
       margin-top: 10px;
     }
     #rosterTable {
       border-collapse: collapse;
-      min-width: 800px; /* minimum width to ensure proper display */
+      min-width: 800px; /* so there's something to scroll horizontally if needed */
     }
     #rosterTable th, #rosterTable td {
       border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
-      vertical-align: middle;
+      white-space: nowrap;
     }
     #rosterTable th {
       background-color: #f0f0f0;
@@ -115,11 +116,11 @@
     }
   </style>
 
-  <!-- For PDF export (remove if you don't need PDF) -->
+  <!-- For PDF export (remove if not needed) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <h1>Transposed Roster (Lobby Split + Buffer Staff)</h1>
+  <h1>Transposed Roster (Lobby Split + Buffer Staff + Multiple IDs + Table Slider)</h1>
 
   <!-- Staff Dashboard Table -->
   <table id="staffTable">
@@ -156,7 +157,6 @@
     /***********************************************************************
      * A. Staff Dashboard
      ***********************************************************************/
-    // On page load, retrieve staff data from localStorage.
     window.addEventListener('DOMContentLoaded', () => {
       loadFromLocalStorage();
     });
@@ -305,6 +305,7 @@
       link.href = url;
       link.download = "staffData.json";
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
 
@@ -312,29 +313,26 @@
      * D. Roster Generation (Rule-Based, Transposed)
      *
      * We define separate positions for "Lobby 1" and "Lobby 2" so each staff
-     * appears in its own cell (no "/").
-     *
-     * We also define "Pass Counter (Buffer)" with required=1 but we skip
-     * displaying it in the final transposed table. It's assigned behind the scenes.
+     * gets its own cell. We also have a "Pass Counter (Buffer)" that's hidden.
+     * If your logic assigns multiple staff to a single position/slot, 
+     * they will appear joined by " | ".
      ***********************************************************************/
     // Example time slots from 20:00 to 00:00
     const timeSlots = ["20:00","20:30","21:00","22:00","23:00","00:00"];
 
-    // Positions, each requiring 1 staff
-    // We have "Lobby 1" and "Lobby 2" instead of a single Lobby with 2 staff.
-    // "Pass Counter (Buffer)" is assigned but hidden in the final display.
+    // Each position requires 1 staff. "Lobby 1" & "Lobby 2" avoid slash, "Pass Counter (Buffer)" is hidden.
     const positions = {
-      "Pass Counter":       { required: 1, visible: true },
-      "Pass Counter (Buffer)": { required: 1, visible: false },
-      "Guard House":        { required: 1, visible: true },
-      "HHMD":               { required: 1, visible: true },
-      "Lobby 1":            { required: 1, visible: true },
-      "Lobby 2":            { required: 1, visible: true }
+      "Pass Counter":           { required: 1, visible: true },
+      "Pass Counter (Buffer)":  { required: 1, visible: false },
+      "Guard House":            { required: 1, visible: true },
+      "HHMD":                   { required: 1, visible: true },
+      "Lobby 1":                { required: 1, visible: true },
+      "Lobby 2":                { required: 1, visible: true }
     };
 
     function generateRoster() {
       const staff = getStaffList();
-      // Build roster[pos][slot] = []
+      // Build roster[pos][slot] = arrayOfStaffIDs
       let roster = {};
       Object.keys(positions).forEach(pos => {
         roster[pos] = {};
@@ -343,11 +341,11 @@
         });
       });
 
-      // Track if staff is assigned at a slot
+      // Keep track if staff is assigned at a slot
       let assignedMap = {};
       Object.keys(staff).forEach(sid => { assignedMap[sid] = {}; });
 
-      // For each slot & position, assign staff who meets constraints
+      // For each slot & position, assign staff who meet constraints
       timeSlots.forEach(slot => {
         Object.keys(positions).forEach(pos => {
           let needed = positions[pos].required;
@@ -361,7 +359,7 @@
                 break;
               }
             }
-            // if no staff found, that position remains partially unfilled
+            // If no staff found, that position remains partially unfilled
           }
         });
       });
@@ -421,16 +419,15 @@
 
     /***********************************************************************
      * E. Display Transposed Roster
-     *
-     * We'll skip positions that have "visible: false"
-     * so "Pass Counter (Buffer)" is assigned but not displayed.
+     * 
+     *  - Skips positions with visible=false
+     *  - Joins multiple staff IDs with " | "
+     *  - Wraps the table in #rosterTableWrapper for horizontal scrolling
      ***********************************************************************/
     function displayRosterTransposed(roster) {
       let html = "<h2>Generated Roster (Transposed)</h2>";
-      
-      // Add a wrapper for horizontal scrolling
       html += '<div id="rosterTableWrapper">';
-      html += "<table id='rosterTable'><thead><tr><th>Location</th>";
+      html += '<table id="rosterTable"><thead><tr><th>Location</th>';
 
       // Header columns = timeSlots
       timeSlots.forEach(slot => {
@@ -444,23 +441,20 @@
         html += `<tr><td>${pos}</td>`;
         timeSlots.forEach(slot => {
           let assignedStaff = roster[pos][slot];
-          
-          // Improved handling of empty arrays and display format
+          // If multiple staff, join with " | "
           if (assignedStaff.length === 0) {
             html += "<td>-</td>";
           } else {
-            // Join with " | " separator instead of " / "
             let cell = assignedStaff.join(" | ");
             html += `<td>${cell}</td>`;
           }
         });
         html += "</tr>";
       });
-      
       html += "</tbody></table>";
-      html += "</div>"; // Close the horizontal scroll wrapper
+      html += "</div>"; // close #rosterTableWrapper
 
-      // Add export buttons
+      // Export buttons
       html += `
         <div class="export-buttons">
           <button class="btn" onclick="exportRosterPDF()">Export Roster PDF</button>
