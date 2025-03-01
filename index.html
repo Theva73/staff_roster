@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <style>
+/* (All your CSS styles here - no changes needed in the CSS) */
     /* =================== Global Style Variables =================== */
     :root {
       --primary-color: #4f46e5; /* Original primary color */
@@ -562,8 +563,7 @@
         else if(workingCount < 8){ countElement.style.color = "orange"; countElement.title = "Minimal staff count"; }
         else{ countElement.style.color = "green"; countElement.title = "Sufficient staff"; }
       },
-
-           /******************** Roster Generation & Scheduling ********************/
+      /******************** Roster Generation & Scheduling ********************/
       shuffleBreakTimes: function() {
         const staffList = this.getCurrentStaffList();
         let changedCount = 0;
@@ -610,6 +610,8 @@
       toggleBreakNote: function() {
         document.getElementById("breakListContainer").classList.toggle("hidden");
       },
+      
+
       /******************** Import/Export Functions ********************/
       importData: function() {
         const fileInput = document.getElementById("importFile");
@@ -672,18 +674,15 @@
 
 
       /******************** Roster Generation & Conflict Resolution ********************/
-     generateRoster: function() {
+    generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
         if (staffList.length === 0) {
-          this.showError("Add staff before generating roster.");
-          return;
+            this.showError("Add staff before generating roster."); return;
         }
 
-        staffList.forEach(st => {
-          if (!st.locked) st.assigned = [];
-        });
+        staffList.forEach(st => { if (!st.locked) st.assigned = []; });
 
         let roster = this.initializeRoster();
         let shortfalls = [];
@@ -704,161 +703,134 @@
         this.displayNotes(shortfalls);
         this.displayBreakList();
 
-        const healthStatus = shortfalls.length === 0 ? "Optimal roster generated!" : `Roster generated with ${shortfalls.length} issues.`;
+        const healthStatus = shortfalls.length === 0 ? "Optimal roster generated!"
+                                                    : `Roster generated with ${shortfalls.length} issues.`;
         this.showSuccess(healthStatus);
-        return {
-          roster: this.generatedRosterData,
-          shortfalls
-        };
-      },
+        return { roster: this.generatedRosterData, shortfalls };
+    },
 
-      initializeRoster: function() {
+    initializeRoster: function() {
         let roster = {};
-        PRIORITY.forEach(({
-          location
-        }) => {
-          roster[location] = {};
-        });
+        PRIORITY.forEach(({ location }) => { roster[location] = {}; });
         return roster;
-      },
+    },
 
     assignCritical: function(roster, staffList, isWeekend, shortfalls) {
-    for (const loc in CRITICAL_LOCATIONS) {
-        if (loc === "Report Room" && isWeekend) continue; // Skip Report Room on weekends
-        for (const slot of CRITICAL_LOCATIONS[loc]) {
-            if (!this.locationApplies(loc, slot, isWeekend)) continue; // Use locationApplies
+        for (const loc in CRITICAL_LOCATIONS) {
+            if (loc === "Report Room" && isWeekend) continue;
+            for (const slot of CRITICAL_LOCATIONS[loc]) {
+                if (!this.locationApplies(loc, slot, isWeekend)) continue;
+                if (!roster[loc][slot]) roster[loc][slot] = "";
 
-            if (!roster[loc][slot]) roster[loc][slot] = "";
-
-            let chosen = this.findAvailableStaff(staffList, slot, loc);
-            if (chosen) {
-                let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-                roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
-                chosen.assigned.push({ slot, location: loc });
-            } else {
-                chosen = this.findEmergencyStaff(staffList, slot, loc); // Consider emergency staff, BUT with location check
+                let chosen = this.findAvailableStaff(staffList, slot, loc);
                 if (chosen) {
-                  let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-                  roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
-                  chosen.assigned.push({ slot, location: loc });
-                  shortfalls.push(`Emergency: ${chosen.staffID} assigned to ${loc} at ${slot}`);
+                    let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+                    roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
+                    chosen.assigned.push({ slot, location: loc });
                 } else {
-                    shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot}`);
+                    chosen = this.findEmergencyStaff(staffList, slot, loc); // Pass loc here
+                    if (chosen) {
+                        let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+                        roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
+                        chosen.assigned.push({ slot, location: loc });
+                        shortfalls.push(`Emergency: ${chosen.staffID} assigned to ${loc} at ${slot}`);
+                    } else {
+                        shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot}`);
+                    }
                 }
             }
         }
-    }
 
-    // Check for completely empty locations after critical assignments
-    for (const loc in roster) {
-        let allEmpty = true;
-        for (const slot in roster[loc]) {
-            if (roster[loc][slot] && roster[loc][slot].trim() !== "") {
-                allEmpty = false;
-                break;
+        // Check for completely empty locations:
+        for (const loc in roster) {
+            let allEmpty = true;
+            for (const slot in roster[loc]) {
+                if (roster[loc][slot] && roster[loc][slot].trim() !== "") {
+                    allEmpty = false;
+                    break;
+                }
             }
+            if (allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments.`);
         }
-        if (allEmpty) {
-            shortfalls.push(`CRITICAL: ${loc} has zero assignments.`);
-        }
-    }
-},
+    },
 
-      checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
+    checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
         const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
         for (let time of vpTimes) {
-          if (!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0)
-            shortfalls.push(`Missing Vertical Patrol at ${time}`);
+            if (!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0)
+                shortfalls.push(`Missing Vertical Patrol at ${time}`);
         }
         if (!isWeekend) {
-          const reportTimes = ["20:00", "21:00"];
-          for (let time of reportTimes) {
-            if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0)
-              shortfalls.push(`Missing Report Room at ${time}`);
-          }
+            const reportTimes = ["20:00", "21:00"];
+            for (let time of reportTimes) {
+                if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0)
+                    shortfalls.push(`Missing Report Room at ${time}`);
+            }
         }
         if (!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0)
-          shortfalls.push(`Missing Tango Papa at 07:00`);
+            shortfalls.push(`Missing Tango Papa at 07:00`);
 
-        // Check Pass Counter staffing levels
         for (const slot of ROSTER_TIMES) {
-          if (slot === "07:00") continue; // Skip 07:00, handled by Tango Papa
-          const count = roster["Pass Counter"][slot] ? roster["Pass Counter"][slot].split(" | ").filter(Boolean).length : 0;
-          if (count < 2) {
-            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
-          }
+            if(slot === '07:00') continue; //skip 07:00 check
+            const count = roster["Pass Counter"][slot] ? roster["Pass Counter"][slot].split(" | ").filter(Boolean).length : 0;
+            if (count < 2) shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
         }
 
-        // Check HHMD staffing
         for (const slot of ROSTER_TIMES) {
-          if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
-            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
-          }
+            if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0)
+                shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
         }
-      },
+    },
 
-      assignNonCritical: function(roster, staffList, isWeekend, shortfalls) {
+    assignNonCritical: function(roster, staffList, isWeekend, shortfalls) {
         for (let p of PRIORITY) {
-          const loc = p.location,
-            needed = p.needed;
-          for (let slot of ROSTER_TIMES) {
-             if (!this.locationApplies(loc, slot, isWeekend)) continue; //  use locationApplies
-            if (!roster[loc][slot]) roster[loc][slot] = "";
+            const loc = p.location, needed = p.needed;
+            for (let slot of ROSTER_TIMES) {
+                if (!this.locationApplies(loc, slot, isWeekend)) continue;
+                if (!roster[loc][slot]) roster[loc][slot] = "";
 
-            let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-            const assignedIDs = roster[loc][slot].split(separator).map(s => s.trim()).filter(Boolean);
-            const stillNeeded = needed - assignedIDs.length;
+                let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+                const assignedIDs = roster[loc][slot].split(separator).map(s => s.trim()).filter(Boolean);
+                const stillNeeded = needed - assignedIDs.length;
+                if (stillNeeded <= 0) continue;
 
-            if (stillNeeded <= 0) continue; // Enough staff already assigned
-
-            for (let i = 0; i < stillNeeded; i++) {
-              const availableStaff = this.findAvailableStaff(staffList, slot, loc);
-              if (availableStaff && !this.wouldCauseConflict(roster, availableStaff, slot, loc)) {
-                roster[loc][slot] += (roster[loc][slot] ? separator : "") + availableStaff.staffID;
-                availableStaff.assigned.push({
-                  slot,
-                  location: loc
-                });
-              } else {
-                // Report shortfall if no staff available, but only if *no* staff are assigned yet
-                if(assignedIDs.length + i === 0) { // Check if this is the *first* missing staff
-                    shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
-                } else { //If it is not the *first* staff then, show as *Shortfall*
-                    shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedIDs.length + i}/${needed} staff`);
+                for (let i = 0; i < stillNeeded; i++) {
+                    const availableStaff = this.findAvailableStaff(staffList, slot, loc);
+                    if (availableStaff && !this.wouldCauseConflict(roster, availableStaff, slot, loc)) {
+                        roster[loc][slot] += (roster[loc][slot] ? separator : "") + availableStaff.staffID;
+                        availableStaff.assigned.push({ slot, location: loc });
+                    } else {
+                        if(assignedIDs.length + i === 0) { // Check if this is the *first* missing staff
+                            shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
+                        } else {
+                            shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedIDs.length + i}/${needed} staff`);
+                        }
+                        break; // Stop trying on this slot
+                    }
                 }
-                break; // Stop trying to assign more staff to this slot
-              }
             }
-          }
         }
-      },
+    },
 
-      addBufferStaff: function(roster, staffList, isWeekend) {
-        // Add buffer staff *only* to Pass Counter, and *only* if the required number is already met
+    addBufferStaff: function(roster, staffList, isWeekend) {
         if (roster["Pass Counter"]) {
-          ROSTER_TIMES.forEach(slot => {
-            if (!this.locationApplies("Pass Counter", slot, isWeekend)) return; //check if it applies
-            if (roster["Pass Counter"][slot]) {
-              // Count staff, excluding buffers (marked with *)
-              let visibleAssignments = roster["Pass Counter"][slot].split(" | ").filter(id => !id.includes("*"));
-              if (visibleAssignments.length === PRIORITY.find(p => p.location === "Pass Counter").needed) {
-                // Only add buffer if the required count is met
-                let bufferStaff = this.findAvailableStaff(staffList, slot, "Pass Counter");
-                if (bufferStaff && !this.wouldCauseConflict(roster, bufferStaff, slot, "Pass Counter")) {
-                  roster["Pass Counter"][slot] += " | " + bufferStaff.staffID + "*"; // Mark as buffer
-                  bufferStaff.assigned.push({
-                    slot,
-                    location: "Pass Counter",
-                    buffer: true
-                  }); // Add buffer: true
+            ROSTER_TIMES.forEach(slot => {
+                if (!this.locationApplies("Pass Counter", slot, isWeekend)) return;
+                if (roster["Pass Counter"][slot]) {
+                    let visibleAssignments = roster["Pass Counter"][slot].split(" | ").filter(id => !id.includes("*"));
+                    if (visibleAssignments.length === PRIORITY.find(p => p.location === "Pass Counter").needed) {
+                        let bufferStaff = this.findAvailableStaff(staffList, slot, "Pass Counter");
+                        if (bufferStaff && !this.wouldCauseConflict(roster, bufferStaff, slot, "Pass Counter")) {
+                            roster["Pass Counter"][slot] += " | " + bufferStaff.staffID + "*";
+                            bufferStaff.assigned.push({ slot, location: "Pass Counter", buffer: true });
+                        }
+                    }
                 }
-              }
-            }
-          });
+            });
         }
-      },
+    },
 
-      createDisplayData: function(roster) {
+    createDisplayData: function(roster) {
         let displayData = {};
         OUTPUT_ORDER.forEach(loc => {
           displayData[loc] = {};
@@ -880,7 +852,6 @@
         });
         return displayData;
       },
-
 
     autoCorrect: function(roster, staffList, gapThreshold) {
         const maxIterations = 20;
@@ -912,7 +883,7 @@
         }
     },
 
-    findEmergencyStaff: function(staffList, slot, loc) { // Added loc parameter
+   findEmergencyStaff: function(staffList, slot, loc) { // Added loc parameter
         // Prioritize staff who are *not* locked.
         const availableStaff = staffList.filter(st =>
             st.attendance === "Yes" &&
@@ -934,7 +905,6 @@
 
         return null; // No staff available
     },
-
     findAvailableStaff: function(staffList, slot, loc) {
         const sortedStaff = [...staffList].sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0));
 
@@ -950,32 +920,29 @@
         }
         return null;
     },
+
     isOnBreak: function(st, slot) {
-    if (!st.breakTime || !st.breakTime.includes("-")) return false;
+        if (!st.breakTime || !st.breakTime.includes("-")) return false;
+        if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]-([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(st.breakTime)) {
+            console.warn("Invalid break time format:", st.staffID, st.breakTime);
+            return false;
+        }
+        const [bStart, bEnd] = st.breakTime.split("-");
+        const slotTime = this.timeToMinutes(slot);
+        const breakStart = this.timeToMinutes(bStart);
+        const breakEnd = this.timeToMinutes(bEnd);
 
-    // Check if breakTime format is valid
-    if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]-([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(st.breakTime)) {
-        console.warn("Invalid break time format for staff:", st.staffID, st.breakTime);
-        return false; // Consider invalid format as NOT on break to prevent incorrect assignments
-    }
+        if (breakStart <= breakEnd) {
+            return slotTime >= breakStart && slotTime <= breakEnd;
+        } else {
+            return slotTime >= breakStart || slotTime <= breakEnd;
+        }
+    },
 
-    const [bStart, bEnd] = st.breakTime.split("-");
-    const slotTime = this.timeToMinutes(slot);
-    const breakStart = this.timeToMinutes(bStart);
-    const breakEnd = this.timeToMinutes(bEnd);
-
-
-    if (breakStart <= breakEnd) {
-        // Normal case: break starts and ends on the same day
-        return slotTime >= breakStart && slotTime <= breakEnd;
-    } else {
-        // Overnight break: break starts on one day and ends on the next
-        return slotTime >= breakStart || slotTime <= breakEnd;
-    }
-},
-      isDoubleBooked: function(st, slot) {
+    isDoubleBooked: function(st, slot) {
         return st.assigned && st.assigned.some(a => a.slot === slot);
-      },
+    },
+
    wouldCauseConflict: function(roster, staff, slot, loc) {
     if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
 
@@ -1001,163 +968,134 @@
 
     return false;
 },
-      autoCorrectRoster: function(roster, staffList, conflicts) {
+    autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
-
-        // Iterate through the conflicts
         for (let loc in conflicts) {
-          for (let slot in conflicts[loc]) {
-            let staffObj = conflicts[loc][slot];
-            for (let staffID in staffObj) {
-              let staff = staffList.find(s => s.staffID === staffID);
-              if (staff) {
-                // Remove the conflicting assignment
-                this.removeAssignment(roster, staff, slot, loc);
+            for (let slot in conflicts[loc]) {
+                for (let staffID in conflicts[loc][slot]) {
+                    let staff = staffList.find(s => s.staffID === staffID);
+                    if (staff) {
+                        this.removeAssignment(roster, staff, slot, loc);
+                        let currentAssignments = roster[loc][slot]
+                            .split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",")
+                            .map(s => s.trim()).filter(Boolean);
+                        roster[loc][slot] = [...new Set(currentAssignments)].join((loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ");
 
-                // Clean up the roster entry (remove duplicates, etc.)
-                let currentAssignments = roster[loc][slot].split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
-                roster[loc][slot] = [...new Set(currentAssignments)].join((loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ");
-
-                // Try to find a replacement *only* if it's not Tango Papa at 07:00 (which should be fixed)
-                if (slot !== "07:00" || loc === "Tango Papa") { //Special rule for 07:00
-                  let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot, loc); // Exclude original, include loc
-                  if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc) && !this.isOnBreak(newStaff,slot)) {
-                    // Assign the new staff member
-                    roster[loc][slot] = roster[loc][slot] ? ((loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot] + " | " + newStaff.staffID : roster[loc][slot] + ", " + newStaff.staffID) : newStaff.staffID;
-                    newStaff.assigned.push({
-                      slot,
-                      location: loc
-                    });
-                    correctionsMade = true;
-                  } else {
-                    //If cant find, flag that correction has been made.
-                    correctionsMade = true;
-                  }
-                } else {
-                    correctionsMade = true; // Indicate that a change was made, even if no replacement
+                        if (slot !== "07:00" || loc === "Tango Papa") {
+                            let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot, loc); // Use emergency
+                            if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc) && !this.isOnBreak(newStaff, slot)) {
+                                roster[loc][slot] = roster[loc][slot]
+                                    ? ((loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot] + " | " + newStaff.staffID : roster[loc][slot] + ", " + newStaff.staffID)
+                                    : newStaff.staffID;
+                                newStaff.assigned.push({ slot, location: loc });
+                                correctionsMade = true;
+                            } else {
+                                correctionsMade = true; // Still count as a correction
+                            }
+                        } else {
+                             correctionsMade = true;
+                        }
+                    }
                 }
-              }
             }
-          }
         }
         return correctionsMade;
-      },
+    },
+
     removeAssignment: function(roster, staff, slot, loc) {
-        // Remove the assignment from the staff member's assigned array
         staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
-
-        // Remove the staff ID from the roster string
         if (roster[loc] && roster[loc][slot]) {
-          let ids = roster[loc][slot].split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
-          ids = ids.filter(id => id !== staff.staffID); // Remove the staff ID
-          roster[loc][slot] = ids.join((loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ");
+            let ids = roster[loc][slot].split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
+            ids = ids.filter(id => id !== staff.staffID);
+            roster[loc][slot] = ids.join((loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ");
         }
-      },
-    validateRoster: function(roster, gapThreshold = 120) {
-    const staffAssignments = {};
-    const issues = [];
-    const conflicts = {};
+    },
 
-    const staffList = this.getCurrentStaffList(); // Get current staff
+   validateRoster: function(roster, gapThreshold = 120) {
+        const staffAssignments = {};
+        const issues = [];
+        const conflicts = {};
+        const staffList = this.getCurrentStaffList();
 
-    // Helper function to add a conflict
-    function addConflict(loc, slot, staffID, conflictType) {
-        if (!conflicts[loc]) conflicts[loc] = {};
-        if (!conflicts[loc][slot]) conflicts[loc][slot] = {};
-        if (!conflicts[loc][slot][staffID]) conflicts[loc][slot][staffID] = [];
-        conflicts[loc][slot][staffID].push(conflictType);
-    }
+        function addConflict(loc, slot, staffID, conflictType) {
+            if (!conflicts[loc]) conflicts[loc] = {};
+            if (!conflicts[loc][slot]) conflicts[loc][slot] = {};
+            if (!conflicts[loc][slot][staffID]) conflicts[loc][slot][staffID] = [];
+            conflicts[loc][slot][staffID].push(conflictType);
+        }
 
+        for (const loc in roster) {
+            for (const slot in roster[loc]) {
+                const staffListStr = roster[loc][slot];
+                if (!staffListStr) continue;
 
-    // Iterate through each location and time slot
-    for (const loc in roster) {
-        for (const slot in roster[loc]) {
-            const staffListStr = roster[loc][slot];
-            if (!staffListStr) continue; // Skip empty slots
+                if (slot === "07:00" && loc !== "Tango Papa") {
+                    const staffIDs = staffListStr.split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
+                    staffIDs.forEach(staffID => {
+                        issues.push(`Staff ${staffID} assigned at ${loc} for 07:00, reserved for Tango Papa`);
+                        addConflict(loc, slot, staffID, "invalid0700");
+                    });
+                    continue;
+                }
 
-
-            //Special validation for 07:00
-            if(slot === "07:00" && loc !== "Tango Papa"){
                 const staffIDs = staffListStr.split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
-                staffIDs.forEach(staffID => {
-                    issues.push(`Staff ${staffID} assigned at ${loc} for 07:00, reserved for Tango Papa`);
-                    addConflict(loc, slot, staffID, "invalid0700");
-                });
-                continue; // Skip further processing for this invalid slot
-            }
-
-            // Split the staff IDs based on the location
-            const staffIDs = staffListStr.split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
-
-
-            // Check for duplicate assignments within the same slot
-            const uniqueStaffIDs = new Set(staffIDs);
-            if (uniqueStaffIDs.size < staffIDs.length) {
-                const duplicates = staffIDs.filter((id, index) => staffIDs.indexOf(id) !== index);
-                duplicates.forEach(id => {
-                    issues.push(`Staff ${id} listed multiple times at ${loc} for ${slot}`);
-                    addConflict(loc, slot, id, "duplicateAssignment");
-                });
-            }
-
-            // Iterate through each staff ID assigned to the current slot
-            for (const staffID of staffIDs) {
-                const staff = staffList.find(s => s.staffID === staffID);
-
-                // Check if the staff member is on break -- No longer needed
-                //if (staff && rosterSystem.isOnBreak(staff, slot)) {
-                //    issues.push(`Staff ${staffID} assigned at ${loc} during break at ${slot}`);
-                //    addConflict(loc, slot, staffID, "breakViolation");
-                //}
-
-                // Check for double-booking (being assigned to multiple locations at the same time)  -- Simplified
-                if (!staffAssignments[staffID]) staffAssignments[staffID] = [];
-                const existingAssignment = staffAssignments[staffID].find(a => a.slot === slot); // Simplified check
-                if (existingAssignment) {
-                    issues.push(`Staff ${staffID} double-booked at ${slot}: ${existingAssignment.location} and ${loc}`);
-                    addConflict(loc, slot, staffID, "doubleBooked");
-                    addConflict(existingAssignment.location, slot, staffID, "doubleBooked"); // Mark both locations
+                const uniqueStaffIDs = new Set(staffIDs);
+                if (uniqueStaffIDs.size < staffIDs.length) {
+                    const duplicates = staffIDs.filter((id, index) => staffIDs.indexOf(id) !== index);
+                    duplicates.forEach(id => {
+                        issues.push(`Staff ${id} listed multiple times at ${loc} for ${slot}`);
+                        addConflict(loc, slot, id, "duplicateAssignment");
+                    });
                 }
 
-                // Add the current assignment to the staff member's assignments
-                staffAssignments[staffID].push({ slot, location: loc, buffer: false }); //Not a buffer staff
-            }
-        }
-    }
+                for (const staffID of staffIDs) {
+                    const staff = staffList.find(s => s.staffID === staffID);
 
-    // Check for gap violations and consecutive assignments
-    for (const staffID in staffAssignments) {
-        const assignments = staffAssignments[staffID].sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
-        for (let i = 0; i < assignments.length - 1; i++) {
-            const curr = assignments[i];
-            const next = assignments[i + 1];
+                  //  if (staff && rosterSystem.isOnBreak(staff, slot)) {   -- No need to check anymore since this will handle findAvailableStaff
+                  //      issues.push(`Staff ${staffID} assigned at ${loc} during break at ${slot}`);
+                  //     addConflict(loc, slot, staffID, "breakViolation");
+                  //  }
 
-             // Check for consecutive assignments at the same location
-            if (curr.location === next.location &&
-                Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
-                issues.push(`Staff ${staffID} has consecutive assignments at ${curr.location}: ${curr.slot} and ${next.slot}`);
-                addConflict(curr.location, curr.slot, staffID, "consecutive");
-                addConflict(next.location, next.slot, staffID, "consecutive");
-            }
+                    if (!staffAssignments[staffID]) staffAssignments[staffID] = [];
+                    const existingAssignment = staffAssignments[staffID].find(a => a.slot === slot);
+                    if (existingAssignment) {
+                        issues.push(`Staff ${staffID} double-booked at ${slot}: ${existingAssignment.location} and ${loc}`);
+                        addConflict(loc, slot, staffID, "doubleBooked");
+                        addConflict(existingAssignment.location, slot, staffID, "doubleBooked");
+                    }
 
-
-            // Check for gap violations
-            if (curr.location === next.location) {
-                const currTime = rosterSystem.timeToMinutes(curr.slot);
-                const nextTime = rosterSystem.timeToMinutes(next.slot);
-
-                //Calculate the difference and check against gapThreshold
-                if (nextTime - currTime < gapThreshold && nextTime - currTime > 0) {
-                    issues.push(`Staff ${staffID} violates ${gapThreshold/60}-hour gap at ${curr.location}: ${curr.slot} and ${next.slot}`);
-                    addConflict(curr.location, curr.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
-                    addConflict(next.location, next.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
+                    staffAssignments[staffID].push({ slot, location: loc, buffer: false });
                 }
             }
         }
-    }
 
-    return { issues, conflicts };
-},
+        for (const staffID in staffAssignments) {
+            const assignments = staffAssignments[staffID].sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
+            for (let i = 0; i < assignments.length - 1; i++) {
+                const curr = assignments[i];
+                const next = assignments[i + 1];
+
+                if (curr.location === next.location &&
+                    Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
+                    issues.push(`Staff ${staffID} has consecutive assignments at ${curr.location}: ${curr.slot} and ${next.slot}`);
+                    addConflict(curr.location, curr.slot, staffID, "consecutive");
+                    addConflict(next.location, next.slot, staffID, "consecutive");
+                }
+
+                if (curr.location === next.location) {
+                    const currTime = rosterSystem.timeToMinutes(curr.slot);
+                    const nextTime = rosterSystem.timeToMinutes(next.slot);
+                    if (nextTime - currTime < gapThreshold && nextTime - currTime > 0) {
+                        issues.push(`Staff ${staffID} violates ${gapThreshold/60}-hour gap at ${curr.location}: ${curr.slot} and ${next.slot}`);
+                        addConflict(curr.location, curr.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
+                        addConflict(next.location, next.slot, staffID, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
+                    }
+                }
+            }
+        }
+
+        return { issues, conflicts };
+    },
       saveAssignedToRows: function(staffList) {
         const rows = document.getElementById("staffTable").querySelector("tbody").rows;
         for (let i = 0; i < rows.length; i++) {
@@ -1170,87 +1108,62 @@
         }
         this.saveStaffList(); // crucial to save after roster generation
       },
+      
 
       /******************** Display Functions ********************/
-      displayRoster: function(roster, conflicts = {}, creationTime) {
+     displayRoster: function(roster, conflicts = {}, creationTime) {
         const container = document.getElementById("rosterContainer");
         const rosterDate = document.getElementById("rosterDate").value;
         const dayValue = document.getElementById("rosterDay").value;
 
-        // Header with date, day, and generation time
         let headerHTML = `<div style="text-align:left; margin-bottom:15px; font-size:13px; display:flex; justify-content: space-between; flex-wrap: wrap;">
-          <div><strong>Roster Date:</strong> ${rosterDate} (${dayValue})</div>
-          <div><strong>Generated:</strong> ${creationTime.toLocaleString()}</div>
+            <div><strong>Roster Date:</strong> ${rosterDate} (${dayValue})</div>
+            <div><strong>Generated:</strong> ${creationTime.toLocaleString()}</div>
         </div>`;
 
-        let tableHTML = `<table id="editableRoster" class="roster-table">
-          <thead>
-            <tr><th style="min-width:100px;">Location</th>`; // Location column (frozen)
-        ROSTER_TIMES.forEach(slot => {
-          tableHTML += `<th>${slot}</th>`;
-        });
+        let tableHTML = `<table id="editableRoster" class="roster-table"><thead><tr><th style="min-width:100px;">Location</th>`;
+        ROSTER_TIMES.forEach(slot => tableHTML += `<th>${slot}</th>`);
         tableHTML += `</tr></thead><tbody>`;
-
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
 
-        // Iterate through locations in the specified output order
         OUTPUT_ORDER.forEach(loc => {
-          tableHTML += `<tr data-loc="${loc}"><td><strong>${loc}</strong></td>`; // Location row
+            tableHTML += `<tr data-loc="${loc}"><td><strong>${loc}</strong></td>`;
+            ROSTER_TIMES.forEach(slot => {
+                const applies = this.locationApplies(loc, slot, isWeekend);
+                let assignedStr = applies ? (roster[loc]?.[slot] || "") : "";
+                let staffIDs = (loc === "Pass Counter" || loc === "Lobby") ? assignedStr.split(" | ") : assignedStr.split(",");
+                staffIDs = staffIDs.map(s => s.trim()).filter(Boolean);
 
-          //Iterate through each time slot
-          ROSTER_TIMES.forEach(slot => {
-            const applies = this.locationApplies(loc, slot, isWeekend); // Check if applicable
-
-            let assignedStr = applies ? (roster[loc]?.[slot] || "") : ""; // Get assignments
-            let staffIDs = (loc === "Pass Counter" || loc === "Lobby") ? assignedStr.split(" | ") : assignedStr.split(",");
-            staffIDs = staffIDs.map(s => s.trim()).filter(Boolean); //remove empty strings
-
-
-            let cellClass = "",
-              cellStyle = "";
-            if (!applies) {
-              // Not applicable (greyed out)
-              cellStyle = "background-color:#f8f8f8; color:#999;";
-              cellClass = "non-applicable";
-            } else if (conflicts[loc] && conflicts[loc][slot]) {
-              // Conflicts (highlighted in red)
-              cellStyle = "background-color:#ffd2d2;";
-              cellClass = "conflict";
-            } else if (applies && staffIDs.length === 0) {
-              // Applicable but empty (highlight in light red)
-              cellStyle = "background-color:#ffcccc;";
-              cellClass = "empty";
-            } else if (CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) {
-              // Critical location (highlight in light blue)
-              cellStyle = "background-color:#e2f0ff;";
-              cellClass = "critical";
-            }
-
-            tableHTML += `<td contenteditable="true" data-slot="${slot}" class="${cellClass}" style="min-width:80px; ${cellStyle}" title="${applies ? 'Click to edit assignments' : 'Not applicable'}">${assignedStr}</td>`;
-          });
-          tableHTML += `</tr>`;
+                let cellClass = "", cellStyle = "";
+                if (!applies) {
+                    cellStyle = "background-color:#f8f8f8; color:#999;";
+                    cellClass = "non-applicable";
+                } else if (conflicts[loc] && conflicts[loc][slot]) {
+                    cellStyle = "background-color:#ffd2d2;";
+                    cellClass = "conflict";
+                } else if (applies && !staffIDs.length) {
+                    cellStyle = "background-color:#ffcccc;";
+                    cellClass = "empty";
+                } else if (CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) {
+                    cellStyle = "background-color:#e2f0ff;";
+                    cellClass = "critical";
+                }
+                tableHTML += `<td contenteditable="true" data-slot="${slot}" class="${cellClass}" style="min-width:80px; ${cellStyle}" title="${applies ? 'Edit' : 'N/A'}">${assignedStr}</td>`;
+            });
+            tableHTML += "</tr>";
         });
-        tableHTML += `</tbody></table>`;
+        tableHTML += "</tbody></table>";
 
-        // Add a "Save Edits" button
         let saveButtonHTML = `<div style="margin-top:15px; text-align:right;"><button class="roster-btn" id="saveEditsBtn">Save Edits</button></div>`;
-
         container.innerHTML = headerHTML + tableHTML + saveButtonHTML;
-
-        // Add event listener to the "Save Edits" button
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
 
-        // Add event listeners for styling editable cells
         const editableCells = container.querySelectorAll("td[contenteditable='true']");
         editableCells.forEach(cell => {
-          cell.addEventListener("focus", function() {
-            this.style.boxShadow = "0 0 0 2px rgba(79,70,229,0.4)";
-          }); // Add focus style
-          cell.addEventListener("blur", function() {
-            this.style.boxShadow = "";
-          }); // Remove focus style
+            cell.addEventListener("focus", () => cell.style.boxShadow = "0 0 0 2px rgba(108, 117, 125, 0.4)");
+            cell.addEventListener("blur", () => cell.style.boxShadow = "");
         });
-      },
+    },
       // displayNotes: Shows first 3 issues by default, with a toggle to reveal/hide more.
       displayNotes: function(shortfalls) {
         const notesContainer = document.getElementById("notesContainer");
@@ -1390,12 +1303,17 @@
         if (format === "csv") this.downloadAsCSV();
         else if (format === "pdf") this.downloadAsPDF();
       },
-      downloadAsCSV: function() {
+    downloadAsCSV: function() {
         const tableData = this.getTableData();
-        const csv = tableData.map(row => row.join(",")).join("\n");
-        const blob = new Blob([csv], {
-          type: "text/csv"
-        });
+        const rosterDate = document.getElementById("rosterDate").value;
+        const dayValue = document.getElementById("rosterDay").value;
+        const creationTime = new Date().toLocaleString();
+
+        // Add a header row to the CSV data
+        const headerRow = [`Roster Date: ${rosterDate} (${dayValue})`, `Generated: ${creationTime}`];
+        const csvData = [headerRow, ...tableData].map(row => row.join(",")).join("\n");
+
+        const blob = new Blob([csvData], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         const date = new Date().toISOString().split("T")[0];
@@ -1403,38 +1321,64 @@
         link.download = `roster_${date}.csv`;
         link.click();
         URL.revokeObjectURL(url);
-        this.showSuccess("CSV file downloaded successfully."); // Success message
-      },
-      downloadAsPDF: function() {
-        try {
-          const {
-            jsPDF
-          } = window.jspdf;
-          const doc = new jsPDF();
-          doc.text("Staff Roster", 14, 20);
-          const tableData = this.getTableData();
-          doc.autoTable({
-            head: [tableData[0]],
-            body: tableData.slice(1),
+        this.showSuccess("CSV file downloaded successfully.");
+    },
+    downloadAsPDF: function() {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const rosterDate = document.getElementById("rosterDate").value;
+        const dayValue = document.getElementById("rosterDay").value;
+        const creationTime = new Date().toLocaleString();
+
+        // Add a title with date, day, and generation time
+        doc.text(`Staff Roster - ${rosterDate} (${dayValue})\nGenerated: ${creationTime}`, 14, 20);
+
+        const tableData = this.getTableData();
+
+        // Use autoTable with improved styling and column widths
+        doc.autoTable({
+            head: [tableData[0]], // Header row
+            body: tableData.slice(1), // Data rows
+            startY: 30, // Start below the title
+            margin: { top: 30 }, // Ensure enough space for the title
             styles: {
-              halign: 'center',
-              cellPadding: 3
+                halign: 'center',
+                valign: 'middle', // Vertical alignment
+                cellPadding: 3,
+                fontSize: 10,
+                lineColor: [0, 0, 0], // Black border
+                lineWidth: 0.1,
             },
             headStyles: {
-              fillColor: [108, 117, 125],
-              halign: 'center',
-              textColor: 255
-            } // Grey header
-          });
-          const date = new Date().toISOString().split("T")[0];
-          doc.save(`roster_${date}.pdf`);
-          this.showSuccess("PDF file downloaded successfully."); // Success message
-        } catch (e) {
-          console.error("PDF download error:", e);
-          this.showError("Failed to download PDF: " + e.message);
-        }
-      },
-    /******************** Utility Functions ********************/
+                fillColor: [108, 117, 125], // Gray background
+                textColor: 255, // White text
+                halign: 'center',
+                fontStyle: 'bold',
+            },
+            columnStyles: {
+                0: { cellWidth: 80 }, // Location column wider
+                // You can add more column styles here if needed
+            },
+            didParseCell: function (data) {
+                // Remove content from non-applicable cells for cleaner output
+                const cell = data.cell;
+                if (cell.raw && cell.raw.includes && cell.raw.includes('Not applicable')) {
+                  data.cell.text = ''; // Clear the text
+                }
+            }
+        });
+
+        const date = new Date().toISOString().split("T")[0];
+        doc.save(`roster_${date}.pdf`);
+        this.showSuccess("PDF file downloaded successfully.");
+    } catch (e) {
+        console.error("PDF download error:", e);
+        this.showError("Failed to download PDF: " + e.message);
+    }
+},
+      /******************** Utility Functions ********************/
     timeToMinutes: function(timeStr) {
         if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) {
             console.warn("Invalid time format:", timeStr);
