@@ -2,53 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Staff Roster - Freeze Location Column</title>
+  <title>Roster Test - Sticky Location & Buttons</title>
   <style>
-    /* Example style for freezing the first column */
+    /* Basic table styling */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+
+    /* Make roster container scrollable horizontally */
     #rosterContainer {
       overflow-x: auto;
+      max-width: 100%;
     }
-    #editableRoster thead th:first-child,
-    #editableRoster tbody td:first-child {
+    /* Freeze first column */
+    #rosterTable thead th:first-child,
+    #rosterTable tbody td:first-child {
       position: sticky;
       left: 0;
-      background: #fff;
+      background: #fdfdfd; /* or white, or your header color */
       z-index: 10;
     }
-    /* ... rest of your CSS ... */
+    .button-row {
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
+  <h2>Roster Test - Sticky Location & Buttons</h2>
   <div id="rosterContainer">
-    <table id="editableRoster">
+    <table id="rosterTable">
       <thead>
         <tr>
           <th>Location</th>
           <th>20:00</th>
           <th>20:30</th>
-          <!-- etc. -->
+          <th>21:00</th>
+          <!-- Add more columns as needed -->
         </tr>
       </thead>
       <tbody>
-        <!-- Roster rows -->
+        <!-- Example row -->
+        <tr>
+          <td>Pass Counter</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Lobby</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
       </tbody>
     </table>
   </div>
 
+  <!-- Buttons -->
+  <div class="button-row">
+    <button id="addStaffBtn">Add Staff</button>
+    <button id="generateRosterBtn">Generate Roster</button>
+    <button id="importDataBtn">Import Data</button>
+    <button id="exportDataBtn">Export Data</button>
+  </div>
+
   <script>
-    /* Make sure STORAGE_KEY is defined */
+    /* 1) Define STORAGE_KEY (must be declared before usage). */
     const STORAGE_KEY = 'staffListData_v2';
 
-    /* Example usage in localStorage */
-    function saveStaffList(staffList) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
-      } catch (e) {
-        console.error("Failed to save staff list:", e);
-      }
-    }
+    /* 2) Attach event listeners once DOM is loaded. */
+    document.addEventListener('DOMContentLoaded', function() {
+      // Example event listeners:
+      document.getElementById('addStaffBtn').addEventListener('click', () => {
+        alert('Add Staff clicked');
+      });
+      document.getElementById('generateRosterBtn').addEventListener('click', () => {
+        alert('Generate Roster clicked');
+      });
+      document.getElementById('importDataBtn').addEventListener('click', () => {
+        // Example import logic
+        alert('Import Data clicked');
+      });
+      document.getElementById('exportDataBtn').addEventListener('click', () => {
+        // Example export logic
+        alert('Export Data clicked');
+      });
 
-    /* ... the rest of your script ... */
+      console.log("All buttons are now bound to their click handlers!");
+    });
   </script>
 </body>
 </html>
