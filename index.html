@@ -611,7 +611,7 @@
         document.getElementById("breakListContainer").classList.toggle("hidden");
       },
 
-      /******************** Import/Export Functions ********************/
+     /******************** Import/Export Functions ********************/
       importData: function() {
         const fileInput = document.getElementById("importFile");
         fileInput.value = "";
@@ -780,7 +780,6 @@
                 shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
         }
     },
-
     assignNonCritical: function(roster, staffList, isWeekend, shortfalls) {
         for (let p of PRIORITY) {
             const loc = p.location, needed = p.needed;
@@ -829,24 +828,23 @@
         }
     },
 
- createDisplayData: function(roster) {
-    let displayData = {};
-    OUTPUT_ORDER.forEach(loc => {
-        displayData[loc] = {};
-        ROSTER_TIMES.forEach(slot => {
-            let ids = [];
-            if (roster[loc] && roster[loc][slot]) {
-                let tokens = (loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot].split(" | ") : roster[loc][slot].split(",");
-                // Sort staff IDs numerically before joining:
-                ids = tokens.map(s => s.trim()).filter(id => id && !id.includes("*")).sort((a,b) => parseInt(a) - parseInt(b));
-            }
-            displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby") ? ids.join(" | ") : ids.join(", ");
+    // *** Important: Sorting Staff IDs within createDisplayData ***
+     createDisplayData: function(roster) {
+        let displayData = {};
+        OUTPUT_ORDER.forEach(loc => {
+            displayData[loc] = {};
+            ROSTER_TIMES.forEach(slot => {
+                let ids = [];
+                if (roster[loc] && roster[loc][slot]) {
+                    let tokens = (loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot].split(" | ") : roster[loc][slot].split(",");
+                    // Trim, filter out empty strings and buffers, THEN sort:
+                    ids = tokens.map(s => s.trim()).filter(id => id && !id.includes("*")).sort((a,b) => parseInt(a) - parseInt(b));
+                }
+                displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby") ? ids.join(" | ") : ids.join(", ");
+            });
         });
-    });
-    return displayData;
-},
-
-
+        return displayData;
+    },
     autoCorrect: function(roster, staffList, gapThreshold) {
         const maxIterations = 20;
         let iteration = 0;
@@ -963,7 +961,7 @@
 
     return false;
 },
-    autoCorrectRoster: function(roster, staffList, conflicts) {
+ autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
             for (let slot in conflicts[loc]) {
@@ -1006,8 +1004,7 @@
             roster[loc][slot] = ids.join((loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ");
         }
     },
-
-  validateRoster: function(roster, gapThreshold = 120) {
+    validateRoster: function(roster, gapThreshold = 120) {
         const staffAssignments = {};
         const issues = [];
         const conflicts = {};
@@ -1065,7 +1062,7 @@
             }
         }
 
-        for (const staffID in staffAssignments) {
+            for (const staffID in staffAssignments) {
             const assignments = staffAssignments[staffID].sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
             for (let i = 0; i < assignments.length - 1; i++) {
                 const curr = assignments[i];
@@ -1105,7 +1102,7 @@
         this.saveStaffList(); // crucial to save after roster generation
       },
 
- /******************** Display Functions ********************/
+      /******************** Display Functions ********************/
      displayRoster: function(roster, conflicts = {}, creationTime) {
         const container = document.getElementById("rosterContainer");
         const rosterDate = document.getElementById("rosterDate").value;
@@ -1257,8 +1254,7 @@
           this.showError("Failed to save roster edits: " + error.message);
         }
       },
-
- getEditableRosterData: function() {
+      getEditableRosterData: function() {
         const rosterTable = document.getElementById("editableRoster");
         if (!rosterTable) return {}; // Return empty object if no table
 
@@ -1289,7 +1285,8 @@
         });
         return data;
       },
-      /******************** Export Functions ********************/
+
+ /******************** Export Functions ********************/
       copyTSV: function() {
         const tableData = this.getTableData();
         const tsv = tableData.map(row => row.join("\t")).join("\n");
@@ -1319,8 +1316,7 @@
         URL.revokeObjectURL(url);
         this.showSuccess("CSV file downloaded successfully.");
     },
-
-downloadAsPDF: function() {
+    downloadAsPDF: function() {
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -1353,13 +1349,13 @@ downloadAsPDF: function() {
                 lineWidth: 0.5, // Thicker border
             },
             headStyles: {
-                fillColor: [108, 117, 125],
-                textColor: 255,
+                fillColor: [108, 117, 125], // Grey background
+                textColor: 255, // White text
                 halign: 'center',
                 fontStyle: 'bold',
             },
             columnStyles: {
-                0: { cellWidth: 80 }, // Location column
+                0: { cellWidth: 80 }, // Location column wider
                // 1: { cellWidth: 20 }, // Example: Adjust other columns as needed
                // 2: { cellWidth: 20 },
                // ... and so on for all columns
@@ -1371,6 +1367,23 @@ downloadAsPDF: function() {
                   data.cell.text = '';
                 }
             },
+
+             // Add thin lines *within* cells for multiple staff
+            didDrawCell: function(data) {
+                if (data.section === 'body' && data.column.index !== 0) { // Skip location column
+                    const cell = data.cell;
+                    const lines = cell.text;
+                    if (lines.length > 1) { // Multiple staff
+                        let y = cell.y + cell.padding('top');
+                        for (let i = 1; i < lines.length; i++) {
+                            y += cell.textLineHeight; // Move down to the next line position
+                            doc.setLineWidth(0.1); // Thinner line
+                            doc.line(cell.x, y, cell.x + cell.width, y); // Horizontal line
+                        }
+                        doc.setLineWidth(0.5); //restore to normal width
+                    }
+                }
+            }
 
         });
 
@@ -1410,7 +1423,7 @@ downloadAsPDF: function() {
     }
 },
 
- /******************** Utility Functions ********************/
+/******************** Utility Functions ********************/
     timeToMinutes: function(timeStr) {
         if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) {
             console.warn("Invalid time format:", timeStr);
@@ -1464,3 +1477,5 @@ downloadAsPDF: function() {
   </script>
 </body>
 </html>
+
+       
