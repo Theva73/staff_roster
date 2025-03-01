@@ -10,8 +10,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <style>
-/* (All your CSS styles here - no changes needed in the CSS) */
-     /* =================== Global Style Variables =================== */
+  /* (All your CSS styles here - will include adjustments for table width) */
+      /* =================== Global Style Variables =================== */
     :root {
       --primary-color: #4f46e5; /* Original primary color */
       --primary-hover: #4338ca; /* Original hover color */
@@ -85,7 +85,7 @@
     }
 
     /* =================== Form Element Styles =================== */
-      input, select {
+     input, select {
         padding: 8px 12px; /* Slightly larger padding */
         text-align: center;
         font-size: 14px; /* Slightly larger font */
@@ -169,6 +169,22 @@
           font-size: 13px;
       }
     }
+    /* Adjust Staff table width */
+        #staffTable {
+            table-layout: fixed; /* Important for consistent column widths */
+        }
+        #staffTable th:nth-child(1) { width: 80px; } /* Staff ID */
+        #staffTable th:nth-child(2) { width: 120px; } /* Name */
+        #staffTable th:nth-child(3) { width: 100px; } /* Break Time - Now narrower */
+        #staffTable th:nth-child(4) { width: 60px; }  /* HHMD */
+        #staffTable th:nth-child(5) { width: 60px; }  /* Attendance */
+        #staffTable th:nth-child(6) { width: 50px; }  /* Lock */
+        #staffTable th:nth-child(7) { width: 80px; }  /* Action*/
+
+        /* Style for the break time input (single input) */
+        .break-time-input {
+            width: 90px; /*  width */
+        }
   </style>
 </head>
 <body>
@@ -300,10 +316,10 @@
     ];
     const OUTPUT_ORDER = ["Pass Counter", "HHMD", "Lobby", "Guard House", "Vertical Patrol", "Report Room", "Tango Papa"];
     const BREAK_TIME_POOL = [
-      "20:00-21:30", "21:30-23:30", "22:00-00:00",
-      "23:00-01:00", "00:00-02:00", "01:30-03:30",
-      "02:00-04:00", "03:00-05:00", "04:00-06:00",
-      "05:00-07:00", "06:00-08:00"
+        "20:00-21:30", "21:30-23:30", "22:00-00:00",
+        "23:00-01:00", "00:00-02:00", "01:30-03:30",
+        "02:00-04:00", "03:00-05:00", "04:00-06:00",
+        "05:00-07:00", "06:00-08:00"
     ];
     // CRITICAL_LOCATIONS: For Tango Papa, critical time is now "07:00"
     const CRITICAL_LOCATIONS = {
@@ -462,19 +478,20 @@
         const staffList = [];
         for(let row of rows){
           try{
-            const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
-            const startTime = timeInputs[0].value, endTime = timeInputs[1].value;
-            const formatTime = time => {
-              if(!time) return "00:00";
-              const [h, m] = time.split(":").map(Number);
-              return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            };
-            const breakTime = `${formatTime(startTime)}-${formatTime(endTime)}`;
+           // const timeInputs = row.cells[2].querySelectorAll("input[type='time']");  REMOVED
+           // const startTime = timeInputs[0].value, endTime = timeInputs[1].value; REMOVED
+           // const formatTime = time => {  REMOVED
+            //  if(!time) return "00:00";
+            //  const [h, m] = time.split(":").map(Number);
+            //  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+           // };
+           // const breakTime = `${formatTime(startTime)}-${formatTime(endTime)}`; REMOVED
+            const breakTime = row.cells[2].querySelector("input").value.trim();  // ADDED: Get break time directly
             const assigned = row.dataset.assigned ? JSON.parse(row.dataset.assigned) : [];
             staffList.push({
               staffID: row.cells[0].querySelector("input").value.trim(),
               name: row.cells[1].querySelector("input").value.trim(),
-              breakTime,
+              breakTime, // Use the direct string value
               hhmdEligible: row.cells[3].querySelector("select").value,
               attendance: row.cells[4].querySelector("select").value,
               locked: row.cells[5].querySelector("input[type='checkbox']").checked,
@@ -486,42 +503,29 @@
         }
         return staffList;
       },
-      getStaffRowHTML: function(staff = {}){
-        // Default break time if not provided: "21:30-23:30"
-        let [startVal, endVal] = ["21:30", "23:30"];
-        if(staff.breakTime && staff.breakTime.includes("-")){
-          [startVal, endVal] = staff.breakTime.split("-");
-        }
-        return `
-          <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
+    getStaffRowHTML: function(staff = {}) {
+    const breakTime = staff.breakTime || "21:30-23:30"; // Default value
+    return `
+        <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
             <td><input type="text" value="${staff.staffID || ''}" class="staff-input" placeholder="ID"></td>
             <td><input type="text" value="${staff.name || ''}" class="staff-input" placeholder="Name"></td>
+            <td><input type="text" value="${breakTime}" class="break-time-input" placeholder="HH:MM-HH:MM"></td>
             <td>
-              <div class="break-time-container">
-                <input type="time" value="${startVal}" step="1800" class="time-input">
-                <span>-</span>
-                <input type="time" value="${endVal}" step="1800" class="time-input">
-              </div>
+                <select class="staff-select">
+                    <option value="Yes" ${staff.hhmdEligible === "Yes" ? "selected" : ""}>Yes</option>
+                    <option value="No" ${staff.hhmdEligible === "No" ? "selected" : ""}>No</option>
+                </select>
             </td>
             <td>
-              <select class="staff-select">
-                <option value="Yes" ${staff.hhmdEligible==="Yes"?"selected":""}>Yes</option>
-                <option value="No" ${staff.hhmdEligible==="No"?"selected":""}>No</option>
-              </select>
+                <select class="staff-select">
+                    <option value="Yes" ${staff.attendance === "Yes" ? "selected" : ""}>Yes</option>
+                    <option value="No" ${staff.attendance === "No" ? "selected" : ""}>No</option>
+                </select>
             </td>
-            <td>
-              <select class="staff-select">
-                <option value="Yes" ${staff.attendance==="Yes"?"selected":""}>Yes</option>
-                <option value="No" ${staff.attendance==="No"?"selected":""}>No</option>
-              </select>
-            </td>
-            <td>
-              <input type="checkbox" ${staff.locked ? "checked" : ""} title="Lock this staff member">
-            </td>
+            <td><input type="checkbox" ${staff.locked ? "checked" : ""} title="Lock this staff member"></td>
             <td><button class="remove-btn roster-btn" data-staff-id="${staff.staffID || ''}">Remove</button></td>
-          </tr>
-        `;
-      },
+        </tr>`;
+},
       addStaff: function(){
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         const newStaff = { staffID: "", name: "", breakTime: "21:30-23:30", hhmdEligible: "No", attendance: "Yes", locked: false, assigned: [] };
@@ -538,15 +542,25 @@
         this.saveStaffList();
         this.updateStaffCount();
       },
-      addListenersToAllRows: function(){
-        const tbody = document.getElementById("staffTable").querySelector("tbody");
-        const self = this;
-        const inputs = tbody.querySelectorAll("input, select");
-        inputs.forEach(inp => {
-          inp.removeEventListener("change", inp._changeHandler);
-          inp._changeHandler = function(){ self.saveStaffList(); self.updateStaffCount(); self.displayBreakList(); };
-          inp.addEventListener("change", inp._changeHandler);
-        });
+    addListenersToAllRows: function() {
+    const tbody = document.getElementById("staffTable").querySelector("tbody");
+    const self = this;
+    const inputs = tbody.querySelectorAll("input, select");
+
+    inputs.forEach(inp => {
+        inp.removeEventListener("change", inp._changeHandler);
+        inp._changeHandler = function() {
+            self.saveStaffList();
+            self.updateStaffCount();
+            self.displayBreakList();
+            // Validate the break time format when it changes
+            if (inp.classList.contains('break-time-input')) {
+                self.validateBreakTimeInput(inp);
+            }
+        };
+        inp.addEventListener("change", inp._changeHandler);
+    });
+
         const removeButtons = tbody.querySelectorAll(".remove-btn");
         removeButtons.forEach(btn => {
           btn.removeEventListener("click", btn._clickHandler);
@@ -554,6 +568,25 @@
           btn.addEventListener("click", btn._clickHandler);
         });
       },
+    // Added input validation for break time
+    validateBreakTimeInput: function(input) {
+        if (!/^[0-2]?\d:[0-5]\d-[0-2]?\d:[0-5]\d$/.test(input.value)) {
+            input.style.borderColor = "red"; // Highlight invalid input
+            this.showError("Invalid break time format. Use HH:MM-HH:MM (e.g., 20:00-22:00).");
+        } else {
+            // Further check: Ensure end time is after start time
+            const [start, end] = input.value.split("-");
+            if(this.timeToMinutes(start) >= this.timeToMinutes(end)) {
+                input.style.borderColor = "red";
+                this.showError("Break end time must be after start time.");
+                return; // Exit to prevent saving
+            }
+            input.style.borderColor = ""; // Reset to default
+            this.showSuccess("Input Time is valid")
+        }
+
+    },
+
       updateStaffCount: function(){
         const staffList = this.getCurrentStaffList();
         const workingCount = staffList.filter(st => st.attendance === "Yes").length;
@@ -563,6 +596,7 @@
         else if(workingCount < 8){ countElement.style.color = "orange"; countElement.title = "Minimal staff count"; }
         else{ countElement.style.color = "green"; countElement.title = "Sufficient staff"; }
       },
+
       /******************** Roster Generation & Scheduling ********************/
       shuffleBreakTimes: function() {
         const staffList = this.getCurrentStaffList();
@@ -610,8 +644,7 @@
       toggleBreakNote: function() {
         document.getElementById("breakListContainer").classList.toggle("hidden");
       },
-
-     /******************** Import/Export Functions ********************/
+      /******************** Import/Export Functions ********************/
       importData: function() {
         const fileInput = document.getElementById("importFile");
         fileInput.value = "";
@@ -828,8 +861,8 @@
         }
     },
 
-    // *** Important: Sorting Staff IDs within createDisplayData ***
-     createDisplayData: function(roster) {
+    // *** IMPORTANT: Sorting Staff IDs within createDisplayData ***
+    createDisplayData: function(roster) {
         let displayData = {};
         OUTPUT_ORDER.forEach(loc => {
             displayData[loc] = {};
@@ -837,7 +870,7 @@
                 let ids = [];
                 if (roster[loc] && roster[loc][slot]) {
                     let tokens = (loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot].split(" | ") : roster[loc][slot].split(",");
-                    // Trim, filter out empty strings and buffers, THEN sort:
+                    // Trim, filter out empty strings and buffers, THEN sort numerically:
                     ids = tokens.map(s => s.trim()).filter(id => id && !id.includes("*")).sort((a,b) => parseInt(a) - parseInt(b));
                 }
                 displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby") ? ids.join(" | ") : ids.join(", ");
@@ -961,7 +994,7 @@
 
     return false;
 },
- autoCorrectRoster: function(roster, staffList, conflicts) {
+    autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
         for (let loc in conflicts) {
             for (let slot in conflicts[loc]) {
@@ -1062,7 +1095,7 @@
             }
         }
 
-            for (const staffID in staffAssignments) {
+        for (const staffID in staffAssignments) {
             const assignments = staffAssignments[staffID].sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
             for (let i = 0; i < assignments.length - 1; i++) {
                 const curr = assignments[i];
@@ -1102,7 +1135,7 @@
         this.saveStaffList(); // crucial to save after roster generation
       },
 
-      /******************** Display Functions ********************/
+/******************** Display Functions ********************/
      displayRoster: function(roster, conflicts = {}, creationTime) {
         const container = document.getElementById("rosterContainer");
         const rosterDate = document.getElementById("rosterDate").value;
@@ -1390,6 +1423,7 @@
         // --- Break Time List ---
         const breakListData = this.getCurrentStaffList()
                                   .filter(staff => staff.attendance === "Yes")
+                                   //Modify output format
                                   .map(staff => `${staff.staffID} (${staff.name}): ${staff.breakTime}`);
 
         if (breakListData.length > 0) {
@@ -1422,8 +1456,7 @@
         this.showError("Failed to download PDF: " + e.message);
     }
 },
-
-/******************** Utility Functions ********************/
+ /******************** Utility Functions ********************/
     timeToMinutes: function(timeStr) {
         if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) {
             console.warn("Invalid time format:", timeStr);
@@ -1478,4 +1511,3 @@
 </body>
 </html>
 
-       
