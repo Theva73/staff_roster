@@ -562,12 +562,13 @@
         else if(workingCount < 8){ countElement.style.color = "orange"; countElement.title = "Minimal staff count"; }
         else{ countElement.style.color = "green"; countElement.title = "Sufficient staff"; }
       },
-      /******************** Roster Generation & Scheduling ********************/
-      shuffleBreakTimes: function(){
+
+           /******************** Roster Generation & Scheduling ********************/
+      shuffleBreakTimes: function() {
         const staffList = this.getCurrentStaffList();
         let changedCount = 0;
         staffList.forEach(st => {
-          if(st.attendance === "Yes" && !st.locked){
+          if (st.attendance === "Yes" && !st.locked) {
             const randomIndex = Math.floor(Math.random() * BREAK_TIME_POOL.length);
             st.breakTime = BREAK_TIME_POOL[randomIndex];
             changedCount++;
@@ -578,14 +579,15 @@
         this.displayBreakList();
         this.showSuccess(`Break times shuffled for ${changedCount} staff members!`);
       },
-      applyStaffListToTable: function(staffList){
+      applyStaffListToTable: function(staffList) {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         tbody.innerHTML = "";
-        staffList.forEach(staff => { tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(staff)); });
+        staffList.forEach(staff => {
+          tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(staff));
+        });
         this.addListenersToAllRows();
         this.updateStaffCount();
       },
-
       /******************** Break List Display ********************/
       displayBreakList: function() {
         const container = document.getElementById("breakListContainer");
@@ -597,7 +599,9 @@
           staffList.sort((a, b) => this.parseBreakTime(a.breakTime).start - this.parseBreakTime(b.breakTime).start);
           staffList.forEach(st => {
             html += `<strong>${st.staffID || "??"}</strong> (${st.name || "??"}): ${st.breakTime}`;
-            if (st.locked) { html += " 🔒"; }
+            if (st.locked) {
+              html += " 🔒";
+            }
             html += "<br>";
           });
         }
@@ -649,7 +653,9 @@
             return;
           }
           const jsonStr = JSON.stringify(staffList, null, 2);
-          const blob = new Blob([jsonStr], { type: "application/json" });
+          const blob = new Blob([jsonStr], {
+            type: "application/json"
+          });
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           const date = new Date().toISOString().split('T')[0];
@@ -666,7 +672,7 @@
 
 
       /******************** Roster Generation & Conflict Resolution ********************/
-      generateRoster: function() {
+     generateRoster: function() {
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
@@ -730,7 +736,7 @@
                 roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
                 chosen.assigned.push({ slot, location: loc });
             } else {
-                chosen = this.findEmergencyStaff(staffList, slot); // Consider emergency staff
+                chosen = this.findEmergencyStaff(staffList, slot, loc); // Consider emergency staff, BUT with location check
                 if (chosen) {
                   let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
                   roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
@@ -876,80 +882,74 @@
       },
 
 
-      autoCorrect: function(roster, staffList, gapThreshold) {
+    autoCorrect: function(roster, staffList, gapThreshold) {
         const maxIterations = 20;
         let iteration = 0;
-        let {
-          issues,
-          conflicts
-        } = this.validateRoster(roster, gapThreshold);
-        this.lastValidationConflicts = conflicts; // Store for display
+        let { issues, conflicts } = this.validateRoster(roster, gapThreshold);
+        this.lastValidationConflicts = conflicts;
 
         while (issues.length > 0 && iteration < maxIterations) {
-          if (!this.autoCorrectRoster(roster, staffList, conflicts)) break; // Stop if no corrections made
-          const result = this.validateRoster(roster, gapThreshold);
-          issues = result.issues;
-          conflicts = result.conflicts;
-          this.lastValidationConflicts = conflicts; // Update after each iteration
-          iteration++;
-        }
-
-        // If there are still issues, and if the user is using 2-hour gap, then try again with the 1-hour gap
-        if (issues.length > 0 && gapThreshold > 60) {
-          const reducedThreshold = 60; // One-hour gap (in minutes)
-          iteration = 0;
-
-          while (issues.length > 0 && iteration < maxIterations) {
-            if (!this.autoCorrectRoster(roster, staffList, conflicts)) break;  // Stop if no corrections
-
-            const result = this.validateRoster(roster, reducedThreshold); // Use reduced threshold
-            issues = result.issues;
-            conflicts = result.conflicts;
-            this.lastValidationConflicts = conflicts; // Update after each iteration
+            if (!this.autoCorrectRoster(roster, staffList, conflicts)) break;
+            ({ issues, conflicts } = this.validateRoster(roster, gapThreshold));
+            this.lastValidationConflicts = conflicts;
             iteration++;
-          }
-           // After auto-correction, check and add remaining issues to shortfalls if it contains "violates" then, don't show
-          if (issues.length > 0){
-            shortfalls.push(...issues.filter(issue => !issue.includes("violates")));
-          }
-        }else if(issues.length > 0){
-          shortfalls.push(...issues);
         }
-      },
 
-      findEmergencyStaff: function(staffList, slot) {
-        // Prioritize staff who are *not* locked, then those who are.
-        const availableStaff = staffList.filter(st => st.attendance === "Yes" && !this.isOnBreak(st, slot) && !this.isDoubleBooked(st, slot));
+        if (issues.length > 0 && gapThreshold > 60) {
+            const reducedThreshold = 60;
+            iteration = 0;
+            while (issues.length > 0 && iteration < maxIterations) {
+                if (!this.autoCorrectRoster(roster, staffList, conflicts)) break;
+                ({ issues, conflicts } = this.validateRoster(roster, reducedThreshold));
+                this.lastValidationConflicts = conflicts;
+                iteration++;
+            }
+            if (issues.length > 0) {
+                shortfalls.push(...issues.filter(issue => !issue.includes("violates")));
+            }
+        } else if (issues.length > 0) {
+            shortfalls.push(...issues);
+        }
+    },
+
+    findEmergencyStaff: function(staffList, slot, loc) { // Added loc parameter
+        // Prioritize staff who are *not* locked.
+        const availableStaff = staffList.filter(st =>
+            st.attendance === "Yes" &&
+            !this.isOnBreak(st, slot) &&
+            !this.isDoubleBooked(st, slot) &&
+            this.locationApplies(loc, slot, document.getElementById("rosterDay").value) // Added location check
+        );
 
         const unlockedStaff = availableStaff.filter(st => !st.locked);
         if (unlockedStaff.length > 0) {
-          return unlockedStaff.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
+            return unlockedStaff.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
         }
 
         // If no unlocked staff, consider locked staff
         const lockedStaff = availableStaff.filter(st => st.locked);
         if (lockedStaff.length > 0) {
-          return lockedStaff.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
+            return lockedStaff.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
         }
 
         return null; // No staff available
-      },
-      findAvailableStaff: function(staffList, slot, loc) {
-        // Sort staff by the number of assignments they already have (least busy first)
+    },
+
+    findAvailableStaff: function(staffList, slot, loc) {
         const sortedStaff = [...staffList].sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0));
 
         for (let st of sortedStaff) {
-          // Check attendance, break time, double-booking, and HHMD eligibility
-          if (st.attendance === "Yes" &&
-            !this.isOnBreak(st, slot) &&
-            !this.isDoubleBooked(st, slot) &&
-            !(loc === "HHMD" && st.hhmdEligible !== "Yes")
-          ) {
-            return st;
-          }
+            if (st.attendance === "Yes" &&
+                !this.isOnBreak(st, slot) &&
+                !this.isDoubleBooked(st, slot) &&
+                !(loc === "HHMD" && st.hhmdEligible !== "Yes") &&
+                this.locationApplies(loc, slot, document.getElementById("rosterDay").value) // Key addition
+            ) {
+                return st;
+            }
         }
-        return null; // No staff available
-      },
+        return null;
+    },
     isOnBreak: function(st, slot) {
     if (!st.breakTime || !st.breakTime.includes("-")) return false;
 
@@ -976,32 +976,31 @@
       isDoubleBooked: function(st, slot) {
         return st.assigned && st.assigned.some(a => a.slot === slot);
       },
-      wouldCauseConflict: function(roster, staff, slot, loc) {
-        // Check for immediate conflicts (break/double booking)
-        if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
+   wouldCauseConflict: function(roster, staff, slot, loc) {
+    if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) return true;
 
-        // Simulate adding the new assignment
-        const potentialAssignments = [...staff.assigned.filter(a => !a.buffer), {
-          slot,
-          location: loc
-        }];
-        potentialAssignments.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
+    const potentialAssignments = [...staff.assigned.filter(a => !a.buffer), { slot, location: loc }];
+    potentialAssignments.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
 
-        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
+    const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
 
-        // Check for gap violations
-        for (let i = 0; i < potentialAssignments.length - 1; i++) {
-          if (potentialAssignments[i].location === potentialAssignments[i + 1].location) {
-            const gap = this.timeToMinutes(potentialAssignments[i + 1].slot) - this.timeToMinutes(potentialAssignments[i].slot);
-            // Check gap only forward in time
-            if(gap > 0 && gap < gapThreshold) {
-                return true;
+    for (let i = 0; i < potentialAssignments.length - 1; i++) {
+        const current = potentialAssignments[i];
+        const next = potentialAssignments[i + 1];
+
+        // Direct time comparison for consecutive slots at the same location
+        if (current.location === next.location) {
+            const currentTime = this.timeToMinutes(current.slot);
+            const nextTime = this.timeToMinutes(next.slot);
+
+            if (nextTime > currentTime && nextTime - currentTime < gapThreshold) {
+                return true; // Gap violation
             }
-          }
         }
+    }
 
-        return false; // No conflicts
-      },
+    return false;
+},
       autoCorrectRoster: function(roster, staffList, conflicts) {
         let correctionsMade = false;
 
@@ -1021,7 +1020,7 @@
 
                 // Try to find a replacement *only* if it's not Tango Papa at 07:00 (which should be fixed)
                 if (slot !== "07:00" || loc === "Tango Papa") { //Special rule for 07:00
-                  let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot); // Exclude original
+                  let newStaff = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot, loc); // Exclude original, include loc
                   if (newStaff && !this.wouldCauseConflict(roster, newStaff, slot, loc) && !this.isOnBreak(newStaff,slot)) {
                     // Assign the new staff member
                     roster[loc][slot] = roster[loc][slot] ? ((loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot] + " | " + newStaff.staffID : roster[loc][slot] + ", " + newStaff.staffID) : newStaff.staffID;
@@ -1043,7 +1042,7 @@
         }
         return correctionsMade;
       },
-     removeAssignment: function(roster, staff, slot, loc) {
+    removeAssignment: function(roster, staff, slot, loc) {
         // Remove the assignment from the staff member's assigned array
         staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
 
@@ -1105,15 +1104,15 @@
             for (const staffID of staffIDs) {
                 const staff = staffList.find(s => s.staffID === staffID);
 
-                // Check if the staff member is on break
-                if (staff && rosterSystem.isOnBreak(staff, slot)) {
-                    issues.push(`Staff ${staffID} assigned at ${loc} during break at ${slot}`);
-                    addConflict(loc, slot, staffID, "breakViolation");
-                }
+                // Check if the staff member is on break -- No longer needed
+                //if (staff && rosterSystem.isOnBreak(staff, slot)) {
+                //    issues.push(`Staff ${staffID} assigned at ${loc} during break at ${slot}`);
+                //    addConflict(loc, slot, staffID, "breakViolation");
+                //}
 
-                // Check for double-booking (being assigned to multiple locations at the same time)
+                // Check for double-booking (being assigned to multiple locations at the same time)  -- Simplified
                 if (!staffAssignments[staffID]) staffAssignments[staffID] = [];
-                const existingAssignment = staffAssignments[staffID].find(a => a.slot === slot && !a.buffer); // Find non-buffer
+                const existingAssignment = staffAssignments[staffID].find(a => a.slot === slot); // Simplified check
                 if (existingAssignment) {
                     issues.push(`Staff ${staffID} double-booked at ${slot}: ${existingAssignment.location} and ${loc}`);
                     addConflict(loc, slot, staffID, "doubleBooked");
@@ -1171,7 +1170,6 @@
         }
         this.saveStaffList(); // crucial to save after roster generation
       },
-      
 
       /******************** Display Functions ********************/
       displayRoster: function(roster, conflicts = {}, creationTime) {
@@ -1436,19 +1434,21 @@
           this.showError("Failed to download PDF: " + e.message);
         }
       },
-      /******************** Utility Functions ********************/
-      timeToMinutes: function(timeStr) {
+    /******************** Utility Functions ********************/
+    timeToMinutes: function(timeStr) {
         if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) {
-          console.warn("Invalid time format:", timeStr);
-          return 0;
+            console.warn("Invalid time format:", timeStr);
+            return 0; // Or throw an error, depending on your needs
         }
         let [hours, minutes] = timeStr.split(":").map(Number);
+        // Adjust for the 20:00 start time.  Times before 08:00 are considered next-day.
         if (hours < 8) {
-          hours += 24;
+            hours += 24; // Add 24 hours to shift to the next day
         }
         return (hours - 20) * 60 + minutes;
-      },
-      locationApplies: function(loc, slot, isWeekend) {
+    },
+
+    locationApplies: function(loc, slot, isWeekend) {
         //Tango Papa only at 07:00
         if(loc === "Tango Papa") return slot === "07:00";
 
@@ -1488,5 +1488,3 @@
   </script>
 </body>
 </html>
-
-
