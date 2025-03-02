@@ -228,7 +228,7 @@
       "05:00-07:00",
       "06:00-08:00"
     ];
-    const ROSTER_TIMES = ["20:00","20:30","21:00","22:00","23:00","00:00","01:00","01:30","02:00","03:00","04:00","05:00","06:00","07:00"];
+    const ROSTER_TIMES = ["20:00","20:30","21:00","22:00","23:00","00:00","01:00","01:30","02:00","03:00","04:00","05:00","06:30","07:00"];
     const PRIORITY = [
       { location: "Pass Counter", needed: 2 },
       { location: "HHMD", needed: 1 },
@@ -615,7 +615,7 @@
       },
       
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
-        const vpTimes = ["20:30", "23:00", "01:30", "06:00"];
+        const vpTimes = ["20:30", "23:00", "01:30", "06:30"];
         for(let time of vpTimes) {
           if(!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0)
             shortfalls.push(`Missing Vertical Patrol at ${time}`);
@@ -1158,7 +1158,7 @@
       locationApplies: function(loc, slot, isWeekend) {
         if(loc === "Tango Papa") return slot === "07:00";
         if(loc === "Vertical Patrol") {
-          return ["20:30", "23:00", "01:30", "06:00"].includes(slot);
+          return ["20:30", "23:00", "01:30", "06:30"].includes(slot);
         }
         if(slot === "06:30" && loc !== "Vertical Patrol") return false;
         if(slot === "07:00" && loc !== "Tango Papa") return false;
