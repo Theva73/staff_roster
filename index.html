@@ -109,11 +109,25 @@
     .status-success { background-color: var(--success-color); }
     .status-warning { background-color: var(--warning-color); }
     .status-danger { background-color: var(--danger-color); }
+    /* =================== Small Break Time Table =================== */
+    .break-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .break-table th, .break-table td {
+      border: 1px solid var(--border-color);
+      padding: 4px 6px;
+      text-align: center;
+    }
+    .break-table th { background-color: var(--light-bg); }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Staff Roster Management System CP</h2>
+    
     <!-- Date & Gap Policy Section -->
     <div class="card">
       <div class="date-container">
@@ -146,6 +160,7 @@
         </div>
       </div>
     </div>
+    
     <!-- Staff Management Section -->
     <div class="card">
       <h3>Staff Management</h3>
@@ -162,7 +177,7 @@
           </tr>
         </thead>
         <tbody>
-          <!-- Rows will be inserted dynamically -->
+          <!-- Staff rows inserted dynamically -->
         </tbody>
       </table>
       <div class="button-container">
@@ -172,12 +187,10 @@
           <button class="roster-btn" id="exportDataBtn">Export</button>
         </div>
         <div class="button-row">
-          <!-- Shuffle Breaks is disabled because break times follow dashboard -->
-          <button class="roster-btn" id="shuffleBreaksBtn" style="background-color:#aaa; cursor:not-allowed;" title="Disabled - Break times are fixed">
-            Shuffle (Disabled)
-          </button>
-          <button class="roster-btn" id="generateRosterBtn">Generate</button>
-          <button class="roster-btn" id="copyTSVBtn">Copy</button>
+          <!-- Shuffle now reassigns break times by shuffling the existing dashboard values -->
+          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
+          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
+          <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
         </div>
         <div class="button-row">
           <button class="roster-btn" id="downloadCSVBtn">CSV</button>
@@ -186,36 +199,47 @@
         </div>
       </div>
     </div>
-    <!-- Hidden file input for import -->
     <input type="file" id="importFile" accept=".json" style="display:none;" />
+    
     <!-- Generated Roster Section -->
     <div class="card">
       <h3>Generated Roster</h3>
       <div id="rosterContainer">
-        <!-- Roster table will be generated here -->
+        <!-- Roster table generated dynamically -->
       </div>
     </div>
+    
     <!-- Roster Health Section -->
     <div class="card">
       <h4>Roster Health</h4>
       <div id="notesContainer">
-        <!-- Health issues will be displayed here -->
+        <!-- Health issues displayed here -->
+      </div>
+    </div>
+    
+    <!-- Staff Break Times Display (Smaller Table) -->
+    <div class="card">
+      <h4>Staff Break Times</h4>
+      <div id="breakTimesDisplay">
+        <!-- A small table replicating the sample design -->
       </div>
     </div>
   </div>
-  <!-- Floating Break List -->
+  
+  <!-- Floating Break List (Draggable) -->
   <div id="breakListContainer">
     <strong>Staff Break Times</strong><br><br>
     <!-- Populated dynamically -->
   </div>
+  
   <div id="notification-container"></div>
+  
   <script>
     /**************************************************************
      * Global Constants & Variables
      **************************************************************/
     const STORAGE_KEY = 'staffListData_v2';
-    // BREAK_TIME_POOL is not used because break times follow the dashboard
-    // Updated ROSTER_TIMES: Added "06:30" for Vertical Patrol (now 15 slots)
+    // BREAK_TIME_POOL is not used when using dashboard break times
     const ROSTER_TIMES = ["20:00","20:30","21:00","22:00","23:00","00:00",
                           "01:00","01:30","02:00","03:00","04:00","05:00",
                           "06:00","06:30","07:00"];
@@ -229,7 +253,7 @@
       { location: "Tango Papa", needed: 1 }
     ];
     const OUTPUT_ORDER = ["Pass Counter","HHMD","Guard House","Lobby","Report Room","Vertical Patrol","Tango Papa"];
-    // CRITICAL_LOCATIONS: Note that for Vertical Patrol, we now require an assignment at "06:30"
+    // For critical locations, Vertical Patrol now requires assignment at "06:30"
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30", "23:00", "01:30", "06:30"],
       "Report Room": ["20:00", "21:00"],
@@ -238,8 +262,8 @@
     
     /**************************************************************
      * Roster System Object
-     * - This version uses dashboard-defined break times.
-     * - It adds the "06:30" column for Vertical Patrol.
+     * - Break times are taken from the dashboard.
+     * - The Shuffle Break Times function randomly reassigns break times among staff.
      **************************************************************/
     const rosterSystem = {
       generatedRosterData: null,
@@ -252,6 +276,7 @@
         this.makeDraggable(document.getElementById('breakListContainer'));
         this.loadStaffList();
         this.displayBreakList();
+        this.displayBreakTimesTable();
         this.showSuccess("System initialized successfully.");
       },
       
@@ -270,9 +295,8 @@
         document.getElementById("addStaffBtn").addEventListener("click", () => this.addStaff());
         document.getElementById("importDataBtn").addEventListener("click", () => this.importData());
         document.getElementById("exportDataBtn").addEventListener("click", () => this.exportData());
-        document.getElementById("shuffleBreaksBtn").addEventListener("click", () => {
-          this.showWarning("Shuffle is disabled. Break times follow the dashboard.");
-        });
+        // Enable Shuffle: This function shuffles break times among active, unlocked staff.
+        document.getElementById("shuffleBreaksBtn").addEventListener("click", () => this.shuffleBreakTimes());
         document.getElementById("generateRosterBtn").addEventListener("click", () => this.generateRoster());
         document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV());
         document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
@@ -363,7 +387,7 @@
           try {
             const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
             const startTime = timeInputs[0].value, endTime = timeInputs[1].value;
-            const formatTime = t => { return t ? t.padStart(5, "0") : "00:00"; };
+            const formatTime = t => t ? t.padStart(5, "0") : "00:00";
             const breakTime = formatTime(startTime) + "-" + formatTime(endTime);
             staffList.push({
               staffID: row.cells[0].querySelector("input").value.trim(),
@@ -418,7 +442,7 @@
       addListenersToAllRows: function() {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         const inputs = tbody.querySelectorAll("input, select");
-        inputs.forEach(inp => { inp.onchange = () => { this.saveStaffList(); this.updateStaffCount(); this.displayBreakList(); }; });
+        inputs.forEach(inp => { inp.onchange = () => { this.saveStaffList(); this.updateStaffCount(); this.displayBreakList(); this.displayBreakTimesTable(); }; });
         const removeButtons = tbody.querySelectorAll(".remove-btn");
         removeButtons.forEach(btn => {
           btn.onclick = () => {
@@ -429,6 +453,7 @@
               this.saveStaffList();
               this.updateStaffCount();
               this.displayBreakList();
+              this.displayBreakTimesTable();
             }
           };
         });
@@ -452,11 +477,77 @@
         this.updateStaffCount();
       },
       
-      /******************** Break List Display ********************/
+      /******************** Shuffle Break Times ********************/
+      // This function shuffles the existing break times among active, unlocked staff.
+      shuffleBreakTimes: function() {
+        let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
+        if(staffList.length < 2) {
+          this.showWarning("Not enough staff to shuffle break times.");
+          return;
+        }
+        // Collect current break times
+        let breaks = staffList.map(st => st.breakTime);
+        // Shuffle using Fisher–Yates algorithm
+        for (let i = breaks.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [breaks[i], breaks[j]] = [breaks[j], breaks[i]];
+        }
+        // Reassign the shuffled break times back to staff and update input fields
+        const tbody = document.getElementById("staffTable").querySelector("tbody");
+        let rows = Array.from(tbody.rows);
+        let idx = 0;
+        rows.forEach(row => {
+          const att = row.cells[4].querySelector("select").value;
+          const locked = row.cells[5].querySelector("input[type='checkbox']").checked;
+          if(att === "Yes" && !locked) {
+            const inputs = row.cells[2].querySelectorAll("input[type='time']");
+            const [newStart, newEnd] = breaks[idx].split("-");
+            inputs[0].value = newStart;
+            inputs[1].value = newEnd;
+            idx++;
+          }
+        });
+        this.saveStaffList();
+        this.displayBreakList();
+        this.displayBreakTimesTable();
+        this.showSuccess("Shuffled break times among staff.");
+      },
+      
+      /******************** Break Times Table Display ********************/
+      // This function builds a compact table similar to the attached sample design.
+      displayBreakTimesTable: function() {
+        const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
+        let html = "";
+        if(staffList.length === 0) {
+          html = "<em>No staff scheduled</em>";
+        } else {
+          html += `<table class="break-table">
+                    <thead>
+                      <tr>
+                        <th>Staff ID</th>
+                        <th>Name</th>
+                        <th>Break Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>`;
+          staffList.sort((a, b) => this.parseBreakTime(a.breakTime).start - this.parseBreakTime(b.breakTime).start);
+          staffList.forEach(st => {
+            html += `<tr>
+                       <td>${st.staffID || "??"}</td>
+                       <td>${st.name || "??"}</td>
+                       <td>${st.breakTime.replace("-", " to ")}</td>
+                     </tr>`;
+          });
+          html += `</tbody></table>`;
+        }
+        document.getElementById("breakTimesDisplay").innerHTML = html;
+      },
+      
+      /******************** Floating Break List ********************/
       displayBreakList: function() {
         const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
         let html = "<strong>Staff Break Times</strong><br><br>";
-        if(!staffList.length) { html += "<em>No staff scheduled</em>"; }
+        if(staffList.length === 0) { html += "<em>No staff scheduled</em>"; }
         else {
           staffList.sort((a, b) => this.parseBreakTime(a.breakTime).start - this.parseBreakTime(b.breakTime).start);
           staffList.forEach(st => {
@@ -490,6 +581,7 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
             this.displayBreakList();
+            this.displayBreakTimesTable();
             this.showSuccess("Imported data successfully.");
           } catch(err) {
             this.showError("Import error: " + err.message);
@@ -525,7 +617,7 @@
           this.showError("Add staff before generating roster.");
           return;
         }
-        // DO NOT alter dashboard break times
+        // Do not override break times from dashboard
         staffList.forEach(st => { if(!st.locked) st.assigned = []; });
         let roster = this.initializeRoster();
         let shortfalls = [];
@@ -541,8 +633,7 @@
         this.displayRoster(this.generatedRosterData, this.lastValidationConflicts, creationTime);
         this.displayNotes(shortfalls);
         this.displayBreakList();
-        const healthStatus = shortfalls.length === 0 ? "Optimal roster generated!" : `Roster generated with ${shortfalls.length} issues.`;
-        this.showSuccess(healthStatus);
+        this.showSuccess(shortfalls.length === 0 ? "Optimal roster generated!" : `Roster generated with ${shortfalls.length} issues.`);
         return { roster: this.generatedRosterData, shortfalls };
       },
       
@@ -622,10 +713,10 @@
             const stillNeeded = needed - assignedIDs.length;
             if(stillNeeded <= 0) continue;
             for(let i = 0; i < stillNeeded; i++) {
-              const availableStaff = this.findAvailableStaff(staffList, slot, loc);
-              if(availableStaff && !this.wouldCauseConflict(roster, availableStaff, slot, loc)) {
-                roster[loc][slot] += (roster[loc][slot] ? separator : "") + availableStaff.staffID;
-                availableStaff.assigned.push({ slot, location: loc });
+              const available = this.findAvailableStaff(staffList, slot, loc);
+              if(available && !this.wouldCauseConflict(roster, available, slot, loc)) {
+                roster[loc][slot] += (roster[loc][slot] ? separator : "") + available.staffID;
+                available.assigned.push({ slot, location: loc });
               } else {
                 if(assignedIDs.length + i === 0)
                   shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
@@ -694,14 +785,14 @@
           !(loc === "HHMD" && st.hhmdEligible !== "Yes")
         );
         const unlocked = available.filter(st => !st.locked);
-        if(unlocked.length > 0) return unlocked.sort((a,b) => (a.assigned?.length||0) - (b.assigned?.length||0))[0];
+        if(unlocked.length > 0) return unlocked.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
         const locked = available.filter(st => st.locked);
-        if(locked.length > 0) return locked.sort((a,b) => (a.assigned?.length||0) - (b.assigned?.length||0))[0];
+        if(locked.length > 0) return locked.sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0))[0];
         return null;
       },
       
       findAvailableStaff: function(staffList, slot, loc) {
-        const sorted = [...staffList].sort((a, b) => (a.assigned?.length||0) - (b.assigned?.length||0));
+        const sorted = [...staffList].sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0));
         for(let st of sorted) {
           if(st.attendance === "Yes" &&
              !this.isOnBreak(st, slot) &&
@@ -736,7 +827,7 @@
         potential.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
         for(let i = 0; i < potential.length - 1; i++) {
-          const curr = potential[i], next = potential[i + 1];
+          const curr = potential[i], next = potential[i+1];
           if(curr.location === next.location) {
             const diff = this.timeToMinutes(next.slot) - this.timeToMinutes(curr.slot);
             if(diff > 0 && diff < gapThreshold) return true;
@@ -759,7 +850,7 @@
                 if(slot !== "07:00" || loc === "Tango Papa") {
                   let newSt = this.findEmergencyStaff(staffList.filter(s => s.staffID !== staffID), slot, loc);
                   if(newSt && !this.wouldCauseConflict(roster, newSt, slot, loc) && !this.isOnBreak(newSt, slot)) {
-                    roster[loc][slot] = roster[loc][slot] ? (sep ? roster[loc][slot] + sep + newSt.staffID : newSt.staffID) : newSt.staffID;
+                    roster[loc][slot] = roster[loc][slot] ? roster[loc][slot] + sep + newSt.staffID : newSt.staffID;
                     newSt.assigned.push({ slot, location: loc });
                     correctionsMade = true;
                   } else { correctionsMade = true; }
@@ -797,14 +888,14 @@
             const str = roster[loc][slot];
             if(!str) continue;
             if(slot === "07:00" && loc !== "Tango Papa") {
-              const ids = str.split((loc==="Pass Counter"||loc==="Lobby")?" | ":",").map(s => s.trim()).filter(Boolean);
+              const ids = str.split((loc==="Pass Counter"||loc==="Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
               ids.forEach(id => {
                 issues.push(`Staff ${id} assigned at ${loc} for 07:00, reserved for Tango Papa`);
                 addConflict(loc, slot, id, "invalid0700");
               });
               continue;
             }
-            const ids = str.split((loc==="Pass Counter"||loc==="Lobby")?" | ":",").map(s => s.trim()).filter(Boolean);
+            const ids = str.split((loc==="Pass Counter"||loc==="Lobby") ? " | " : ",").map(s => s.trim()).filter(Boolean);
             const unique = new Set(ids);
             if(unique.size < ids.length) {
               const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
@@ -829,8 +920,7 @@
           const asgn = staffAssignments[id].sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
           for(let i = 0; i < asgn.length - 1; i++) {
             const curr = asgn[i], next = asgn[i+1];
-            if(curr.location === next.location &&
-               Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
+            if(curr.location === next.location && Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1) {
               issues.push(`Staff ${id} has consecutive assignments at ${curr.location}: ${curr.slot} & ${next.slot}`);
               addConflict(curr.location, curr.slot, id, "consecutive");
               addConflict(next.location, next.slot, id, "consecutive");
@@ -839,8 +929,8 @@
               const ct = rosterSystem.timeToMinutes(curr.slot), nt = rosterSystem.timeToMinutes(next.slot);
               if(nt - ct < gapThreshold && nt - ct > 0) {
                 issues.push(`Staff ${id} violates ${gapThreshold/60}-hour gap at ${curr.location}: ${curr.slot} & ${next.slot}`);
-                addConflict(curr.location, curr.slot, id, gapThreshold===120?"twoHourGap":"oneHourGap");
-                addConflict(next.location, next.slot, id, gapThreshold===120?"twoHourGap":"oneHourGap");
+                addConflict(curr.location, curr.slot, id, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
+                addConflict(next.location, next.slot, id, gapThreshold === 120 ? "twoHourGap" : "oneHourGap");
               }
             }
           }
@@ -876,7 +966,7 @@
           ROSTER_TIMES.forEach(slot => {
             const applies = this.locationApplies(loc, slot, isWeekend);
             let cellText = applies ? (roster[loc]?.[slot] || "") : "";
-            let ids = (loc==="Pass Counter" || loc==="Lobby") ? cellText.split(" | ") : cellText.split(",");
+            let ids = (loc==="Pass Counter"||loc==="Lobby") ? cellText.split(" | ") : cellText.split(",");
             ids = ids.map(s => s.trim()).filter(Boolean);
             let style = "";
             if(!applies) style = "background-color:#f8f8f8; color:#999;";
@@ -902,7 +992,7 @@
         if(!shortfalls.length) {
           container.innerHTML = `<div class="status-message success"><span class="status-indicator status-success"></span> Roster Health: All clear.</div>`;
         } else {
-          const visible = shortfalls.slice(0,3);
+          const visible = shortfalls.slice(0, 3);
           const hidden = shortfalls.slice(3);
           let html = `<ul style="text-align:left; margin-top:10px; font-size:12px;">`;
           visible.forEach(n => {
@@ -949,10 +1039,10 @@
           });
           this.saveAssignedToRows(staffList);
           const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
-          const result = this.validateRoster(this.getEditableRosterData(), gapThreshold);
-          this.lastValidationConflicts = result.conflicts;
-          this.displayNotes(result.issues);
-          this.displayRoster(this.getEditableRosterData(), result.conflicts, new Date());
+          const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
+          this.lastValidationConflicts = conflicts;
+          this.displayNotes(issues);
+          this.displayRoster(this.getEditableRosterData(), conflicts, new Date());
           this.showSuccess("Roster edits saved successfully!");
         } catch(e) {
           console.error(e);
@@ -1036,9 +1126,9 @@
             styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
             headStyles: { fillColor: [108,117,125], halign: 'center', textColor: 255 }
           });
-          // Optionally add break times as a separate table
+          // Add a break times table at the bottom
           const staffList = this.getCurrentStaffList();
-          const breakData = staffList.filter(st => st.attendance === "Yes").map(st => [st.staffID, st.name, st.breakTime]);
+          const breakData = staffList.filter(st => st.attendance === "Yes").map(st => [st.staffID, st.name, st.breakTime.replace("-", " to ")]);
           if(breakData.length) {
             const finalY = doc.autoTable.previous.finalY + 30;
             doc.setFontSize(12);
@@ -1073,15 +1163,14 @@
         return (h - 20) * 60 + m;
       },
       
-      // =================== Key Change: locationApplies ===================
-      // For Vertical Patrol, only allow slots: 20:30, 23:00, 01:30, and now 06:30.
-      // For Tango Papa, only allow 07:00.
-      // For other locations, allow all slots except "06:30" (and 07:00 for non-Tango Papa).
+      /******************** Key Change: locationApplies ********************/
+      // For Tango Papa, only allow "07:00".
+      // For Vertical Patrol, only allow "20:30", "23:00", "01:30" and now "06:30".
+      // For all other locations, disallow "06:30" and "07:00".
       locationApplies: function(loc, slot, isWeekend) {
         if(loc === "Tango Papa") return slot === "07:00";
-        if(loc === "Vertical Patrol") return ["20:30","23:00","01:30","06:30"].includes(slot);
-        if(slot === "06:30") return false;
-        if(slot === "07:00") return false;
+        if(loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "06:30"].includes(slot);
+        if(slot === "06:30" || slot === "07:00") return false;
         if(loc === "Report Room" && isWeekend) return false;
         return true;
       }
