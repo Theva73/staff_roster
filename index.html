@@ -1130,13 +1130,13 @@
           const staffList = this.getCurrentStaffList();
           const breakData = staffList.filter(st => st.attendance === "Yes").map(st => [st.staffID, st.name, st.breakTime.replace("-", " to ")]);
           if(breakData.length) {
-            const finalY = doc.autoTable.previous.finalY + 10;
+            const finalY = doc.autoTable.previous.finalY + 30;
             doc.setFontSize(12);
             doc.text("Staff Break Times", 40, finalY);
             doc.autoTable({
               head: [["Staff ID", "Name", "Break Time"]],
               body: breakData,
-              startY: finalY + 10,
+              startY: finalY + 5,
               margin: { left: 40, right: 40 },
               styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
               headStyles: { fillColor: [108,117,125], textColor: 255, halign: 'center' }
