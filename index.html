@@ -94,7 +94,7 @@
     td[contenteditable="true"] {
       -webkit-user-select: none; -webkit-touch-callout: none; user-select: none;
     }
-    /* Draggable staff ID styling (when in drag mode) */
+    /* Draggable staff ID styling */
     .staff-id {
       display: inline-block; padding: 2px 4px; margin: 1px;
       background: #fff; border: 1px solid #ccc; border-radius: 4px;
@@ -107,7 +107,7 @@
 <body>
   <div class="container">
     <h2>Staff Roster Management System CP</h2>
-    <!-- New Edit Mode & Undo Controls -->
+    <!-- Edit Mode & Undo Controls -->
     <div class="button-row" style="justify-content: center;">
       <button id="toggleDragModeBtn" class="roster-btn">Enable Drag & Drop</button>
       <button id="undoBtn" class="roster-btn">Undo</button>
@@ -180,13 +180,14 @@
           <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
         </div>
       </div>
+      <!-- Hidden file input for Import -->
       <input type="file" id="importFile" accept=".json" style="display:none;" />
     </div>
     
     <!-- Generated Roster Section -->
     <div class="card">
       <h3>Generated Roster</h3>
-      <div id="rosterContainer"><!-- Generated roster table goes here --></div>
+      <div id="rosterContainer"><!-- Roster table goes here --></div>
     </div>
   </div>
   
@@ -210,7 +211,7 @@
       { location: "Tango Papa", needed: 1 }
     ];
     const OUTPUT_ORDER = ["Pass Counter","HHMD","Guard House","Lobby","Report Room","Vertical Patrol","Tango Papa"];
-    // Critical times for Vertical Patrol now include 04:00
+    // Critical times for Vertical Patrol now include 04:00 as critical.
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"],
       "Report Room": ["20:00", "21:00"],
@@ -218,7 +219,7 @@
     };
     
     /**************************************************************
-     * Helper: Render cell content as draggable spans (if in drag mode)
+     * Helper: Render cell content as draggable spans if in drag mode
      **************************************************************/
     function renderCellContent(cellText, loc) {
       const delim = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
@@ -235,9 +236,9 @@
     const rosterSystem = {
       generatedRosterData: null,
       lastValidationConflicts: {},
-      draggedItem: null,      // To store item during drag
-      dragMode: false,        // Toggle for edit mode drag&drop
-      undoStack: [],          // To support undo of moves
+      draggedItem: null,
+      dragMode: false,
+      undoStack: [],
       
       init: function() {
         console.log("Initializing roster system...");
@@ -263,9 +264,11 @@
         document.getElementById("addStaffBtn").addEventListener("click", () => this.addStaff());
         document.getElementById("importDataBtn").addEventListener("click", () => this.importData());
         document.getElementById("exportDataBtn").addEventListener("click", () => this.exportData());
+        
         document.getElementById("shuffleBreaksBtn").addEventListener("click", () => this.shuffleBreakTimes());
         document.getElementById("generateRosterBtn").addEventListener("click", () => this.generateRoster());
         document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV());
+        
         document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
         document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
         document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
@@ -275,6 +278,16 @@
         document.getElementById("toggleDragModeBtn").addEventListener("click", () => {
           this.dragMode = !this.dragMode;
           document.getElementById("toggleDragModeBtn").textContent = this.dragMode ? "Disable Drag & Drop" : "Enable Drag & Drop";
+          // When edit mode is on, show the whole roster on screen.
+          const container = document.getElementById("rosterContainer");
+          if(this.dragMode) {
+            container.style.overflowX = "visible";
+            container.style.width = "100%";
+            // Optionally, adjust zoom or transform to fit the entire roster.
+          } else {
+            container.style.overflowX = "auto";
+            container.style.width = "";
+          }
           this.refreshDraggableCells();
         });
         document.getElementById("undoBtn").addEventListener("click", () => this.undoLastMove());
@@ -373,11 +386,11 @@
       addListenersToAllRows: function() {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         const inputs = tbody.querySelectorAll("input, select");
-        inputs.forEach(inp => {
-          inp.onchange = () => {
-            this.saveStaffList();
-            this.updateStaffCount();
-          };
+        inputs.forEach(inp => { 
+          inp.onchange = () => { 
+            this.saveStaffList(); 
+            this.updateStaffCount(); 
+          }; 
         });
         const removeButtons = tbody.querySelectorAll(".remove-btn");
         removeButtons.forEach(btn => {
@@ -421,9 +434,7 @@
           try {
             const text = await file.text();
             const imported = JSON.parse(text);
-            if(!Array.isArray(imported)) {
-              throw new Error("Invalid JSON format. Must be an array of staff objects.");
-            }
+            if(!Array.isArray(imported)) throw new Error("Invalid JSON format. Must be an array of staff objects.");
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
             this.showSuccess("Imported data successfully!");
@@ -437,10 +448,7 @@
       exportData: function() {
         try {
           const staffList = this.getCurrentStaffList();
-          if(!staffList.length) {
-            this.showWarning("No data to export.");
-            return;
-          }
+          if(!staffList.length) { this.showWarning("No data to export."); return; }
           const jsonStr = JSON.stringify(staffList, null, 2);
           const blob = new Blob([jsonStr], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -456,12 +464,9 @@
       },
       
       /******************** Shuffle Break Times ********************/
-      shuffleBreakTimes: function() {
+      shuffleBreaks: function() {
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
-        if(staffList.length < 2) {
-          this.showWarning("Not enough staff to shuffle break times.");
-          return;
-        }
+        if(staffList.length < 2) { this.showWarning("Not enough staff to shuffle break times."); return; }
         let breaks = staffList.map(st => st.breakTime);
         for (let i = breaks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -490,28 +495,21 @@
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        if(!staffList.length) {
-          this.showError("Add staff before generating roster.");
-          return;
-        }
+        if(!staffList.length) { this.showError("Add staff before generating roster."); return; }
         staffList.forEach(st => { if(!st.locked) st.assigned = []; });
         let roster = this.initializeRoster();
         let shortfalls = [];
         this.assignCritical(roster, staffList, isWeekend, shortfalls);
         this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
         this.assignNonCritical(roster, staffList, isWeekend, shortfalls);
-        // Do not auto-add buffer staff so Pass Counter remains 2 by default.
+        // No auto-add buffer staff so Pass Counter remains 2 by default.
         this.generatedRosterData = this.createDisplayData(roster);
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
         this.autoCorrect(this.generatedRosterData, staffList, gapThreshold);
         this.saveAssignedToRows(staffList);
         const creationTime = new Date();
         this.displayRoster(this.getEditableRosterData(), this.lastValidationConflicts, creationTime);
-        this.showSuccess(
-          shortfalls.length === 0
-            ? "Optimal roster generated!"
-            : `Roster generated with ${shortfalls.length} issues.`
-        );
+        this.showSuccess(shortfalls.length === 0 ? "Optimal roster generated!" : `Roster generated with ${shortfalls.length} issues.`);
         return { roster: this.generatedRosterData, shortfalls };
       },
       
@@ -616,7 +614,7 @@
         }
       },
       
-      // Buffer function removed so Pass Counter remains 2 by default
+      // Buffer function removed
       
       createDisplayData: function(roster) {
         let displayData = {};
@@ -777,14 +775,12 @@
       
       /******************** Drag & Drop (Edit Mode) Helpers ********************/
       refreshDraggableCells: function() {
-        // If drag mode is enabled, re-render each cell in the roster table
         const cells = document.querySelectorAll("#editableRoster td[data-slot]");
         cells.forEach(cell => {
           const loc = cell.parentElement.getAttribute("data-loc");
           const text = cell.textContent.trim();
           if(this.dragMode) {
             cell.innerHTML = renderCellContent(text, loc);
-            // Attach drag event listeners to each staff-id span
             const spans = cell.querySelectorAll(".staff-id");
             spans.forEach(span => {
               span.addEventListener("dragstart", e => this.handleDragStart(e));
@@ -792,7 +788,6 @@
             cell.addEventListener("dragover", e => this.handleDragOver(e));
             cell.addEventListener("drop", e => this.handleDrop(e));
           } else {
-            // When not in drag mode, revert to plain text (if needed)
             cell.textContent = text;
           }
         });
@@ -808,9 +803,7 @@
         e.dataTransfer.setData("text/plain", staffID);
       },
       
-      handleDragOver: function(e) {
-        e.preventDefault();
-      },
+      handleDragOver: function(e) { e.preventDefault(); },
       
       handleDrop: function(e) {
         e.preventDefault();
@@ -818,15 +811,12 @@
         const targetCell = e.currentTarget;
         const newLoc = targetCell.parentElement.getAttribute("data-loc");
         const newSlot = targetCell.getAttribute("data-slot");
-        // Validate using house rules
         if (!this.canAssignStaff(this.draggedItem.staffID, newSlot, newLoc)) {
           alert("This move violates the house rules!");
           return;
         }
-        // Perform move: remove from old cell and add to new cell
         this.removeStaffFromCell(this.draggedItem.staffID, this.draggedItem.loc, this.draggedItem.slot);
         this.addStaffToCell(this.draggedItem.staffID, newLoc, newSlot);
-        // Push move onto undo stack
         this.undoStack.push({
           type: "move",
           staffID: this.draggedItem.staffID,
@@ -845,10 +835,8 @@
         const staff = this.getCurrentStaffList().find(s => s.staffID === staffID);
         if(!staff || staff.attendance !== "Yes") return false;
         if(this.isOnBreak(staff, slot)) return false;
-        // Use existing locationApplies to check if slot is allowed at location.
         const currentDay = document.getElementById("rosterDay").value;
         if(!this.locationApplies(loc, slot, currentDay)) return false;
-        // Also ensure not already assigned to that slot at that location.
         if(staff.assigned && staff.assigned.some(a => a.slot === slot && a.location === loc)) return false;
         return true;
       },
@@ -860,7 +848,6 @@
           return;
         }
         const lastMove = this.undoStack.pop();
-        // Reverse the move: remove from 'to' and add back to 'from'
         this.removeStaffFromCell(lastMove.staffID, lastMove.to.loc, lastMove.to.slot);
         this.addStaffToCell(lastMove.staffID, lastMove.from.loc, lastMove.from.slot);
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
@@ -890,9 +877,7 @@
           ROSTER_TIMES.forEach(slot => {
             const applies = this.locationApplies(loc, slot, isWeekend);
             let cellText = applies ? (roster[loc]?.[slot] || "") : "";
-            // If in drag mode, render as individual draggable spans
             let content = this.dragMode ? renderCellContent(cellText, loc) : cellText;
-            // Determine background color
             let ids = (loc==="Pass Counter"||loc==="Lobby")
               ? cellText.split(" | ") : cellText.split(",");
             ids = ids.map(s => s.trim()).filter(Boolean);
@@ -910,17 +895,10 @@
         let btnHTML = `<div style="margin-top:15px; text-align:right;"><button class="roster-btn" id="saveEditsBtn">Save Edits</button></div>`;
         container.innerHTML = headerHTML + tableHTML + btnHTML;
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
-        // Set up events on each cell
         container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
           this.setupLongPress(cell);
-          cell.addEventListener("click", () => {
-            if (this.dragMode && this.draggedItem == null) {
-              // In drag mode, clicking a cell (if no item is currently dragged) does nothing.
-            }
-          });
           cell.addEventListener("contextmenu", e => e.preventDefault());
         });
-        // If in drag mode, refresh draggable elements:
         if(this.dragMode) this.refreshDraggableCells();
       },
       
@@ -1036,7 +1014,6 @@
             styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
             headStyles: { fillColor: [108,117,125], halign: 'center', textColor: 255 }
           });
-          // Append staff break times
           const staffList = this.getCurrentStaffList();
           const breakData = staffList.filter(st => st.attendance === "Yes")
                           .map(st => [st.staffID, st.name, st.breakTime.replace("-", " to ")]);
@@ -1069,7 +1046,7 @@
         return (h - 20) * 60 + m;
       },
       
-      // House rules for location applicability. Vertical Patrol now allows 04:00 as critical.
+      // House rules for slot applicability. For Vertical Patrol, critical slots include 04:00.
       locationApplies: function(loc, slot, isWeekend) {
         if(loc === "Tango Papa") return slot === "07:00";
         if(loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
@@ -1089,16 +1066,13 @@
       },
       
       generateNewArrangement: function() {
-        this.shuffleBreakTimes();
+        this.shuffleBreaks();
         this.generateRoster();
       },
       
       /******************** Undo Functionality ********************/
       undoLastMove: function() {
-        if (!this.undoStack.length) {
-          alert("Nothing to undo.");
-          return;
-        }
+        if (!this.undoStack.length) { alert("Nothing to undo."); return; }
         const lastMove = this.undoStack.pop();
         this.removeStaffFromCell(lastMove.staffID, lastMove.to.loc, lastMove.to.slot);
         this.addStaffToCell(lastMove.staffID, lastMove.from.loc, lastMove.from.slot);
@@ -1110,27 +1084,7 @@
         this.showSuccess("Last move undone.");
       },
       
-      /******************** Drag & Drop: Remove & Add Helpers ********************/
-      removeStaffFromCell: function(staffID, loc, slot) {
-        const staffList = this.getCurrentStaffList();
-        const staff = staffList.find(s => s.staffID === staffID);
-        if(staff && staff.assigned) {
-          staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
-          this.saveAssignedToRows(staffList);
-        }
-      },
-      
-      addStaffToCell: function(staffID, loc, slot) {
-        const staffList = this.getCurrentStaffList();
-        const staff = staffList.find(s => s.staffID === staffID);
-        if(staff) {
-          if(!staff.assigned) staff.assigned = [];
-          staff.assigned.push({ slot, location: loc });
-          this.saveAssignedToRows(staffList);
-        }
-      },
-      
-      /******************** Refresh Draggable Cells ********************/
+      /******************** Drag & Drop Helpers ********************/
       refreshDraggableCells: function() {
         const cells = document.querySelectorAll("#editableRoster td[data-slot]");
         cells.forEach(cell => {
@@ -1139,9 +1093,7 @@
           if(this.dragMode) {
             cell.innerHTML = renderCellContent(text, loc);
             const spans = cell.querySelectorAll(".staff-id");
-            spans.forEach(span => {
-              span.addEventListener("dragstart", e => this.handleDragStart(e));
-            });
+            spans.forEach(span => { span.addEventListener("dragstart", e => this.handleDragStart(e)); });
             cell.addEventListener("dragover", e => this.handleDragOver(e));
             cell.addEventListener("drop", e => this.handleDrop(e));
           } else {
@@ -1186,6 +1138,16 @@
         this.displayRoster(this.getEditableRosterData(), conflicts, new Date());
         this.refreshDraggableCells();
         this.draggedItem = null;
+      },
+      
+      canAssignStaff: function(staffID, slot, loc) {
+        const staff = this.getCurrentStaffList().find(s => s.staffID === staffID);
+        if(!staff || staff.attendance !== "Yes") return false;
+        if(this.isOnBreak(staff, slot)) return false;
+        const currentDay = document.getElementById("rosterDay").value;
+        if(!this.locationApplies(loc, slot, currentDay)) return false;
+        if(staff.assigned && staff.assigned.some(a => a.slot === slot && a.location === loc)) return false;
+        return true;
       },
       
       /******************** Display Roster (Existing) ********************/
@@ -1245,7 +1207,7 @@
             cells.forEach(cell => {
               const slot = cell.getAttribute("data-slot");
               const ids = cell.textContent.split((loc==="Pass Counter" || loc==="Lobby") ? " | " : ",")
-                           .map(s => s.trim()).filter(Boolean);
+                          .map(s => s.trim()).filter(Boolean);
               ids.forEach(id => {
                 const st = staffList.find(x => x.staffID === id);
                 if(st && st.attendance === "Yes" && !st.locked) st.assigned.push({ slot, location: loc });
