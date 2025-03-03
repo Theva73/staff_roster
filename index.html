@@ -274,6 +274,8 @@
       generatedRosterData: null,
       lastValidationConflicts: {},
       clonedStaffID: null,  // For long press copy
+      editMode: false,      // New flag for edit mode
+      previousRosterHTML: null, // Backup for undo
       
       init: function() {
         console.log("Initializing roster system...");
@@ -1055,28 +1057,72 @@
         });
         tableHTML += "</tbody></table>";
         
+        // Updated button section with toggle and undo buttons
         let btnHTML = `
           <div style="margin-top:15px; text-align:right;">
+            <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
+            <button class="roster-btn" id="undoEditsBtn">Undo</button>
             <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
           </div>`;
         
         container.innerHTML = headerHTML + tableHTML + btnHTML;
         
+        // Attach event listeners to the new buttons
+        document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
+        document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
         
         // Setup events for each editable cell
         container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
-          // Our custom long-press logic
           this.setupLongPress(cell);
-          // If user just clicks, we paste the cloned ID (if any)
           cell.addEventListener("click", () => {
             if (this.clonedStaffID) {
               this.pasteClonedStaff(cell);
             }
           });
-          // Also block system context menu on right-click
           cell.addEventListener("contextmenu", e => e.preventDefault());
         });
+      },
+      
+      // New function: Toggle Edit Mode
+      toggleEditMode: function() {
+        this.editMode = !this.editMode;
+        const container = document.getElementById("rosterContainer");
+        if (this.editMode) {
+          // Save current state for undo backup
+          this.previousRosterHTML = container.innerHTML;
+          container.style.overflow = "visible";
+          container.style.width = "100%";
+          document.getElementById("toggleEditModeBtn").textContent = "Disable Edit Mode";
+        } else {
+          container.style.overflow = "auto";
+          container.style.width = "";
+          document.getElementById("toggleEditModeBtn").textContent = "Enable Edit Mode";
+        }
+      },
+      
+      // New function: Undo Edits (restore previous state)
+      undoEdits: function() {
+        const container = document.getElementById("rosterContainer");
+        if (this.previousRosterHTML) {
+          container.innerHTML = this.previousRosterHTML;
+          this.showSuccess("Undo successful. Reverted to previous state.");
+          // Reattach event listeners for the restored table:
+          document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
+          document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
+          document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
+          container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
+            this.setupLongPress(cell);
+            cell.addEventListener("click", () => {
+              if (this.clonedStaffID) {
+                this.pasteClonedStaff(cell);
+              }
+            });
+            cell.addEventListener("contextmenu", e => e.preventDefault());
+          });
+        } else {
+          this.showWarning("No previous state to revert to.");
+        }
       },
       
       saveEditedRoster: function() {
