@@ -944,23 +944,24 @@
             let cellText = applies ? (roster[loc]?.[slot] || "") : "";
             let content = this.dragMode ? renderCellContent(cellText, loc) : cellText;
             
-            let ids = (loc==="Pass Counter"||loc==="Lobby")
+            let ids = (loc === "Pass Counter" || loc === "Lobby")
               ? cellText.split(" | ")
               : cellText.split(",");
             ids = ids.map(s => s.trim()).filter(Boolean);
             
             let style = "";
-            if(!applies) style = "background-color:#f8f8f8; color:#999;";
-            else if(conflicts[loc] && conflicts[loc][slot]) style = "background-color:#ffd2d2;";
-            else if(CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) style = "background-color:#e2f0ff;";
-            else if(ids.length === 0) style = "background-color:#ffcccc;";
+            if (!applies) style = "background-color:#f8f8f8; color:#999;";
+            else if (conflicts[loc] && conflicts[loc][slot]) style = "background-color:#ffd2d2;";
+            else if (CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) style = "background-color:#e2f0ff;";
+            else if (ids.length === 0) style = "background-color:#ffcccc;";
             else style = "background-color:#fff;";
             
-            tableHTML += `<td contenteditable="true" data-slot="${slot}" style="min-width:80px; ${style}" title="${applies?'Long-press to copy staff ID':'Not applicable'}">${content}</td>`;
+            tableHTML += `<td contenteditable="true" data-slot="${slot}" style="min-width:80px; ${style}" title="${applies ? 'Long-press to copy staff ID' : 'Not applicable'}">${content}
+						</td>`;
           });
           tableHTML += "</tr>";
         });
-        tableHTML += "</tbody></table>`;
+        tableHTML += "</tbody></table>";
         
         let btnHTML = `<div style="margin-top:15px; text-align:right;">
           <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
@@ -975,18 +976,18 @@
           cell.addEventListener("contextmenu", e => e.preventDefault());
         });
         
-        if(this.dragMode) this.refreshDraggableCells();
+        if (this.dragMode) this.refreshDraggableCells();
       },
       
       saveEditedRoster: function() {
         try {
           const table = document.getElementById("editableRoster");
-          if(!table) {
+          if (!table) {
             this.showError("No roster table found.");
             return;
           }
           const staffList = this.getCurrentStaffList();
-          staffList.forEach(st => { if(!st.locked) st.assigned = []; });
+          staffList.forEach(st => { if (!st.locked) st.assigned = []; });
           
           const rows = table.querySelectorAll("tbody tr");
           rows.forEach(row => {
@@ -994,11 +995,11 @@
             const cells = row.querySelectorAll("td[data-slot]");
             cells.forEach(cell => {
               const slot = cell.getAttribute("data-slot");
-              const ids = cell.textContent.split((loc==="Pass Counter" || loc==="Lobby") ? " | " : ",")
+              const ids = cell.textContent.split((loc === "Pass Counter" || loc === "Lobby") ? " | " : ",")
                 .map(s => s.trim()).filter(Boolean);
               ids.forEach(id => {
                 const st = staffList.find(x => x.staffID === id);
-                if(st && st.attendance === "Yes" && !st.locked) {
+                if (st && st.attendance === "Yes" && !st.locked) {
                   st.assigned.push({ slot, location: loc });
                 }
               });
@@ -1021,7 +1022,7 @@
       
       getEditableRosterData: function() {
         const table = document.getElementById("editableRoster");
-        if(!table) return {};
+        if (!table) return {};
         const data = {};
         const rows = table.querySelectorAll("tbody tr");
         rows.forEach(row => {
@@ -1038,7 +1039,7 @@
       
       getTableData: function() {
         const table = document.getElementById("editableRoster");
-        if(!table) return [];
+        if (!table) return [];
         const data = [];
         table.querySelectorAll("tr").forEach(row => {
           const rowData = [];
@@ -1060,8 +1061,8 @@
       },
       
       downloadRoster: function(fmt) {
-        if(fmt === "csv") this.downloadAsCSV();
-        else if(fmt === "pdf") this.downloadAsPDF();
+        if (fmt === "csv") this.downloadAsCSV();
+        else if (fmt === "pdf") this.downloadAsPDF();
       },
       
       downloadAsCSV: function() {
@@ -1155,6 +1156,76 @@
         n.textContent = "⚠️ " + msg;
         container.appendChild(n);
         setTimeout(() => container.removeChild(n), 4000);
+      },
+      
+      // Helper method for long-press functionality (assumed to exist or needs implementation)
+      setupLongPress: function(cell) {
+        let pressTimer;
+        cell.addEventListener("mousedown", () => {
+          pressTimer = setTimeout(() => {
+            const text = cell.textContent.trim();
+            if (text) navigator.clipboard.writeText(text).then(() => {
+              this.showSuccess("Copied staff ID(s) to clipboard!");
+            }).catch(() => this.showError("Failed to copy to clipboard."));
+          }, 1000); // 1-second long press
+        });
+        cell.addEventListener("mouseup", () => clearTimeout(pressTimer));
+        cell.addEventListener("mouseleave", () => clearTimeout(pressTimer));
+      },
+      
+      // Helper method to check if a staff member is on break at a given slot
+      isOnBreak: function(staff, slot) {
+        if (!staff.breakTime) return false;
+        const [start, end] = staff.breakTime.split("-");
+        const slotMinutes = this.timeToMinutes(slot);
+        const startMinutes = this.timeToMinutes(start);
+        const endMinutes = this.timeToMinutes(end);
+        if (endMinutes < startMinutes) endMinutes += 24 * 60; // Handle overnight breaks
+        if (slotMinutes < startMinutes) slotMinutes += 24 * 60;
+        return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+      },
+      
+      // Helper method to convert time (HH:MM) to minutes since midnight
+      timeToMinutes: function(time) {
+        const [hours, minutes] = time.split(":").map(Number);
+        return hours * 60 + minutes;
+      },
+      
+      // Helper method to check if a location applies for a given slot and day
+      locationApplies: function(location, slot, isWeekend) {
+        if (isWeekend && location === "Report Room") return false;
+        if (location === "Tango Papa" && slot !== "07:00") return false;
+        return true;
+      },
+      
+      // Helper method to find an available staff member for a slot and location
+      findAvailableStaff: function(staffList, slot, location) {
+        return staffList.find(st => 
+          st.attendance === "Yes" && 
+          !st.locked && 
+          !this.isOnBreak(st, slot) && 
+          !st.assigned.some(a => a.slot === slot && a.location === location) &&
+          (location !== "HHMD" || st.hhmdEligible === "Yes")
+        );
+      },
+      
+      // Helper method to find an emergency staff member (less strict criteria)
+      findEmergencyStaff: function(staffList, slot, location) {
+        return staffList.find(st => 
+          st.attendance === "Yes" && 
+          !this.isOnBreak(st, slot) && 
+          !st.assigned.some(a => a.slot === slot && a.location === location)
+        );
+      },
+      
+      // Helper method to check if assigning a staff member would cause a conflict
+      wouldCauseConflict: function(roster, staff, slot, location) {
+        const currentDay = document.getElementById("rosterDay").value;
+        const isWeekend = ["Saturday", "Sunday"].includes(currentDay);
+        if (!this.locationApplies(location, slot, isWeekend)) return true;
+        if (this.isOnBreak(staff, slot)) return true;
+        if (staff.assigned.some(a => a.slot === slot && a.location === location)) return true;
+        return false;
       }
     };
     
