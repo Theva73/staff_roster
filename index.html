@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System CP - Fixed</title>
+  <title>Staff Roster Management System CP - Enhanced</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -33,7 +33,7 @@
       text-align: center;
     }
     h2 { margin-bottom: 25px; font-weight: 600; }
-    h3, h4 { margin: 20px 0 10px; }
+    h3 { margin: 20px 0 10px; }
     .container { max-width: 1200px; margin: 0 auto; padding: 0 15px; }
     .card {
       background: #fff; border-radius: 8px;
@@ -95,33 +95,11 @@
       .button-row { flex-direction: row; flex-wrap: wrap; justify-content: space-between; width: 100%; max-width: 320px; }
       .roster-btn { flex: 1 1 45%; margin-bottom: 8px; }
     }
-    /* =================== Floating Break List =================== */
-    #breakListContainer {
-      position: fixed; bottom: 20px; left: 20px; width: 240px; max-height: 350px; overflow: auto;
-      background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      padding: 15px; font-size: 13px; text-align: left; cursor: move; z-index: 1000;
-      border: 1px solid var(--border-color); transition: opacity 0.3s;
-    }
-    #breakListContainer.hidden { opacity: 0.2; }
-    #breakListContainer:hover { opacity: 1; }
-    /* =================== Roster Health Notes =================== */
-    .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-    .status-success { background-color: var(--success-color); }
-    .status-warning { background-color: var(--warning-color); }
-    .status-danger { background-color: var(--danger-color); }
-    /* =================== Small Break Time Table =================== */
-    .break-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 12px;
-    }
-    .break-table th, .break-table td {
-      border: 1px solid var(--border-color);
-      padding: 4px 6px;
-      text-align: center;
-    }
-    .break-table th { background-color: var(--light-bg); }
+    /* Notification Styles */
+    .notification { margin: 5px; padding: 8px; border-radius: 4px; font-size: 14px; }
+    .notification.success { background-color: #d4edda; color: #155724; }
+    .notification.error { background-color: #f8d7da; color: #721c24; }
+    .notification.warning { background-color: #fff3cd; color: #856404; }
   </style>
 </head>
 <body>
@@ -187,7 +165,6 @@
           <button class="roster-btn" id="exportDataBtn">Export</button>
         </div>
         <div class="button-row">
-          <!-- Shuffle now reassigns break times by shuffling the existing dashboard values -->
           <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
           <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
           <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
@@ -195,11 +172,11 @@
         <div class="button-row">
           <button class="roster-btn" id="downloadCSVBtn">CSV</button>
           <button class="roster-btn" id="downloadPDFBtn">PDF</button>
-          <button class="roster-btn" id="toggleBreakNoteBtn">Break Note</button>
+          <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
         </div>
       </div>
+      <input type="file" id="importFile" accept=".json" style="display:none;" />
     </div>
-    <input type="file" id="importFile" accept=".json" style="display:none;" />
     
     <!-- Generated Roster Section -->
     <div class="card">
@@ -208,28 +185,7 @@
         <!-- Roster table generated dynamically -->
       </div>
     </div>
-    
-    <!-- Roster Health Section -->
-    <div class="card">
-      <h4>Roster Health</h4>
-      <div id="notesContainer">
-        <!-- Health issues displayed here -->
-      </div>
-    </div>
-    
-    <!-- Staff Break Times Display (Smaller Table) -->
-    <div class="card">
-      <h4>Staff Break Times</h4>
-      <div id="breakTimesDisplay">
-        <!-- A small table replicating the sample design -->
-      </div>
-    </div>
-  </div>
-  
-  <!-- Floating Break List (Draggable) -->
-  <div id="breakListContainer">
-    <strong>Staff Break Times</strong><br><br>
-    <!-- Populated dynamically -->
+    <!-- Note: The "Roster Health" and "Staff Break Times" panels and floating break list have been removed. -->
   </div>
   
   <div id="notification-container"></div>
@@ -239,7 +195,6 @@
      * Global Constants & Variables
      **************************************************************/
     const STORAGE_KEY = 'staffListData_v2';
-    // BREAK_TIME_POOL is not used when using dashboard break times
     const ROSTER_TIMES = ["20:00","20:30","21:00","22:00","23:00","00:00",
                           "01:00","01:30","02:00","03:00","04:00","05:00",
                           "06:00","06:30","07:00"];
@@ -253,7 +208,6 @@
       { location: "Tango Papa", needed: 1 }
     ];
     const OUTPUT_ORDER = ["Pass Counter","HHMD","Guard House","Lobby","Report Room","Vertical Patrol","Tango Papa"];
-    // For critical locations, Vertical Patrol now requires assignment at "06:30"
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30", "23:00", "01:30", "06:30"],
       "Report Room": ["20:00", "21:00"],
@@ -262,21 +216,17 @@
     
     /**************************************************************
      * Roster System Object
-     * - Break times are taken from the dashboard.
-     * - The Shuffle Break Times function randomly reassigns break times among staff.
      **************************************************************/
     const rosterSystem = {
       generatedRosterData: null,
       lastValidationConflicts: {},
+      clonedStaffID: null,  // For long press copy
       
       init: function() {
         console.log("Initializing roster system...");
         this.initializeDateAndDay();
         this.setupEventListeners();
-        this.makeDraggable(document.getElementById('breakListContainer'));
         this.loadStaffList();
-        this.displayBreakList();
-        this.displayBreakTimesTable();
         this.showSuccess("System initialized successfully.");
       },
       
@@ -295,58 +245,13 @@
         document.getElementById("addStaffBtn").addEventListener("click", () => this.addStaff());
         document.getElementById("importDataBtn").addEventListener("click", () => this.importData());
         document.getElementById("exportDataBtn").addEventListener("click", () => this.exportData());
-        // Enable Shuffle: This function shuffles break times among active, unlocked staff.
         document.getElementById("shuffleBreaksBtn").addEventListener("click", () => this.shuffleBreakTimes());
         document.getElementById("generateRosterBtn").addEventListener("click", () => this.generateRoster());
         document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV());
         document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
         document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
-        document.getElementById("toggleBreakNoteBtn").addEventListener("click", () => this.toggleBreakNote());
+        document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
         document.getElementById("rosterDay").addEventListener("change", () => { if(this.generatedRosterData) this.generateRoster(); });
-      },
-      
-      makeDraggable: function(el) {
-        if(!el) return;
-        let pos = { top: 0, left: 0, x: 0, y: 0 };
-        const mouseDownHandler = (e) => {
-          pos = { left: el.offsetLeft, top: el.offsetTop, x: e.clientX, y: e.clientY };
-          document.addEventListener('mousemove', mouseMoveHandler);
-          document.addEventListener('mouseup', mouseUpHandler);
-          el.style.cursor = 'grabbing';
-          el.style.userSelect = 'none';
-        };
-        const mouseMoveHandler = (e) => {
-          const dx = e.clientX - pos.x, dy = e.clientY - pos.y;
-          let newLeft = pos.left + dx, newTop = pos.top + dy;
-          const maxX = window.innerWidth - el.offsetWidth, maxY = window.innerHeight - el.offsetHeight;
-          newLeft = Math.max(0, Math.min(newLeft, maxX));
-          newTop = Math.max(0, Math.min(newTop, maxY));
-          el.style.left = newLeft + 'px';
-          el.style.top = newTop + 'px';
-        };
-        const mouseUpHandler = () => {
-          document.removeEventListener('mousemove', mouseMoveHandler);
-          document.removeEventListener('mouseup', mouseUpHandler);
-          el.style.cursor = 'grab';
-          el.style.userSelect = '';
-        };
-        el.addEventListener('mousedown', mouseDownHandler);
-        el.style.cursor = 'grab';
-        el.style.position = 'fixed';
-      },
-      
-      /* Notification Functions */
-      showSuccess: function(msg) { this.showNotification(msg, 'success'); },
-      showError: function(msg) { this.showNotification(msg, 'error'); },
-      showWarning: function(msg) { this.showNotification(msg, 'warning'); },
-      showNotification: function(message, type='info') {
-        const container = document.getElementById("notification-container");
-        const n = document.createElement("div");
-        n.className = `notification ${type}`;
-        const icons = { success:'✅ ', error:'❌ ', warning:'⚠️ ', info:'ℹ️ ' };
-        n.textContent = icons[type] + message;
-        container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 4000);
       },
       
       /******************** Staff Management ********************/
@@ -442,7 +347,12 @@
       addListenersToAllRows: function() {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         const inputs = tbody.querySelectorAll("input, select");
-        inputs.forEach(inp => { inp.onchange = () => { this.saveStaffList(); this.updateStaffCount(); this.displayBreakList(); this.displayBreakTimesTable(); }; });
+        inputs.forEach(inp => { 
+          inp.onchange = () => { 
+            this.saveStaffList(); 
+            this.updateStaffCount(); 
+          }; 
+        });
         const removeButtons = tbody.querySelectorAll(".remove-btn");
         removeButtons.forEach(btn => {
           btn.onclick = () => {
@@ -452,8 +362,6 @@
               row.remove();
               this.saveStaffList();
               this.updateStaffCount();
-              this.displayBreakList();
-              this.displayBreakTimesTable();
             }
           };
         });
@@ -478,21 +386,17 @@
       },
       
       /******************** Shuffle Break Times ********************/
-      // This function shuffles the existing break times among active, unlocked staff.
       shuffleBreakTimes: function() {
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
         if(staffList.length < 2) {
           this.showWarning("Not enough staff to shuffle break times.");
           return;
         }
-        // Collect current break times
         let breaks = staffList.map(st => st.breakTime);
-        // Shuffle using Fisher–Yates algorithm
         for (let i = breaks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [breaks[i], breaks[j]] = [breaks[j], breaks[i]];
         }
-        // Reassign the shuffled break times back to staff and update input fields
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         let rows = Array.from(tbody.rows);
         let idx = 0;
@@ -508,104 +412,7 @@
           }
         });
         this.saveStaffList();
-        this.displayBreakList();
-        this.displayBreakTimesTable();
         this.showSuccess("Shuffled break times among staff.");
-      },
-      
-      /******************** Break Times Table Display ********************/
-      // This function builds a compact table similar to the attached sample design.
-      displayBreakTimesTable: function() {
-        const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        let html = "";
-        if(staffList.length === 0) {
-          html = "<em>No staff scheduled</em>";
-        } else {
-          html += `<table class="break-table">
-                    <thead>
-                      <tr>
-                        <th>Staff ID</th>
-                        <th>Name</th>
-                        <th>Break Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>`;
-          staffList.sort((a, b) => this.parseBreakTime(a.breakTime).start - this.parseBreakTime(b.breakTime).start);
-          staffList.forEach(st => {
-            html += `<tr>
-                       <td>${st.staffID || "??"}</td>
-                       <td>${st.name || "??"}</td>
-                       <td>${st.breakTime.replace("-", " to ")}</td>
-                     </tr>`;
-          });
-          html += `</tbody></table>`;
-        }
-        document.getElementById("breakTimesDisplay").innerHTML = html;
-      },
-      
-      /******************** Floating Break List ********************/
-      displayBreakList: function() {
-        const staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes");
-        let html = "<strong>Staff Break Times</strong><br><br>";
-        if(staffList.length === 0) { html += "<em>No staff scheduled</em>"; }
-        else {
-          staffList.sort((a, b) => this.parseBreakTime(a.breakTime).start - this.parseBreakTime(b.breakTime).start);
-          staffList.forEach(st => {
-            html += `<strong>${st.staffID || "??"}</strong> (${st.name || "??"}): ${st.breakTime}${st.locked ? " 🔒" : ""}<br>`;
-          });
-        }
-        document.getElementById("breakListContainer").innerHTML = html;
-      },
-      
-      toggleBreakNote: function() {
-        document.getElementById("breakListContainer").classList.toggle("hidden");
-      },
-      
-      parseBreakTime: function(breakTime) {
-        if(!breakTime || !breakTime.includes("-")) return { start: 0, end: 0 };
-        const [s, e] = breakTime.split("-");
-        return { start: this.timeToMinutes(s), end: this.timeToMinutes(e) };
-      },
-      
-      /******************** Import / Export ********************/
-      importData: function() {
-        const fileInput = document.getElementById("importFile");
-        fileInput.value = "";
-        fileInput.onchange = async (e) => {
-          const file = e.target.files[0];
-          if(!file) return;
-          try {
-            const text = await file.text();
-            const imported = JSON.parse(text);
-            if(!Array.isArray(imported)) throw new Error("Invalid JSON array");
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
-            this.loadStaffList();
-            this.displayBreakList();
-            this.displayBreakTimesTable();
-            this.showSuccess("Imported data successfully.");
-          } catch(err) {
-            this.showError("Import error: " + err.message);
-          }
-        };
-        fileInput.click();
-      },
-      
-      exportData: function() {
-        try {
-          const staffList = this.getCurrentStaffList();
-          if(!staffList.length) { this.showWarning("No data to export"); return; }
-          const jsonStr = JSON.stringify(staffList, null, 2);
-          const blob = new Blob([jsonStr], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
-          a.click();
-          URL.revokeObjectURL(url);
-          this.showSuccess("Exported data successfully.");
-        } catch(err) {
-          this.showError("Export error: " + err.message);
-        }
       },
       
       /******************** Roster Generation & Conflict Resolution ********************/
@@ -617,7 +424,7 @@
           this.showError("Add staff before generating roster.");
           return;
         }
-        // Do not override break times from dashboard
+        // Clear previous assignments for unlocked staff
         staffList.forEach(st => { if(!st.locked) st.assigned = []; });
         let roster = this.initializeRoster();
         let shortfalls = [];
@@ -631,8 +438,6 @@
         this.saveAssignedToRows(staffList);
         const creationTime = new Date();
         this.displayRoster(this.generatedRosterData, this.lastValidationConflicts, creationTime);
-        this.displayNotes(shortfalls);
-        this.displayBreakList();
         this.showSuccess(shortfalls.length === 0 ? "Optimal roster generated!" : `Roster generated with ${shortfalls.length} issues.`);
         return { roster: this.generatedRosterData, shortfalls };
       },
@@ -755,7 +560,7 @@
             let ids = [];
             if(roster[loc] && roster[loc][slot]) {
               let tokens = (loc === "Pass Counter" || loc === "Lobby") ? roster[loc][slot].split(" | ") : roster[loc][slot].split(",");
-              ids = tokens.map(s => s.trim()).filter(id => id && !id.includes("*"));
+              ids = tokens.map(s => s.trim()).filter(Boolean);
             }
             displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby") ? ids.join(" | ") : ids.join(", ");
           });
@@ -948,7 +753,68 @@
         this.saveStaffList();
       },
       
-      /******************** Display Functions ********************/
+      /******************** Long Press & Clone Staff ID ********************/
+      setupLongPress: function(cell) {
+        let pressTimer = null;
+        const LONG_PRESS_MS = 600;
+        const startPress = () => {
+          pressTimer = setTimeout(() => {
+            this.copyStaffFromCell(cell);
+          }, LONG_PRESS_MS);
+        };
+        const cancelPress = () => {
+          if (pressTimer) clearTimeout(pressTimer);
+        };
+        cell.addEventListener("mousedown", startPress);
+        cell.addEventListener("mouseup", cancelPress);
+        cell.addEventListener("mouseleave", cancelPress);
+        cell.addEventListener("touchstart", startPress);
+        cell.addEventListener("touchend", cancelPress);
+        cell.addEventListener("touchmove", cancelPress);
+      },
+      
+      copyStaffFromCell: function(cell) {
+        const loc = cell.parentElement.getAttribute("data-loc");
+        const slot = cell.getAttribute("data-slot");
+        if (!loc || !slot) return;
+        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
+        let content = cell.textContent.trim();
+        if (!content) {
+          this.showWarning("No staff ID in this cell to copy.");
+          return;
+        }
+        let ids = content.split(delimiter).map(x => x.trim()).filter(Boolean);
+        this.clonedStaffID = ids[0];
+        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste.`);
+      },
+      
+      pasteClonedStaff: function(cell) {
+        const loc = cell.parentElement.getAttribute("data-loc");
+        const slot = cell.getAttribute("data-slot");
+        if (!loc || !slot) return;
+        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+        let currentText = cell.textContent.trim();
+        if (!currentText) {
+          cell.textContent = this.clonedStaffID;
+        } else {
+          cell.textContent = currentText + delimiter + this.clonedStaffID;
+        }
+        let staff = this.getCurrentStaffList().find(s => s.staffID === this.clonedStaffID);
+        if (staff && !staff.locked && staff.attendance === "Yes") {
+          let alreadyAssigned = staff.assigned.some(a => a.slot === slot && a.location === loc);
+          if (!alreadyAssigned) {
+            staff.assigned.push({ slot, location: loc });
+            this.saveAssignedToRows(this.getCurrentStaffList());
+          }
+        }
+        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot}.`);
+        this.clonedStaffID = null;
+        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
+        const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
+        this.lastValidationConflicts = conflicts;
+      },
+      
+      /******************** Display Roster with Manual Edit Highlight ********************/
       displayRoster: function(roster, conflicts, creationTime) {
         const container = document.getElementById("rosterContainer");
         const date = document.getElementById("rosterDate").value;
@@ -972,8 +838,9 @@
             if(!applies) style = "background-color:#f8f8f8; color:#999;";
             else if(conflicts[loc] && conflicts[loc][slot]) style = "background-color:#ffd2d2;";
             else if(applies && !ids.length) style = "background-color:#ffcccc;";
-            else if(CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) style = "background-color:#e2f0ff;";
-            tableHTML += `<td contenteditable="true" data-slot="${slot}" style="min-width:80px; ${style}" title="${applies?'Edit assignments':'Not applicable'}">${cellText}</td>`;
+            // Start with a white background; manual edits will change it to light yellow
+            style += "background-color:#fff;";
+            tableHTML += `<td contenteditable="true" data-slot="${slot}" style="min-width:80px; ${style}" title="${applies?'Edit assignments or long-press to copy staff':'Not applicable'}">${cellText}</td>`;
           });
           tableHTML += "</tr>";
         });
@@ -984,38 +851,17 @@
         container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
           cell.addEventListener("focus", () => cell.style.boxShadow = "0 0 0 2px rgba(108,117,125,0.4)");
           cell.addEventListener("blur", () => cell.style.boxShadow = "");
+          // When a manual change occurs, change background to light yellow
+          cell.addEventListener("input", () => { cell.style.backgroundColor = "lightyellow"; });
+          // Setup long press for cloning
+          this.setupLongPress(cell);
+          // Setup click to paste cloned staff if available
+          cell.addEventListener("click", () => {
+            if (this.clonedStaffID) {
+              this.pasteClonedStaff(cell);
+            }
+          });
         });
-      },
-      
-      displayNotes: function(shortfalls) {
-        const container = document.getElementById("notesContainer");
-        if(!shortfalls.length) {
-          container.innerHTML = `<div class="status-message success"><span class="status-indicator status-success"></span> Roster Health: All clear.</div>`;
-        } else {
-          const visible = shortfalls.slice(0, 3);
-          const hidden = shortfalls.slice(3);
-          let html = `<ul style="text-align:left; margin-top:10px; font-size:12px;">`;
-          visible.forEach(n => {
-            const s = n.toUpperCase().includes("CRITICAL") ? "color:#EF4444; font-weight:bold;" : "color:#F59E0B;";
-            html += `<li style="${s}">${n}</li>`;
-          });
-          html += `</ul>`;
-          if(hidden.length) {
-            html += `<div id="hiddenNotes" style="display:none;"><ul style="text-align:left; margin-top:10px; font-size:12px;">`;
-            hidden.forEach(n => {
-              const s = n.toUpperCase().includes("CRITICAL") ? "color:#EF4444; font-weight:bold;" : "color:#F59E0B;";
-              html += `<li style="${s}">${n}</li>`;
-            });
-            html += `</ul></div>`;
-            html += `<button class="roster-btn" id="toggleNotesBtn" style="font-size:12px; margin-top:5px;">Show More</button>`;
-          }
-          container.innerHTML = `<div class="status-message"><span class="status-indicator status-danger"></span> Roster Health: ${shortfalls.length} issues</div>` + html;
-          document.getElementById("toggleNotesBtn")?.addEventListener("click", function() {
-            const hiddenDiv = document.getElementById("hiddenNotes");
-            if(hiddenDiv.style.display === "none") { hiddenDiv.style.display = "block"; this.textContent = "Show Less"; }
-            else { hiddenDiv.style.display = "none"; this.textContent = "Show More"; }
-          });
-        }
       },
       
       saveEditedRoster: function() {
@@ -1041,7 +887,6 @@
           const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
           const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
           this.lastValidationConflicts = conflicts;
-          this.displayNotes(issues);
           this.displayRoster(this.getEditableRosterData(), conflicts, new Date());
           this.showSuccess("Roster edits saved successfully!");
         } catch(e) {
@@ -1079,7 +924,7 @@
         return data;
       },
       
-      /******************** Export Functions ********************/
+      /******************** Import / Export ********************/
       copyTSV: function() {
         const data = this.getTableData();
         const tsv = data.map(r => r.join("\t")).join("\n");
@@ -1126,7 +971,7 @@
             styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
             headStyles: { fillColor: [108,117,125], halign: 'center', textColor: 255 }
           });
-          // Add a break times table at the bottom
+          // Add staff break times table at bottom with wrapped columns
           const staffList = this.getCurrentStaffList();
           const breakData = staffList.filter(st => st.attendance === "Yes").map(st => [st.staffID, st.name, st.breakTime.replace("-", " to ")]);
           if(breakData.length) {
@@ -1138,7 +983,7 @@
               body: breakData,
               startY: finalY + 10,
               margin: { left: 40, right: 40 },
-              styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
+              styles: { fontSize: 8, halign: 'center', cellPadding: 3, overflow: 'linebreak' },
               headStyles: { fillColor: [108,117,125], textColor: 255, halign: 'center' }
             });
           }
@@ -1150,12 +995,6 @@
         }
       },
       
-      parseBreakTime: function(breakTime) {
-        if(!breakTime || !breakTime.includes("-")) return { start: 0, end: 0 };
-        const [s, e] = breakTime.split("-");
-        return { start: this.timeToMinutes(s), end: this.timeToMinutes(e) };
-      },
-      
       timeToMinutes: function(timeStr) {
         if(!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) return 0;
         let [h, m] = timeStr.split(":").map(Number);
@@ -1163,16 +1002,55 @@
         return (h - 20) * 60 + m;
       },
       
-      /******************** Key Change: locationApplies ********************/
-      // For Tango Papa, only allow "07:00".
-      // For Vertical Patrol, only allow "20:30", "23:00", "01:30" and now "06:30".
-      // For all other locations, disallow "06:30" and "07:00".
       locationApplies: function(loc, slot, isWeekend) {
         if(loc === "Tango Papa") return slot === "07:00";
         if(loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "06:30"].includes(slot);
         if(slot === "06:30" || slot === "07:00") return false;
         if(loc === "Report Room" && isWeekend) return false;
         return true;
+      },
+      
+      /******************** Clear & New Roster Generation ********************/
+      clearRoster: function() {
+        const container = document.getElementById("rosterContainer");
+        container.innerHTML = "";
+        this.generatedRosterData = null;
+        this.lastValidationConflicts = {};
+        this.showSuccess("Roster cleared. Generating new arrangement...");
+        this.generateNewArrangement();
+      },
+      
+      generateNewArrangement: function() {
+        this.shuffleBreakTimes();
+        this.generateRoster();
+      },
+      
+      /******************** Notification Functions ********************/
+      showSuccess: function(msg) {
+        const container = document.getElementById("notification-container");
+        const n = document.createElement("div");
+        n.className = `notification success`;
+        n.textContent = "✅ " + msg;
+        container.appendChild(n);
+        setTimeout(() => container.removeChild(n), 4000);
+      },
+      
+      showError: function(msg) {
+        const container = document.getElementById("notification-container");
+        const n = document.createElement("div");
+        n.className = `notification error`;
+        n.textContent = "❌ " + msg;
+        container.appendChild(n);
+        setTimeout(() => container.removeChild(n), 4000);
+      },
+      
+      showWarning: function(msg) {
+        const container = document.getElementById("notification-container");
+        const n = document.createElement("div");
+        n.className = `notification warning`;
+        n.textContent = "⚠️ " + msg;
+        container.appendChild(n);
+        setTimeout(() => container.removeChild(n), 4000);
       }
     };
     
