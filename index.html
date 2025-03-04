@@ -263,7 +263,7 @@
       "Pass Counter","HHMD","Guard House",
       "Lobby","Report Room","Vertical Patrol","Tango Papa"
     ];
-    // Now includes "04:00" as critical for Vertical Patrol
+    // Critical times for specific locations
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"],
       "Report Room": ["20:00", "21:00"],
@@ -470,7 +470,6 @@
             if(!Array.isArray(imported)) {
               throw new Error("Invalid JSON format. Must be an array of staff objects.");
             }
-            // Save to localStorage and reload
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
             this.showSuccess("Imported data successfully!");
@@ -502,35 +501,53 @@
         }
       },
       
-      /******************** Shuffle Break Times ********************/
+      /******************** Shuffle Break Times with Lock & Compliance ********************/
+      // New helper function to check break time compliance (e.g., minimum 30 minutes)
+      isBreakTimeCompliant: function(staff, newBreakTime) {
+        const [start, end] = newBreakTime.split("-");
+        const [startH, startM] = start.split(":").map(Number);
+        const [endH, endM] = end.split(":").map(Number);
+        const startTotal = startH * 60 + startM;
+        const endTotal = endH * 60 + endM;
+        const duration = endTotal >= startTotal 
+          ? endTotal - startTotal 
+          : (1440 - startTotal) + endTotal;
+        return duration >= 30;
+      },
+      
+      // Modified shuffleBreakTimes function that shuffles only unlocked staff
       shuffleBreakTimes: function() {
-        let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
-        if(staffList.length < 2) {
-          this.showWarning("Not enough staff to shuffle break times.");
+        let unlockedStaff = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
+        if(unlockedStaff.length < 2) {
+          this.showWarning("Not enough unlocked staff to shuffle break times.");
           return;
         }
-        let breaks = staffList.map(st => st.breakTime);
+        let breakTimes = unlockedStaff.map(st => st.breakTime);
         // Fisher–Yates shuffle
-        for (let i = breaks.length - 1; i > 0; i--) {
+        for (let i = breakTimes.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [breaks[i], breaks[j]] = [breaks[j], breaks[i]];
+          [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]];
         }
+        // Update each unlocked staff if the new break time complies with house rules.
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         let rows = Array.from(tbody.rows);
-        let idx = 0;
-        rows.forEach(row => {
-          const att = row.cells[4].querySelector("select").value;
-          const locked = row.cells[5].querySelector("input[type='checkbox']").checked;
-          if(att === "Yes" && !locked) {
-            const inputs = row.cells[2].querySelectorAll("input[type='time']");
-            const [newStart, newEnd] = breaks[idx].split("-");
-            inputs[0].value = newStart;
-            inputs[1].value = newEnd;
-            idx++;
+        unlockedStaff.forEach((staff, index) => {
+          const newBreakTime = breakTimes[index];
+          if(this.isBreakTimeCompliant(staff, newBreakTime)) {
+            staff.breakTime = newBreakTime;
+            const row = rows.find(r => r.cells[0].querySelector("input").value.trim() === staff.staffID);
+            if(row) {
+              const timeInputs = row.cells[2].querySelectorAll("input[type='time']");
+              const [newStart, newEnd] = newBreakTime.split("-");
+              timeInputs[0].value = newStart;
+              timeInputs[1].value = newEnd;
+            }
+          } else {
+            this.showWarning(`New break time for ${staff.staffID} does not comply with house rules. Keeping original.`);
           }
         });
         this.saveStaffList();
-        this.showSuccess("Shuffled break times among staff.");
+        this.showSuccess("Shuffled break times among unlocked staff (compliant with house rules).");
       },
       
       /******************** Roster Generation & Conflict Resolution ********************/
@@ -542,7 +559,6 @@
           this.showError("Add staff before generating roster.");
           return;
         }
-        // Clear previous assignments for unlocked staff
         staffList.forEach(st => { if(!st.locked) st.assigned = []; });
         
         let roster = this.initializeRoster();
@@ -551,9 +567,6 @@
         this.assignCritical(roster, staffList, isWeekend, shortfalls);
         this.checkCriticalShortfalls(roster, isWeekend, shortfalls);
         this.assignNonCritical(roster, staffList, isWeekend, shortfalls);
-        
-        // Remove or comment out the buffer staff function call
-        // this.addBufferStaff(roster, staffList, isWeekend);
         
         this.generatedRosterData = this.createDisplayData(roster);
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
@@ -629,7 +642,6 @@
         if(!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0) {
           shortfalls.push(`Missing Tango Papa at 07:00`);
         }
-        // Check Pass Counter staff count at each timeslot
         for(const slot of ROSTER_TIMES) {
           if(slot === "07:00") continue;
           const count = roster["Pass Counter"][slot]
@@ -639,7 +651,6 @@
             shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
           }
         }
-        // Check HHMD staff at each timeslot
         for(const slot of ROSTER_TIMES) {
           if(!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
             shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
@@ -674,29 +685,6 @@
             }
           }
         }
-      },
-      
-      // Removed auto buffer function call from generateRoster.
-      
-      createDisplayData: function(roster) {
-        let displayData = {};
-        OUTPUT_ORDER.forEach(loc => {
-          displayData[loc] = {};
-          ROSTER_TIMES.forEach(slot => {
-            let ids = [];
-            if(roster[loc] && roster[loc][slot]) {
-              let tokens = (loc === "Pass Counter" || loc === "Lobby")
-                ? roster[loc][slot].split(" | ")
-                : roster[loc][slot].split(",");
-              ids = tokens.map(s => s.trim()).filter(Boolean);
-            }
-            // Join with correct delimiter
-            displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby")
-              ? ids.join(" | ")
-              : ids.join(", ");
-          });
-        });
-        return displayData;
       },
       
       autoCorrect: function(roster, staffList, gapThreshold) {
@@ -759,7 +747,6 @@
           return slotTime >= breakStart && slotTime <= breakEnd;
         }
         else {
-          // Spans midnight
           return (slotTime >= breakStart || slotTime <= breakEnd);
         }
       },
@@ -845,7 +832,6 @@
           for(const slot in roster[loc]) {
             const str = roster[loc][slot];
             if(!str) continue;
-            // Tango Papa should be only "07:00"
             if(slot === "07:00" && loc !== "Tango Papa") {
               const ids = str.split((loc==="Pass Counter"||loc==="Lobby") ? " | " : ",")
                 .map(s => s.trim()).filter(Boolean);
@@ -1039,7 +1025,6 @@
         });
         tableHTML += "</tbody></table>";
         
-        // New button section with relocated buttons and edit controls
         let btnHTML = `
           <div style="margin-top:15px; text-align:right;">
             <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
@@ -1243,7 +1228,6 @@
             headStyles: { fillColor: [108,117,125], halign: 'center', textColor: 255 }
           });
           
-          // Add staff break times table at bottom
           const staffList = this.getCurrentStaffList();
           const breakData = staffList
             .filter(st => st.attendance === "Yes")
