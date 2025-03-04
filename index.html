@@ -147,6 +147,11 @@
       -webkit-touch-callout: none;   /* iOS Safari */
       user-select: none;             /* Chrome/Safari/Firefox/Edge */
     }
+    
+    /* =================== Edit Mode Styles =================== */
+    .edit-mode td {
+      font-weight: bold; /* Make text thicker when editing */
+    }
   </style>
 </head>
 <body>
@@ -218,8 +223,6 @@
         </div>
         <div class="button-row">
           <button class="roster-btn" id="downloadCSVBtn">CSV</button>
-          <button class="roster-btn" id="downloadPDFBtn">PDF</button>
-          <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
         </div>
       </div>
       <!-- Hidden file input for Import -->
@@ -307,9 +310,7 @@
         document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV());
         
         document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
-        document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
-        document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
-        
+        // Removed PDF and Clear buttons event listeners from Staff Management section
         document.getElementById("rosterDay").addEventListener("change", () => {
           if(this.generatedRosterData) this.generateRoster();
         });
@@ -611,7 +612,7 @@
       },
       
       checkCriticalShortfalls: function(roster, isWeekend, shortfalls) {
-        const vpTimes = ["20:30", "23:00", "01:30", "04:00", "06:30"]; // includes 04:00
+        const vpTimes = ["20:30", "23:00", "01:30", "04:00", "06:30"];
         for(let time of vpTimes) {
           if(!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0) {
             shortfalls.push(`Missing Vertical Patrol at ${time}`);
@@ -675,13 +676,7 @@
         }
       },
       
-      // Removed auto buffer function call from generateRoster. 
-      // If you want to keep the function for reference, comment it out or remove it:
-      /*
-      addBufferStaff: function(roster, staffList, isWeekend) {
-        // was previously adding a third staff with * to Pass Counter
-      },
-      */
+      // Removed auto buffer function call from generateRoster.
       
       createDisplayData: function(roster) {
         let displayData = {};
@@ -864,14 +859,12 @@
               .map(s => s.trim()).filter(Boolean);
             const unique = new Set(ids);
             if(unique.size < ids.length) {
-              // Some duplicates
               const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
               dup.forEach(id => {
                 issues.push(`Staff ${id} listed multiple times at ${loc} for ${slot}`);
                 addConflict(loc, slot, id, "duplicateAssignment");
               });
             }
-            // Build staffAssignments
             for(const id of ids) {
               if(!staffAssignments[id]) staffAssignments[id] = [];
               const exists = staffAssignments[id].find(a => a.slot === slot);
@@ -884,14 +877,12 @@
             }
           }
         }
-        // Check gap threshold & consecutive issues
         for(const id in staffAssignments) {
           const asgn = staffAssignments[id].sort(
             (a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
           );
           for(let i = 0; i < asgn.length - 1; i++) {
             const curr = asgn[i], next = asgn[i+1];
-            // Consecutive assignments at same location
             if(
               curr.location === next.location &&
               Math.abs(ROSTER_TIMES.indexOf(curr.slot) - ROSTER_TIMES.indexOf(next.slot)) === 1
@@ -900,7 +891,6 @@
               addConflict(curr.location, curr.slot, id, "consecutive");
               addConflict(next.location, next.slot, id, "consecutive");
             }
-            // Gap threshold check
             if(curr.location === next.location) {
               const ct = rosterSystem.timeToMinutes(curr.slot),
                     nt = rosterSystem.timeToMinutes(next.slot);
@@ -953,8 +943,6 @@
         cell.addEventListener("touchstart", startPress);
         cell.addEventListener("touchend", cancelPress);
         cell.addEventListener("touchmove", cancelPress);
-        
-        // Also disable right-click context menu to remove the pop-up
         cell.addEventListener("contextmenu", e => e.preventDefault());
       },
       
@@ -1028,26 +1016,20 @@
               : cellText.split(",");
             ids = ids.map(s => s.trim()).filter(Boolean);
             
-            // Determine the background color logic
             let style = "";
             if(!applies) {
-              // Not applicable
               style = "background-color:#f8f8f8; color:#999;";
             }
             else if(conflicts[loc] && conflicts[loc][slot]) {
-              // Conflict
               style = "background-color:#ffd2d2;";
             }
             else if(CRITICAL_LOCATIONS[loc] && CRITICAL_LOCATIONS[loc].includes(slot)) {
-              // Critical timeslot => light blue
               style = "background-color:#e2f0ff;";
             }
             else if(ids.length === 0) {
-              // Empty cell => pink
               style = "background-color:#ffcccc;";
             }
             else {
-              // Normal assigned cell => white
               style = "background-color:#fff;";
             }
             
@@ -1057,22 +1039,24 @@
         });
         tableHTML += "</tbody></table>";
         
-        // Updated button section with toggle and undo buttons
+        // New button section with relocated buttons and edit controls
         let btnHTML = `
           <div style="margin-top:15px; text-align:right;">
             <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
+            <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
+            <button class="roster-btn" id="downloadPDFBtn">PDF</button>
             <button class="roster-btn" id="undoEditsBtn">Undo</button>
             <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
           </div>`;
         
         container.innerHTML = headerHTML + tableHTML + btnHTML;
         
-        // Attach event listeners to the new buttons
         document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
+        document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
+        document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
         document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
         document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
         
-        // Setup events for each editable cell
         container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
           this.setupLongPress(cell);
           cell.addEventListener("click", () => {
@@ -1084,30 +1068,37 @@
         });
       },
       
-      // New function: Toggle Edit Mode
+      // Toggle Edit Mode with enhanced focus
       toggleEditMode: function() {
         this.editMode = !this.editMode;
         const container = document.getElementById("rosterContainer");
+        const table = container.querySelector("table");
         if (this.editMode) {
-          // Save current state for undo backup
           this.previousRosterHTML = container.innerHTML;
           container.style.overflow = "visible";
           container.style.width = "100%";
+          container.style.backgroundColor = "rgba(0,0,0,0.1)";
+          if (table) {
+            table.classList.add("edit-mode");
+          }
           document.getElementById("toggleEditModeBtn").textContent = "Disable Edit Mode";
         } else {
           container.style.overflow = "auto";
           container.style.width = "";
+          container.style.backgroundColor = "";
+          if (table) {
+            table.classList.remove("edit-mode");
+          }
           document.getElementById("toggleEditModeBtn").textContent = "Enable Edit Mode";
         }
       },
       
-      // New function: Undo Edits (restore previous state)
+      // Undo Edits (restore previous state)
       undoEdits: function() {
         const container = document.getElementById("rosterContainer");
         if (this.previousRosterHTML) {
           container.innerHTML = this.previousRosterHTML;
           this.showSuccess("Undo successful. Reverted to previous state.");
-          // Reattach event listeners for the restored table:
           document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
           document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
           document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
@@ -1133,7 +1124,6 @@
             return;
           }
           const staffList = this.getCurrentStaffList();
-          // Clear existing assigned if unlocked
           staffList.forEach(st => { if(!st.locked) st.assigned = []; });
           
           const rows = table.querySelectorAll("tbody tr");
@@ -1283,7 +1273,6 @@
       timeToMinutes: function(timeStr) {
         if(!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) return 0;
         let [h, m] = timeStr.split(":").map(Number);
-        // If hour < 8, treat it as after midnight (28:00, etc.)
         if(h < 8) h += 24;
         return (h - 20) * 60 + m;
       },
@@ -1291,7 +1280,7 @@
       locationApplies: function(loc, slot, isWeekend) {
         if(loc === "Tango Papa") return slot === "07:00";
         if(loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
-        if(slot === "06:30" || slot === "07:00") return false; // exclude from normal
+        if(slot === "06:30" || slot === "07:00") return false;
         if(loc === "Report Room" && isWeekend) return false;
         return true;
       },
@@ -1307,7 +1296,6 @@
       },
       
       generateNewArrangement: function() {
-        // Shuffle break times, then generate a fresh roster
         this.shuffleBreakTimes();
         this.generateRoster();
       },
