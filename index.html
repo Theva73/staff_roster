@@ -502,7 +502,7 @@
       },
       
       /******************** Shuffle Break Times with Lock & Compliance ********************/
-      // New helper function to check break time compliance (e.g., minimum 30 minutes)
+      // Helper function: ensures break duration is at least 30 minutes.
       isBreakTimeCompliant: function(staff, newBreakTime) {
         const [start, end] = newBreakTime.split("-");
         const [startH, startM] = start.split(":").map(Number);
@@ -515,7 +515,7 @@
         return duration >= 30;
       },
       
-      // Modified shuffleBreakTimes function that shuffles only unlocked staff
+      // Modified shuffleBreakTimes: only unlocked staff are shuffled and their break times updated if compliant.
       shuffleBreakTimes: function() {
         let unlockedStaff = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
         if(unlockedStaff.length < 2) {
@@ -523,12 +523,10 @@
           return;
         }
         let breakTimes = unlockedStaff.map(st => st.breakTime);
-        // Fisher–Yates shuffle
         for (let i = breakTimes.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]];
         }
-        // Update each unlocked staff if the new break time complies with house rules.
         const tbody = document.getElementById("staffTable").querySelector("tbody");
         let rows = Array.from(tbody.rows);
         unlockedStaff.forEach((staff, index) => {
@@ -701,11 +699,12 @@
       },
       
       findEmergencyStaff: function(staffList, slot, loc) {
+        const isWeekend = ["Saturday", "Sunday"].includes(document.getElementById("rosterDay").value);
         const available = staffList.filter(st =>
           st.attendance === "Yes" &&
           !this.isOnBreak(st, slot) &&
           !this.isDoubleBooked(st, slot) &&
-          this.locationApplies(loc, slot, document.getElementById("rosterDay").value) &&
+          this.locationApplies(loc, slot, isWeekend) &&
           !(loc === "HHMD" && st.hhmdEligible !== "Yes")
         );
         const unlocked = available.filter(st => !st.locked);
@@ -720,6 +719,7 @@
       },
       
       findAvailableStaff: function(staffList, slot, loc) {
+        const isWeekend = ["Saturday", "Sunday"].includes(document.getElementById("rosterDay").value);
         const sorted = [...staffList].sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0));
         for(let st of sorted) {
           if(
@@ -727,7 +727,7 @@
             !this.isOnBreak(st, slot) &&
             !this.isDoubleBooked(st, slot) &&
             !(loc === "HHMD" && st.hhmdEligible !== "Yes") &&
-            this.locationApplies(loc, slot, document.getElementById("rosterDay").value)
+            this.locationApplies(loc, slot, isWeekend)
           ) {
             return st;
           }
