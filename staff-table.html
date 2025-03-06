@@ -1,88 +1,41 @@
-<div class="card">
-  <!-- Date & Gap Policy Section -->
-  <div class="date-container">
-    <div>
-      <label for="rosterDate">Roster Date:</label>
-      <input type="date" id="rosterDate">
-    </div>
-    <div>
-      <label for="rosterDay">Day:</label>
-      <select id="rosterDay">
-        <option value="Monday">Monday</option>
-        <option value="Tuesday">Tuesday</option>
-        <option value="Wednesday">Wednesday</option>
-        <option value="Thursday">Thursday</option>
-        <option value="Friday">Friday</option>
-        <option value="Saturday">Saturday</option>
-        <option value="Sunday">Sunday</option>
-      </select>
-    </div>
-    <div>
-      <label>Working Staff:</label>
-      <span id="staffCount">0</span>
-    </div>
-  </div>
-  <div class="gap-policy-container">
-    <div>
-      <label for="gapThreshold">Gap Threshold (minutes):</label>
-      <input type="range" id="gapThreshold" min="30" max="120" step="15" value="120">
-      <span id="gapThresholdValue">120</span>
-    </div>
-  </div>
-
-  <!-- Staff Management Section -->
-  <h3>Staff Management</h3>
-  <table id="staffTable">
-    <thead>
-      <tr>
-        <th>Staff ID</th>
-        <th>Name</th>
-        <th>Break Time</th>
-        <th>Attendance</th>
-        <th>Locked</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- Staff rows inserted dynamically -->
-    </tbody>
-  </table>
-
-  <div class="button-container">
-    <!-- Visible Buttons (Default) -->
-    <div class="button-row">
-      <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
-      <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
-    </div>
-
-    <!-- Collapsible extra buttons -->
-    <div id="collapsibleButtons" class="collapsible-container">
+<section>
+  <div class="card">
+    <h3>Staff Management</h3>
+    <table id="staffTable">
+      <thead>
+        <tr>
+          <th>Staff ID</th>
+          <th>Name</th>
+          <th>Break Time</th>
+          <th>Attendance</th>
+          <th>Locked</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will be injected dynamically by rosterFunctions.js -->
+      </tbody>
+    </table>
+    <div class="button-container">
       <div class="button-row">
-        <button class="roster-btn" id="addStaffBtn">Add Staff</button>
-        <button class="roster-btn" id="importDataBtn">Import</button>
-        <button class="roster-btn" id="exportDataBtn">Export</button>
+        <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
+        <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
       </div>
-      <div class="button-row">
-        <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
-        <button class="roster-btn" id="downloadCSVBtn">CSV</button>
+      <!-- Collapsible extra buttons -->
+      <div id="collapsibleButtons" class="collapsible-container">
+        <div class="button-row">
+          <button class="roster-btn" id="addStaffBtn">Add Staff</button>
+          <button class="roster-btn" id="importDataBtn">Import</button>
+          <button class="roster-btn" id="exportDataBtn">Export</button>
+        </div>
+        <div class="button-row">
+          <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
+          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
+        </div>
       </div>
+      <button class="expand-btn" id="toggleCollapsibleBtn">Show More Options</button>
     </div>
-
-    <!-- Toggle button for collapsible section -->
-    <button class="expand-btn" id="toggleCollapsibleBtn">Show More Options</button>
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFile" accept=".json" style="display:none;" />
   </div>
-</div>
-
-<!-- Generated Roster Section -->
-<div class="card">
-  <h3>Generated Roster</h3>
-  <div id="rosterContainer"></div>
-  <div class="edit-mode-buttons">
-    <button class="roster-btn" id="toggleEditModeBtn">Enable Edit Mode</button>
-  </div>
-</div>
-
-<div id="notification-container"></div>
-
-<!-- Hidden file input for Import -->
-<input type="file" id="importFile" accept=".json" style="display:none;">
+</section>
