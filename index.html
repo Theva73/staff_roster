@@ -263,7 +263,7 @@
       "Pass Counter","HHMD","Guard House",
       "Lobby","Report Room","Vertical Patrol","Tango Papa"
     ];
-    // Now includes "04:00" as critical for Vertical Patrol
+    // Critical locations with their designated times remain unchanged for Vertical Patrol.
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"],
       "Report Room": ["20:00", "21:00"],
@@ -674,29 +674,6 @@
             }
           }
         }
-      },
-      
-      // Removed auto buffer function call from generateRoster.
-      
-      createDisplayData: function(roster) {
-        let displayData = {};
-        OUTPUT_ORDER.forEach(loc => {
-          displayData[loc] = {};
-          ROSTER_TIMES.forEach(slot => {
-            let ids = [];
-            if(roster[loc] && roster[loc][slot]) {
-              let tokens = (loc === "Pass Counter" || loc === "Lobby")
-                ? roster[loc][slot].split(" | ")
-                : roster[loc][slot].split(",");
-              ids = tokens.map(s => s.trim()).filter(Boolean);
-            }
-            // Join with correct delimiter
-            displayData[loc][slot] = (loc === "Pass Counter" || loc === "Lobby")
-              ? ids.join(" | ")
-              : ids.join(", ");
-          });
-        });
-        return displayData;
       },
       
       autoCorrect: function(roster, staffList, gapThreshold) {
@@ -1277,11 +1254,25 @@
         return (h - 20) * 60 + m;
       },
       
+      // Updated locationApplies function with the new rules:
+      // - For the 07:00 slot: allow assignments for all locations except Report Room and Vertical Patrol.
+      // - For Report Room: only allow assignments at 20:00 and 21:00 on weekdays.
+      // - Vertical Patrol: only allow assignments at its designated times.
+      // - Tango Papa: only allow 07:00.
+      // - All other locations: default to true.
       locationApplies: function(loc, slot, isWeekend) {
-        if(loc === "Tango Papa") return slot === "07:00";
-        if(loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
-        if(slot === "06:30" || slot === "07:00") return false;
-        if(loc === "Report Room" && isWeekend) return false;
+        if (slot === "07:00") {
+          return !(loc === "Report Room" || loc === "Vertical Patrol");
+        }
+        if (loc === "Report Room") {
+          return (slot === "20:00" || slot === "21:00") && !isWeekend;
+        }
+        if (loc === "Vertical Patrol") {
+          return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
+        }
+        if (loc === "Tango Papa") {
+          return slot === "07:00";
+        }
         return true;
       },
       
