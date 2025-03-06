@@ -924,72 +924,18 @@
         this.saveStaffList();
       },
       
-      /******************** Long Press & Clone Staff ID ********************/
-      setupLongPress: function(cell) {
-        let pressTimer = null;
-        const LONG_PRESS_MS = 600;
-        const startPress = () => {
-          pressTimer = setTimeout(() => {
-            this.copyStaffFromCell(cell);
-          }, LONG_PRESS_MS);
-        };
-        const cancelPress = () => {
-          if (pressTimer) clearTimeout(pressTimer);
-        };
-        cell.addEventListener("mousedown", startPress);
-        cell.addEventListener("mouseup", cancelPress);
-        cell.addEventListener("mouseleave", cancelPress);
-        cell.addEventListener("touchstart", startPress);
-        cell.addEventListener("touchend", cancelPress);
-        cell.addEventListener("touchmove", cancelPress);
-        cell.addEventListener("contextmenu", e => e.preventDefault());
+      /******************** Create Display Data ********************/
+      createDisplayData: function(roster) {
+        const displayData = {};
+        OUTPUT_ORDER.forEach(loc => {
+          displayData[loc] = {};
+          ROSTER_TIMES.forEach(slot => {
+            displayData[loc][slot] = roster[loc] && roster[loc][slot] !== undefined ? roster[loc][slot] : "";
+          });
+        });
+        return displayData;
       },
-      
-      copyStaffFromCell: function(cell) {
-        const loc = cell.parentElement.getAttribute("data-loc");
-        const slot = cell.getAttribute("data-slot");
-        if (!loc || !slot) return;
-        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
-        let content = cell.textContent.trim();
-        if (!content) {
-          this.showWarning("No staff ID in this cell to copy.");
-          return;
-        }
-        let ids = content.split(delimiter).map(x => x.trim()).filter(Boolean);
-        this.clonedStaffID = ids[0];
-        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste.`);
-      },
-      
-      pasteClonedStaff: function(cell) {
-        const loc = cell.parentElement.getAttribute("data-loc");
-        const slot = cell.getAttribute("data-slot");
-        if (!loc || !slot) return;
-        
-        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-        let currentText = cell.textContent.trim();
-        if (!currentText) {
-          cell.textContent = this.clonedStaffID;
-        } else {
-          cell.textContent = currentText + delimiter + this.clonedStaffID;
-        }
-        
-        let staff = this.getCurrentStaffList().find(s => s.staffID === this.clonedStaffID);
-        if (staff && !staff.locked && staff.attendance === "Yes") {
-          let alreadyAssigned = staff.assigned.some(a => a.slot === slot && a.location === loc);
-          if (!alreadyAssigned) {
-            staff.assigned.push({ slot, location: loc });
-            this.saveAssignedToRows(this.getCurrentStaffList());
-          }
-        }
-        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot}.`);
-        this.clonedStaffID = null;
-        
-        // Validate again after manual edit
-        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
-        const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
-        this.lastValidationConflicts = conflicts;
-      },
-      
+
       /******************** Display Roster ********************/
       displayRoster: function(roster, conflicts, creationTime) {
         const container = document.getElementById("rosterContainer");
@@ -1072,6 +1018,72 @@
           });
           cell.addEventListener("contextmenu", e => e.preventDefault());
         });
+      },
+      
+      /******************** Long Press & Clone Staff ID ********************/
+      setupLongPress: function(cell) {
+        let pressTimer = null;
+        const LONG_PRESS_MS = 600;
+        const startPress = () => {
+          pressTimer = setTimeout(() => {
+            this.copyStaffFromCell(cell);
+          }, LONG_PRESS_MS);
+        };
+        const cancelPress = () => {
+          if (pressTimer) clearTimeout(pressTimer);
+        };
+        cell.addEventListener("mousedown", startPress);
+        cell.addEventListener("mouseup", cancelPress);
+        cell.addEventListener("mouseleave", cancelPress);
+        cell.addEventListener("touchstart", startPress);
+        cell.addEventListener("touchend", cancelPress);
+        cell.addEventListener("touchmove", cancelPress);
+        cell.addEventListener("contextmenu", e => e.preventDefault());
+      },
+      
+      copyStaffFromCell: function(cell) {
+        const loc = cell.parentElement.getAttribute("data-loc");
+        const slot = cell.getAttribute("data-slot");
+        if (!loc || !slot) return;
+        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
+        let content = cell.textContent.trim();
+        if (!content) {
+          this.showWarning("No staff ID in this cell to copy.");
+          return;
+        }
+        let ids = content.split(delimiter).map(x => x.trim()).filter(Boolean);
+        this.clonedStaffID = ids[0];
+        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste.`);
+      },
+      
+      pasteClonedStaff: function(cell) {
+        const loc = cell.parentElement.getAttribute("data-loc");
+        const slot = cell.getAttribute("data-slot");
+        if (!loc || !slot) return;
+        
+        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+        let currentText = cell.textContent.trim();
+        if (!currentText) {
+          cell.textContent = this.clonedStaffID;
+        } else {
+          cell.textContent = currentText + delimiter + this.clonedStaffID;
+        }
+        
+        let staff = this.getCurrentStaffList().find(s => s.staffID === this.clonedStaffID);
+        if (staff && !staff.locked && staff.attendance === "Yes") {
+          let alreadyAssigned = staff.assigned.some(a => a.slot === slot && a.location === loc);
+          if (!alreadyAssigned) {
+            staff.assigned.push({ slot, location: loc });
+            this.saveAssignedToRows(this.getCurrentStaffList());
+          }
+        }
+        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot}.`);
+        this.clonedStaffID = null;
+        
+        // Validate again after manual edit
+        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
+        const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
+        this.lastValidationConflicts = conflicts;
       },
       
       // Toggle Edit Mode
