@@ -310,8 +310,6 @@
       "Tango Papa": ["07:00"]
     };
     
-    let zoomLocked = false;
-    
     /**************************************************************
      * ROSTER SYSTEM OBJECT
      **************************************************************/
@@ -538,6 +536,7 @@
           return;
         }
         let shuffledBreaks = unlockedStaff.map(st => st.breakTime);
+        // Simple random shuffle
         for (let i = shuffledBreaks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffledBreaks[i], shuffledBreaks[j]] = [shuffledBreaks[j], shuffledBreaks[i]];
@@ -546,6 +545,7 @@
           let newBreakTime = shuffledBreaks[index];
           if (this.isBreakTimeCompliant(staff, newBreakTime)) {
             staff.breakTime = newBreakTime;
+            // Update the staff table UI
             let rowInput = document.querySelector(`#staffTable tbody tr td:first-child input[value="${staff.staffID}"]`);
             if (rowInput) {
               let tr = rowInput.closest("tr");
@@ -557,6 +557,8 @@
           }
         });
         this.saveStaffList();
+        // Regenerate the roster so the new break times actually take effect in assignments
+        this.generateRoster();
         this.showSuccess("Shuffled break times among unlocked staff.");
       },
       
@@ -566,6 +568,7 @@
         const [endH, endM] = end.split(":").map(Number);
         const startTotal = startH * 60 + startM;
         const endTotal = endH * 60 + endM;
+        // Must be at least 30 minutes
         const duration = endTotal >= startTotal ? endTotal - startTotal : (1440 - startTotal) + endTotal;
         return duration >= 30;
       },
@@ -732,7 +735,7 @@
         const potential = staff.assigned.slice();
         potential.push({ slot, location: loc });
         potential.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
-        const gapThreshold = 120; // Hard-coded 2-hour gap
+        const gapThreshold = 120; // 2-hour gap
         for (let i = 0; i < potential.length - 1; i++) {
           const curr = potential[i], next = potential[i + 1];
           if (curr.location === next.location) {
@@ -764,6 +767,7 @@
         if (breakStart <= breakEnd) {
           return slotTime >= breakStart && slotTime <= breakEnd;
         } else {
+          // Past midnight scenario
           return (slotTime >= breakStart || slotTime <= breakEnd);
         }
       },
@@ -1119,8 +1123,7 @@
       }
     };
     
-    // Example function from prior notes: preventMultipleStaffAssignment
-    // (You can integrate if you want to strictly limit one staff in locked cells.)
+    // Example function: strictly limit one staff in locked cells (unused by default)
     function preventMultipleStaffAssignment(cell, staffList, slot, loc) {
       if (cell && cell.querySelector('input[type="checkbox"]:checked')) {
         const existingStaff = cell.textContent.trim();
