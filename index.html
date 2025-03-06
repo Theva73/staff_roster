@@ -695,10 +695,15 @@
             shortfalls.push(`Missing Vertical Patrol at ${time}`);
           }
         }
-        const reportTimes = ["20:00", "21:00"];
-        for (let time of reportTimes) {
-          if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0) {
-            shortfalls.push(`Missing Report Room at ${time}`);
+        // For Report Room, only check on weekdays
+        let now = new Date();
+        let day = now.getDay(); // 0 = Sunday, 6 = Saturday
+        if (!(day === 0 || day === 6)) {
+          const reportTimes = ["20:00", "21:00"];
+          for (let time of reportTimes) {
+            if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0) {
+              shortfalls.push(`Missing Report Room at ${time}`);
+            }
           }
         }
         if (!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0) {
@@ -712,9 +717,7 @@
           if (count < 2) {
             shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
           }
-        }
-        // Check HHMD for each slot
-        for (const slot of ROSTER_TIMES) {
+          // Check HHMD for each slot
           if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
             shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
           }
@@ -1068,21 +1071,20 @@
       },
       
       // Update locationApplies to allow 07:00 for all locations except Vertical Patrol and Report Room.
+      // For Report Room, only allow slots 20:00 and 21:00 on weekdays; omit on weekends.
       locationApplies(loc, slot) {
-        // Tango Papa only at 07:00.
         if (loc === "Tango Papa") {
           return slot === "07:00";
         }
-        // Vertical Patrol has specific allowed times.
         if (loc === "Vertical Patrol") {
           return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
         }
-        // Report Room should exclude 07:00 (and 06:30 if desired).
         if (loc === "Report Room") {
-          if (slot === "07:00" || slot === "06:30") return false;
-          return true;
+          let now = new Date();
+          let day = now.getDay(); // 0=Sunday, 6=Saturday
+          if (day === 0 || day === 6) return false; // omit on weekends
+          return (slot === "20:00" || slot === "21:00");
         }
-        // For other locations (Pass Counter, HHMD, Guard House, Lobby), only exclude 06:30.
         if (slot === "06:30") return false;
         return true;
       },
@@ -1187,6 +1189,5 @@
 </html>
 
       
-  
-  
+      
   
