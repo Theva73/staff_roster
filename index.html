@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3)</title>
+  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.1)</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -156,7 +156,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System CP (v3)</h2>
+    <h2>Staff Roster Management System CP (v3.1)</h2>
     
     <!-- Date & Gap Policy Section -->
     <div class="card">
@@ -242,9 +242,9 @@
   
   <script>
     /**************************************************************
-     * Global Constants & Variables (v3)
+     * Global Constants & Variables (v3.1)
      **************************************************************/
-    const STORAGE_KEY = 'staffListData_v3';
+    const STORAGE_KEY = 'staffListData_v3.1';
     const ROSTER_TIMES = [
       "20:00","20:30","21:00","22:00","23:00","00:00",
       "01:00","01:30","02:00","03:00","04:00","05:00",
@@ -270,7 +270,7 @@
     };
     
     /**************************************************************
-     * Roster System Object (v3)
+     * Roster System Object (v3.1)
      **************************************************************/
     const rosterSystem = {
       generatedRosterData: null,
@@ -279,14 +279,17 @@
       editMode: false,
       previousRosterHTML: null,
 
-      // Rule (v3): The system must refer to the dashboard (Staff Management table) for all staff-related matters,
-      // including breakTime, HHMD Eligible, attendance, and lock status.
+      // Rule (v3.1): The system must strictly refer to the dashboard (Staff Management table) for all staff-related
+      // matters, including breakTime, HHMD Eligible, attendance, and lock status. Break times are fixed as per
+      // dashboard input (typically 2 hours, sometimes variable) and will not be adjusted automatically to address
+      // shortfalls. Phase 1: System generates roster based on house rules. Phase 2: Manual adjustments are made
+      // offline using Edit Mode to address loopholes.
       init: function() {
-        console.log("Initializing roster system (v3)...");
+        console.log("Initializing roster system (v3.1)...");
         this.initializeDateAndDay();
         this.setupEventListeners();
         this.loadStaffList(); // Loads dashboard data from localStorage
-        this.showSuccess("System initialized successfully (v3). Using dashboard data for staff matters.");
+        this.showSuccess("System initialized successfully (v3.1). Using dashboard data for staff matters without auto-adjusting breaks.");
       },
       
       initializeDateAndDay: function() {
@@ -325,10 +328,10 @@
           try {
             const staffList = JSON.parse(stored);
             staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
-            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3).`);
+            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.1).`);
           } catch(e) {
             console.error(e);
-            this.showWarning("Error loading dashboard staff data (v3). Starting empty.");
+            this.showWarning("Error loading dashboard staff data (v3.1). Starting empty.");
             this.addStaff();
           }
         } else {
@@ -343,12 +346,12 @@
           const staffList = this.getCurrentStaffList(); // Retrieves latest dashboard data
           localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
         } catch(e) {
-          this.showError("Failed to save dashboard staff list (v3): " + e.message);
+          this.showError("Failed to save dashboard staff list (v3.1): " + e.message);
         }
       },
       
       getCurrentStaffList: function() {
-        // Retrieves the authoritative staff data from the dashboard (Staff Management table) (v3)
+        // Retrieves the authoritative staff data from the dashboard (Staff Management table) (v3.1)
         const rows = document.getElementById("staffTable").querySelector("tbody").rows;
         const staffList = [];
         for(let row of rows) {
@@ -471,12 +474,11 @@
             if(!Array.isArray(imported)) {
               throw new Error("Invalid JSON format. Must be an array of staff objects.");
             }
-            // Save to localStorage and reload dashboard
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
-            this.showSuccess("Imported dashboard data successfully (v3)!");
+            this.showSuccess("Imported dashboard data successfully (v3.1)!");
           } catch(err) {
-            this.showError("Import error (v3): " + err.message);
+            this.showError("Import error (v3.1): " + err.message);
           }
         };
         fileInput.click();
@@ -486,7 +488,7 @@
         try {
           const staffList = this.getCurrentStaffList();
           if(!staffList.length) {
-            this.showWarning("No dashboard data to export (v3).");
+            this.showWarning("No dashboard data to export (v3.1).");
             return;
           }
           const jsonStr = JSON.stringify(staffList, null, 2);
@@ -497,9 +499,9 @@
           a.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
-          this.showSuccess("Exported dashboard data successfully (v3).");
+          this.showSuccess("Exported dashboard data successfully (v3.1).");
         } catch(err) {
-          this.showError("Export error (v3): " + err.message);
+          this.showError("Export error (v3.1): " + err.message);
         }
       },
       
@@ -507,7 +509,7 @@
       shuffleBreakTimes: function() {
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
         if(staffList.length < 2) {
-          this.showWarning("Not enough staff in dashboard to shuffle break times (v3).");
+          this.showWarning("Not enough staff in dashboard to shuffle break times (v3.1).");
           return;
         }
         let breaks = staffList.map(st => st.breakTime);
@@ -530,17 +532,18 @@
           }
         });
         this.saveStaffList();
-        this.showSuccess("Shuffled break times from dashboard among staff (v3).");
+        this.showSuccess("Shuffled break times from dashboard among staff (v3.1).");
       },
       
       /******************** Roster Generation & Conflict Resolution ********************/
       generateRoster: function() {
-        // Refer to dashboard data for staff-related matters (breakTime, HHMD Eligible, attendance, lock) (v3)
+        // Phase 1 (v3.1): Generate roster strictly based on dashboard data (breakTime, HHMD Eligible, attendance, lock)
+        // without adjusting break times to address shortfalls. Manual adjustments will be done in Phase 2 via Edit Mode.
         const dayValue = document.getElementById("rosterDay").value;
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
-        let staffList = this.getCurrentStaffList(); // Use dashboard data
+        let staffList = this.getCurrentStaffList(); // Use dashboard data as authoritative source
         if(!staffList.length) {
-          this.showError("Add staff to the dashboard before generating roster (v3).");
+          this.showError("Add staff to the dashboard before generating roster (v3.1).");
           return;
         }
         staffList.forEach(st => { if(!st.locked) st.assigned = []; });
@@ -561,8 +564,8 @@
         this.displayRoster(this.generatedRosterData, this.lastValidationConflicts, creationTime);
         this.showSuccess(
           shortfalls.length === 0
-            ? "Optimal roster generated (v3)!"
-            : `Roster generated with ${shortfalls.length} issues (v3).`
+            ? "Optimal roster generated (v3.1) - Phase 1 complete!"
+            : `Roster generated with ${shortfalls.length} issues (v3.1) - Proceed to Phase 2 for manual adjustments.`
         );
         return { roster: this.generatedRosterData, shortfalls };
       },
@@ -587,15 +590,7 @@
               roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
               chosen.assigned.push({ slot, location: loc });
             } else {
-              chosen = this.findEmergencyStaff(staffList, slot, loc);
-              if(chosen) {
-                let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-                roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
-                chosen.assigned.push({ slot, location: loc });
-                shortfalls.push(`Emergency: ${chosen.staffID} -> ${loc} @ ${slot}`);
-              } else {
-                shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot}`);
-              }
+              shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot} based on dashboard data (v3.1)`);
             }
           }
         }
@@ -606,7 +601,7 @@
               allEmpty = false; break;
             }
           }
-          if(allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments.`);
+          if(allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments (v3.1)`);
         }
       },
       
@@ -614,19 +609,19 @@
         const vpTimes = ["20:30", "23:00", "01:30", "04:00", "06:30"];
         for(let time of vpTimes) {
           if(!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0) {
-            shortfalls.push(`Missing Vertical Patrol at ${time}`);
+            shortfalls.push(`Missing Vertical Patrol at ${time} (v3.1)`);
           }
         }
         if(!isWeekend) {
           const reportTimes = ["20:00", "21:00"];
           for(let time of reportTimes) {
             if(!roster["Report Room"][time] || roster["Report Room"][time].length === 0) {
-              shortfalls.push(`Missing Report Room at ${time}`);
+              shortfalls.push(`Missing Report Room at ${time} (v3.1)`);
             }
           }
         }
         if(!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0) {
-          shortfalls.push(`Missing Tango Papa at 07:00`);
+          shortfalls.push(`Missing Tango Papa at 07:00 (v3.1)`);
         }
         for(const slot of ROSTER_TIMES) {
           if(slot === "07:00") continue;
@@ -634,12 +629,12 @@
             ? roster["Pass Counter"][slot].split(" | ").filter(Boolean).length
             : 0;
           if(count < 2) {
-            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
+            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff (v3.1)`);
           }
         }
         for(const slot of ROSTER_TIMES) {
           if(!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
-            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
+            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned (v3.1)`);
           }
         }
       },
@@ -663,9 +658,9 @@
                 available.assigned.push({ slot, location: loc });
               } else {
                 if(assignedIDs.length + i === 0) {
-                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot}`);
+                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot} based on dashboard data (v3.1)`);
                 } else {
-                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedIDs.length + i}/${needed} staff`);
+                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedIDs.length + i}/${needed} staff (v3.1)`);
                 }
                 break;
               }
@@ -689,10 +684,10 @@
       },
       
       findEmergencyStaff: function(staffList, slot, loc) {
-        // Use dashboard data to find emergency staff (v3)
+        // Use dashboard data to find emergency staff (v3.1) - No break time adjustment
         const available = staffList.filter(st =>
           st.attendance === "Yes" && // Dashboard attendance status
-          !this.isOnBreak(st, slot) && // Dashboard breakTime
+          !this.isOnBreak(st, slot) && // Dashboard breakTime (fixed)
           !this.isDoubleBooked(st, slot) &&
           this.locationApplies(loc, slot, document.getElementById("rosterDay").value) &&
           !(loc === "HHMD" && st.hhmdEligible !== "Yes") // Dashboard HHMD Eligible
@@ -709,12 +704,12 @@
       },
       
       findAvailableStaff: function(staffList, slot, loc) {
-        // Use dashboard data to find available staff (v3)
+        // Use dashboard data to find available staff (v3.1) - No break time adjustment
         const sorted = [...staffList].sort((a, b) => (a.assigned?.length || 0) - (b.assigned?.length || 0));
         for(let st of sorted) {
           if(
             st.attendance === "Yes" && // Dashboard attendance status
-            !this.isOnBreak(st, slot) && // Dashboard breakTime
+            !this.isOnBreak(st, slot) && // Dashboard breakTime (fixed)
             !this.isDoubleBooked(st, slot) &&
             !(loc === "HHMD" && st.hhmdEligible !== "Yes") && // Dashboard HHMD Eligible
             this.locationApplies(loc, slot, document.getElementById("rosterDay").value)
@@ -772,15 +767,12 @@
                 let current = roster[loc][slot].split(sep).map(s => s.trim()).filter(Boolean);
                 roster[loc][slot] = [...new Set(current)].join(sep);
                 
+                // No break time adjustment - only reassign if available without altering breaks
                 let newSt = this.findEmergencyStaff(
                   staffList.filter(s => s.staffID !== staffID),
                   slot, loc
                 );
-                if(
-                  newSt &&
-                  !this.wouldCauseConflict(roster, newSt, slot, loc) &&
-                  !this.isOnBreak(newSt, slot)
-                ) {
+                if(newSt && !this.wouldCauseConflict(roster, newSt, slot, loc)) {
                   roster[loc][slot] = roster[loc][slot]
                     ? roster[loc][slot] + sep + newSt.staffID
                     : newSt.staffID;
@@ -805,7 +797,7 @@
       },
       
       validateRoster: function(roster, gapThreshold = 120) {
-        // Validate using dashboard data (v3)
+        // Validate using dashboard data (v3.1) - No break time adjustments
         const staffAssignments = {};
         const issues = [];
         const conflicts = {};
@@ -1020,12 +1012,12 @@
         let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
         let content = cell.textContent.trim();
         if (!content) {
-          this.showWarning("No staff ID in this cell to copy (v3).");
+          this.showWarning("No staff ID in this cell to copy (v3.1).");
           return;
         }
         let ids = content.split(delimiter).map(x => x.trim()).filter(Boolean);
         this.clonedStaffID = ids[0];
-        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste (v3).`);
+        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste (v3.1).`);
       },
       
       pasteClonedStaff: function(cell) {
@@ -1049,7 +1041,7 @@
             this.saveAssignedToRows(this.getCurrentStaffList());
           }
         }
-        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot} (v3).`);
+        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot} (v3.1).`);
         this.clonedStaffID = null;
         
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
@@ -1058,6 +1050,7 @@
       },
       
       toggleEditMode: function() {
+        // Phase 2 (v3.1): Enable manual adjustments to address loopholes
         this.editMode = !this.editMode;
         const container = document.getElementById("rosterContainer");
         const table = container.querySelector("table");
@@ -1085,7 +1078,7 @@
         const container = document.getElementById("rosterContainer");
         if (this.previousRosterHTML) {
           container.innerHTML = this.previousRosterHTML;
-          this.showSuccess("Undo successful. Reverted to previous state (v3).");
+          this.showSuccess("Undo successful. Reverted to previous state (v3.1).");
           document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
           document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
           document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
@@ -1101,7 +1094,7 @@
             cell.addEventListener("contextmenu", e => e.preventDefault());
           });
         } else {
-          this.showWarning("No previous state to revert to (v3).");
+          this.showWarning("No previous state to revert to (v3.1).");
         }
       },
       
@@ -1109,7 +1102,7 @@
         try {
           const table = document.getElementById("editableRoster");
           if(!table) {
-            this.showError("No roster table found (v3).");
+            this.showError("No roster table found (v3.1).");
             return;
           }
           const staffList = this.getCurrentStaffList();
@@ -1141,10 +1134,10 @@
           this.lastValidationConflicts = conflicts;
           
           this.displayRoster(this.getEditableRosterData(), conflicts, new Date());
-          this.showSuccess("Roster edits saved successfully (v3)!");
+          this.showSuccess("Roster edits saved successfully (v3.1) - Phase 2 complete!");
         } catch(e) {
           console.error(e);
-          this.showError("Failed to save roster edits (v3): " + e.message);
+          this.showError("Failed to save roster edits (v3.1): " + e.message);
         }
       },
       
@@ -1184,8 +1177,8 @@
         const data = this.getTableData();
         const tsv = data.map(r => r.join("\t")).join("\n");
         navigator.clipboard.writeText(tsv)
-          .then(() => this.showSuccess("Copied as TSV (v3)"))
-          .catch(() => this.showError("Copy failed (v3)"));
+          .then(() => this.showSuccess("Copied as TSV (v3.1)"))
+          .catch(() => this.showError("Copy failed (v3.1)"));
       },
       
       downloadRoster: function(fmt) {
@@ -1207,7 +1200,7 @@
         a.download = `roster_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        this.showSuccess("CSV downloaded (v3)!");
+        this.showSuccess("CSV downloaded (v3.1)!");
       },
       
       downloadAsPDF: function() {
@@ -1250,10 +1243,10 @@
             });
           }
           doc.save(`roster_${new Date().toISOString().split('T')[0]}.pdf`);
-          this.showSuccess("PDF downloaded (v3)!");
+          this.showSuccess("PDF downloaded (v3.1)!");
         } catch(e) {
           console.error(e);
-          this.showError("PDF download failed (v3): " + e.message);
+          this.showError("PDF download failed (v3.1): " + e.message);
         }
       },
       
@@ -1286,7 +1279,7 @@
         container.innerHTML = "";
         this.generatedRosterData = null;
         this.lastValidationConflicts = {};
-        this.showSuccess("Roster cleared. Generating new arrangement (v3)...");
+        this.showSuccess("Roster cleared. Generating new arrangement (v3.1)...");
         this.generateNewArrangement();
       },
       
