@@ -1,104 +1,164 @@
-const rosterSystem = {
-  // Existing properties and constants (ROSTER_TIMES, PRIORITY, etc.) can be defined here
+export const rosterSystem = {
+  generatedRosterData: null,
+  lastValidationConflicts: {},
+  clonedStaffID: null,
+  editMode: false,
+  previousRosterHTML: null,
+
   init() {
     this.initializeDateAndDay();
     this.setupEventListeners();
     this.loadStaffList();
     this.showSuccess("System initialized");
-    // New fix: bind the preventMultipleStaffAssignment event
-    this.bindPreventMultipleAssignment();
   },
-  
+
   initializeDateAndDay() {
-    // Implementation to set the roster date and day
     const today = new Date();
-    // (Set the date in an input field if needed)
+    document.getElementById('rosterDate').value = today.toISOString().split('T')[0];
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    document.getElementById('rosterDay').value = days[today.getDay()];
   },
-  
+
   setupEventListeners() {
-    // Bind button events (shuffleBreaksBtn, generateRosterBtn, etc.)
-    document.getElementById("shuffleBreaksBtn")?.addEventListener("click", () => {
-      this.shuffleBreakTimes();
-    });
-    document.getElementById("generateRosterBtn")?.addEventListener("click", () => {
-      this.generateRoster();
-    });
-    // … bind other button events (addStaffBtn, importDataBtn, exportDataBtn, etc.)
-    
-    // Collapsible section toggle
-    const toggleCollapsibleBtn = document.getElementById("toggleCollapsibleBtn");
-    const collapsibleContainer = document.getElementById("collapsibleButtons");
-    toggleCollapsibleBtn?.addEventListener("click", function () {
+    const gapSlider = document.getElementById("gapThreshold");
+    const gapDisplay = document.getElementById("gapThresholdValue");
+    gapSlider.addEventListener("input", () => { gapDisplay.innerText = gapSlider.value; });
+    gapSlider.addEventListener("change", () => { if(this.generatedRosterData) this.generateRoster(); });
+
+    document.getElementById("addStaffBtn").addEventListener("click", () => this.addStaff());
+    document.getElementById("importDataBtn").addEventListener("click", () => this.importData());
+    document.getElementById("exportDataBtn").addEventListener("click", () => this.exportData());
+
+    document.getElementById("shuffleBreaksBtn").addEventListener("click", () => this.shuffleBreakTimes());
+    document.getElementById("generateRosterBtn").addEventListener("click", () => this.generateRoster());
+    document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV());
+
+    document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
+    document.getElementById("rosterDay").addEventListener("change", () => { if(this.generatedRosterData) this.generateRoster(); });
+
+    // Secure import handler
+    document.getElementById("importFile").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await this.readFileSecurely(file);
+        const imported = JSON.parse(text);
+        if(!Array.isArray(imported)) throw new Error("Invalid format");
+        localStorage.setItem('staffListData_v2', JSON.stringify(imported));
+        this.loadStaffList();
+        this.showSuccess("Import successful");
+      } catch(err) {
+        this.showError("Import failed: " + err.message);
+      } finally {
+        e.target.value = "";
+      }
+    }, false);
+
+    // Collapsible buttons toggle
+    const toggleCollapsibleBtn = document.getElementById('toggleCollapsibleBtn');
+    const collapsibleContainer = document.getElementById('collapsibleButtons');
+    toggleCollapsibleBtn.addEventListener("click", () => {
       if (collapsibleContainer.classList.contains("expanded")) {
         collapsibleContainer.classList.remove("expanded");
+        collapsibleContainer.classList.add("collapsed");
         toggleCollapsibleBtn.textContent = "Show More Options";
       } else {
+        collapsibleContainer.classList.remove("collapsed");
         collapsibleContainer.classList.add("expanded");
         toggleCollapsibleBtn.textContent = "Hide Options";
       }
     });
   },
-  
-  // New fix: Prevent assigning multiple staff to locked cells
-  preventMultipleStaffAssignment(cell, staffList, slot, loc) {
-    if (cell && cell.querySelector('input[type="checkbox"]:checked')) {
-      const existingStaff = cell.textContent.trim();
-      if (existingStaff && existingStaff.indexOf(staffList[0]) === -1) {
-        alert(`Can't assign multiple staff members to this cell. This cell is locked.`);
-        return false;
+
+  readFileSecurely(file) {
+    return new Promise((resolve, reject) => {
+      if (!file.type.match('application/json.*')) {
+        reject(new Error("Invalid file type"));
+        return;
       }
-    }
-    return true;
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(new Error("File read error"));
+      reader.readAsText(file);
+    });
   },
-  
-  // Bind the new fix to all cells that are contenteditable in the generated roster
-  bindPreventMultipleAssignment() {
-    // When the roster is generated, add an event listener to each cell
-    // (Make sure this is called after the roster is rendered)
-    const rosterContainer = document.getElementById("roster-container");
-    if (rosterContainer) {
-      rosterContainer.addEventListener("click", (e) => {
-        const cell = e.target;
-        if (cell.matches("td[contenteditable='true']")) {
-          // Example values – in your real code, these could be dynamic
-          const staffList = ["6347", "6399", "7114"];
-          const slot = cell.getAttribute("data-slot") || "20:00";
-          const loc = cell.parentElement.getAttribute("data-loc") || "Pass Counter";
-          if (!this.preventMultipleStaffAssignment(cell, staffList, slot, loc)) {
-            e.stopPropagation();
-          }
-        }
-      });
-    }
-  },
-  
-  // The rest of your roster functions go here…
+
+  // ... (Include the rest of the rosterSystem methods from your original script here)
+  // For brevity, I’ve included only a few methods; you’ll need to copy all the remaining methods
+  // (loadStaffList, saveStaffList, getCurrentStaffList, getStaffRowHTML, etc.) from your original script.
+
   loadStaffList() {
-    // Load and render the staff table rows into #staffTable (inside staff-table.html)
+    const stored = localStorage.getItem('staffListData_v2');
+    const tbody = document.getElementById("staffTable").querySelector("tbody");
+    tbody.innerHTML = "";
+    if(stored) {
+      try {
+        const staffList = JSON.parse(stored);
+        staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
+        this.showSuccess(`Loaded ${staffList.length} staff members.`);
+      } catch(e) {
+        this.showWarning("Error loading staff data. Starting empty.");
+        this.addStaff();
+      }
+    } else {
+      this.addStaff();
+    }
+    this.addListenersToAllRows();
+    this.updateStaffCount();
   },
-  shuffleBreakTimes() {
-    // Implementation based on your original script
-    this.showSuccess("Shuffled break times among unlocked staff (locked rows unchanged).");
-  },
-  generateRoster() {
-    // Generate the roster, merge locked assignments, auto-correct conflicts, etc.
-    // Then render the final table into #roster-container.
-    this.displayRoster();
-  },
-  displayRoster() {
-    // Build your roster HTML and insert it into #roster-container.
-    // You can add event listeners for long-press copy/paste, edit mode, etc.
-  },
+
+  // Add other methods like addStaff, updateStaffCount, shuffleBreakTimes, generateRoster, etc.
+  // Ensure all constants (ROSTER_TIMES, PRIORITY, OUTPUT_ORDER, CRITICAL_LOCATIONS) are defined at the top.
+
   showSuccess(msg) {
-    // Display a notification message (for example, by creating a div in a notification container)
-    console.log("✅ " + msg);
+    const container = document.getElementById("notification-container");
+    const n = document.createElement("div");
+    n.className = "notification success";
+    n.textContent = "✅ " + msg;
+    container.appendChild(n);
+    setTimeout(() => container.removeChild(n), 3000);
   },
+
   showError(msg) {
-    console.error("❌ " + msg);
+    const container = document.getElementById("notification-container");
+    const n = document.createElement("div");
+    n.className = "notification error";
+    n.textContent = "❌ " + msg;
+    container.appendChild(n);
+    setTimeout(() => container.removeChild(n), 4000);
   },
+
   showWarning(msg) {
-    console.warn("⚠️ " + msg);
+    const container = document.getElementById("notification-container");
+    const n = document.createElement("div");
+    n.className = "notification warning";
+    n.textContent = "⚠️ " + msg;
+    container.appendChild(n);
+    setTimeout(() => container.removeChild(n), 4000);
   }
 };
 
-document.addEventListener("DOMContentLoaded", () => rosterSystem.init());
+// Define constants at the top of the module
+rosterSystem.ROSTER_TIMES = [
+  "20:00", "20:30", "21:00", "22:00", "23:00", "00:00",
+  "01:00", "01:30", "02:00", "03:00", "04:00", "05:00",
+  "06:00", "06:30", "07:00"
+];
+rosterSystem.PRIORITY = [
+  { location: "Pass Counter", needed: 2 },
+  { location: "HHMD", needed: 1 },
+  { location: "Lobby", needed: 2 },
+  { location: "Guard House", needed: 1 },
+  { location: "Vertical Patrol", needed: 1 },
+  { location: "Report Room", needed: 1 },
+  { location: "Tango Papa", needed: 1 }
+];
+rosterSystem.OUTPUT_ORDER = [
+  "Pass Counter", "HHMD", "Guard House",
+  "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"
+];
+rosterSystem.CRITICAL_LOCATIONS = {
+  "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"],
+  "Report Room": ["20:00", "21:00"],
+  "Tango Papa": ["07:00"]
+};
