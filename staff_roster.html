@@ -310,6 +310,8 @@
       "Tango Papa": ["07:00"]
     };
     
+    let zoomLocked = false;
+    
     /**************************************************************
      * ROSTER SYSTEM OBJECT
      **************************************************************/
@@ -536,7 +538,6 @@
           return;
         }
         let shuffledBreaks = unlockedStaff.map(st => st.breakTime);
-        // Simple random shuffle
         for (let i = shuffledBreaks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffledBreaks[i], shuffledBreaks[j]] = [shuffledBreaks[j], shuffledBreaks[i]];
@@ -545,19 +546,22 @@
           let newBreakTime = shuffledBreaks[index];
           if (this.isBreakTimeCompliant(staff, newBreakTime)) {
             staff.breakTime = newBreakTime;
-            // Update the staff table UI
-            let rowInput = document.querySelector(`#staffTable tbody tr td:first-child input[value="${staff.staffID}"]`);
-            if (rowInput) {
-              let tr = rowInput.closest("tr");
-              const inputs = tr.cells[2].querySelectorAll("input[type='time']");
-              const [newStart, newEnd] = newBreakTime.split("-");
-              inputs[0].value = newStart;
-              inputs[1].value = newEnd;
+            // Safely query by staff ID in case of special chars
+            const escapedID = CSS.escape(staff.staffID);
+            let rowInput = document.querySelector(`#staffTable tbody tr td:first-child input[value="${escapedID}"]`);
+            if (!rowInput) {
+              console.warn("Could not find row for staff ID:", staff.staffID);
+              return;
             }
+            let tr = rowInput.closest("tr");
+            const inputs = tr.cells[2].querySelectorAll("input[type='time']");
+            const [newStart, newEnd] = newBreakTime.split("-");
+            inputs[0].value = newStart;
+            inputs[1].value = newEnd;
           }
         });
+        // Save changes AND regenerate the roster so user sees new break times in effect
         this.saveStaffList();
-        // Regenerate the roster so the new break times actually take effect in assignments
         this.generateRoster();
         this.showSuccess("Shuffled break times among unlocked staff.");
       },
@@ -568,9 +572,8 @@
         const [endH, endM] = end.split(":").map(Number);
         const startTotal = startH * 60 + startM;
         const endTotal = endH * 60 + endM;
-        // Must be at least 30 minutes
         const duration = endTotal >= startTotal ? endTotal - startTotal : (1440 - startTotal) + endTotal;
-        return duration >= 30;
+        return duration >= 30;  // Must be at least 30 minutes
       },
       
       /**************************************************************
@@ -735,7 +738,7 @@
         const potential = staff.assigned.slice();
         potential.push({ slot, location: loc });
         potential.sort((a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot));
-        const gapThreshold = 120; // 2-hour gap
+        const gapThreshold = 120; // Hard-coded 2-hour gap
         for (let i = 0; i < potential.length - 1; i++) {
           const curr = potential[i], next = potential[i + 1];
           if (curr.location === next.location) {
@@ -764,10 +767,10 @@
         const slotTime = this.timeToMinutes(slot);
         const breakStart = this.timeToMinutes(bStart);
         const breakEnd = this.timeToMinutes(bEnd);
+        // Handle wrapping past midnight
         if (breakStart <= breakEnd) {
           return slotTime >= breakStart && slotTime <= breakEnd;
         } else {
-          // Past midnight scenario
           return (slotTime >= breakStart || slotTime <= breakEnd);
         }
       },
@@ -904,6 +907,30 @@
         }
       },
       
+      /**************************************************************
+       * CLEAR & NEW ROSTER (Forced fresh arrangement)
+       **************************************************************/
+      clearRoster() {
+        // If you truly want a fresh arrangement, also unlock everyone:
+        let staffList = this.getCurrentStaffList();
+        staffList.forEach(st => {
+          st.assigned = [];
+          // If you want them to remain locked, remove the next line:
+          st.locked = false; 
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+        
+        // Clear any displayed roster
+        const container = document.getElementById("rosterContainer");
+        container.innerHTML = "";
+        this.generatedRosterData = null;
+        this.lastValidationConflicts = {};
+        this.showSuccess("Roster cleared. Generating new arrangement...");
+        
+        // We shuffle to randomize break times, then generate a new roster
+        this.shuffleBreakTimes();
+      },
+      
       saveEditedRoster() {
         const table = document.getElementById("editableRoster");
         if (!table) {
@@ -1015,24 +1042,21 @@
       timeToMinutes(timeStr) {
         if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) return 0;
         let [h, m] = timeStr.split(":").map(Number);
+        // Convert times < 08:00 as if they are after midnight
         if (h < 8) h += 24;
         return (h - 20) * 60 + m;
       },
       
       locationApplies(loc, slot) {
+        // Tango Papa only at 07:00
         if (loc === "Tango Papa") return slot === "07:00";
-        if (loc === "Vertical Patrol") return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
+        // Vertical Patrol has specific times
+        if (loc === "Vertical Patrol") {
+          return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
+        }
+        // Hide 06:30 & 07:00 from other locations
         if (slot === "06:30" || slot === "07:00") return false;
         return true;
-      },
-      
-      clearRoster() {
-        const container = document.getElementById("rosterContainer");
-        container.innerHTML = "";
-        this.generatedRosterData = null;
-        this.lastValidationConflicts = {};
-        this.showSuccess("Roster cleared. Generating new arrangement...");
-        this.generateRoster();
       },
       
       /**************************************************************
@@ -1101,7 +1125,9 @@
         n.className = "notification success";
         n.textContent = "✅ " + msg;
         container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 3000);
+        setTimeout(() => {
+          if (container.contains(n)) container.removeChild(n);
+        }, 3000);
       },
       
       showError(msg) {
@@ -1110,7 +1136,9 @@
         n.className = "notification error";
         n.textContent = "❌ " + msg;
         container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 4000);
+        setTimeout(() => {
+          if (container.contains(n)) container.removeChild(n);
+        }, 4000);
       },
       
       showWarning(msg) {
@@ -1119,11 +1147,17 @@
         n.className = "notification warning";
         n.textContent = "⚠️ " + msg;
         container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 4000);
+        setTimeout(() => {
+          if (container.contains(n)) container.removeChild(n);
+        }, 4000);
       }
     };
     
-    // Example function: strictly limit one staff in locked cells (unused by default)
+    /**************************************************************
+     * OPTIONAL: Restrict multiple staff in locked cells
+     * (Uncomment or adjust if needed)
+     **************************************************************/
+    /*
     function preventMultipleStaffAssignment(cell, staffList, slot, loc) {
       if (cell && cell.querySelector('input[type="checkbox"]:checked')) {
         const existingStaff = cell.textContent.trim();
@@ -1134,7 +1168,8 @@
       }
       return true;
     }
-    
+    */
+
     window.addEventListener("DOMContentLoaded", () => rosterSystem.init());
   </script>
 </body>
