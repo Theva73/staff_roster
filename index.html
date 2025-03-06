@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Staff Roster Management System</title>
+  <title>Staff Roster Management System CP</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -229,7 +229,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System</h2>
+    <h2>Staff Roster Management System CP</h2>
     
     <!-- Staff Management Section -->
     <div class="card">
@@ -299,9 +299,15 @@
       { location: "Report Room", needed: 1 },
       { location: "Tango Papa", needed: 1 }
     ];
+    // Updated OUTPUT_ORDER now explicitly includes "HHMD"
     const OUTPUT_ORDER = [
-      "Pass Counter","HHMD","Guard House",
-      "Lobby","Report Room","Vertical Patrol","Tango Papa"
+      "Pass Counter",
+      "HHMD",
+      "Guard House",
+      "Lobby",
+      "Report Room",
+      "Vertical Patrol",
+      "Tango Papa"
     ];
     const CRITICAL_LOCATIONS = {
       "Vertical Patrol": ["20:30","23:00","01:30","04:00","06:30"],
