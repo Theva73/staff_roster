@@ -50,22 +50,7 @@ h3 {
   padding: 20px;
   margin-bottom: 20px;
   border: 1px solid var(--border-color);
-}
-
-.date-container,
-.gap-policy-container {
-  margin: 20px 0;
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.date-container > div,
-.gap-policy-container > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: relative;
 }
 
 table {
@@ -96,47 +81,9 @@ tr:hover {
   background-color: rgba(0,0,0,0.075);
 }
 
-#rosterContainer {
-  overflow-x: auto;
-  transition: transform 0.2s ease;
-}
-
-/* Freeze the first column (Location) */
-#editableRoster thead th:first-child,
-#editableRoster tbody td:first-child {
-  position: sticky;
-  left: 0;
-  background: #fff;
-  z-index: 10;
-}
-
-input, select {
-  padding: 8px 12px;
-  text-align: center;
-  font-size: 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  transition: border-color 0.2s;
-  background-color: #fff;
-  color: var(--text-color);
-}
-
-input::placeholder,
-select::placeholder {
-  color: #6c757d;
-}
-
-input:focus,
-select:focus {
-  outline: none;
-  border-color: var(--button-color);
-  box-shadow: 0 0 0 2px rgba(108,117,125,0.25);
-}
-
-input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+td[contenteditable="true"] {
   cursor: pointer;
+  background-color: #fff;
 }
 
 .button-container {
@@ -178,41 +125,6 @@ input[type="checkbox"] {
   box-shadow: none;
 }
 
-.notification {
-  margin: 5px;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.notification.success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.notification.error {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.notification.warning {
-  background-color: #fff3cd;
-  color: #856404;
-}
-
-/* Disable iOS copy/paste popup on editable cells */
-td[contenteditable="true"] {
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  user-select: none;
-}
-
-/* Bold text in edit mode */
-.edit-mode td {
-  font-weight: bold;
-}
-
-/* Collapsible Container Styles */
 .collapsible-container {
   display: none;
   margin-top: 10px;
@@ -238,4 +150,24 @@ td[contenteditable="true"] {
 
 .expand-btn:hover {
   background-color: var(--primary-hover);
+}
+
+.edit-mode {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.edit-mode td {
+  font-weight: bold;
+}
+
+.edit-mode-buttons {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
