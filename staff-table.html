@@ -29,7 +29,7 @@
       <span id="gapThresholdValue">120</span>
     </div>
   </div>
-  
+
   <!-- Staff Management Section -->
   <h3>Staff Management</h3>
   <table id="staffTable">
@@ -38,9 +38,8 @@
         <th>Staff ID</th>
         <th>Name</th>
         <th>Break Time</th>
-        <th>HHMD Eligible</th>
         <th>Attendance</th>
-        <th>Lock</th>
+        <th>Locked</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -48,13 +47,14 @@
       <!-- Staff rows inserted dynamically -->
     </tbody>
   </table>
-  <!-- Button Container -->
+
   <div class="button-container">
-    <!-- Always visible buttons -->
+    <!-- Visible Buttons (Default) -->
     <div class="button-row">
       <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
       <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
     </div>
+
     <!-- Collapsible extra buttons -->
     <div id="collapsibleButtons" class="collapsible-container">
       <div class="button-row">
@@ -67,17 +67,22 @@
         <button class="roster-btn" id="downloadCSVBtn">CSV</button>
       </div>
     </div>
+
     <!-- Toggle button for collapsible section -->
     <button class="expand-btn" id="toggleCollapsibleBtn">Show More Options</button>
   </div>
-  <!-- Hidden file input for Import -->
-  <input type="file" id="importFile" accept=".json" style="display:none;">
 </div>
 
 <!-- Generated Roster Section -->
 <div class="card">
   <h3>Generated Roster</h3>
   <div id="rosterContainer"></div>
+  <div class="edit-mode-buttons">
+    <button class="roster-btn" id="toggleEditModeBtn">Enable Edit Mode</button>
+  </div>
 </div>
 
 <div id="notification-container"></div>
+
+<!-- Hidden file input for Import -->
+<input type="file" id="importFile" accept=".json" style="display:none;">
