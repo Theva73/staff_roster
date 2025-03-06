@@ -242,6 +242,8 @@
             <th>Break Time</th>
             <th>Attendance</th>
             <th>Locked</th>
+            <!-- [HHMD-ELIGIBLE CHANGE] New column for HHMD Eligible -->
+            <th>HHMD Eligible</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -299,7 +301,7 @@
       { location: "Report Room", needed: 1 },
       { location: "Tango Papa", needed: 1 }
     ];
-    // Updated OUTPUT_ORDER now explicitly includes "HHMD"
+    // OUTPUT_ORDER must include "HHMD" so it shows on the final roster
     const OUTPUT_ORDER = [
       "Pass Counter",
       "HHMD",
@@ -426,12 +428,20 @@
           const endTime = timeInputs[1].value;
           const formatTime = t => t ? t.padStart(5, "0") : "00:00";
           const breakTime = formatTime(startTime) + "-" + formatTime(endTime);
+          
+          // [HHMD-ELIGIBLE CHANGE] we read the new cell’s select or checkbox
+          const hhmdCellIndex = 5; // Because it's the 6th column (0-based indexing)
+          const hhmdEligibleSelect = row.cells[hhmdCellIndex].querySelector("select");
+          // If you prefer a checkbox, you can adjust accordingly. For a select, we do:
+          const hhmdEligible = hhmdEligibleSelect ? hhmdEligibleSelect.value : "No";
+          
           staffList.push({
             staffID: row.cells[0].querySelector("input").value.trim(),
             name: row.cells[1].querySelector("input").value.trim(),
             breakTime: breakTime,
             attendance: row.cells[3].querySelector("select").value,
             locked: row.cells[4].querySelector("input[type='checkbox']").checked,
+            hhmdEligible: hhmdEligible, // store "Yes"/"No"
             assigned: row.dataset.assigned ? JSON.parse(row.dataset.assigned) : []
           });
         }
@@ -443,6 +453,9 @@
         if (staff.breakTime && staff.breakTime.includes("-")) {
           [startVal, endVal] = staff.breakTime.split("-");
         }
+        // [HHMD-ELIGIBLE CHANGE] default to "No" if missing
+        const hhmdVal = staff.hhmdEligible === "Yes" ? "Yes" : "No";
+        
         return `
           <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
             <td><input type="text" value="${staff.staffID || ''}" placeholder="ID"></td>
@@ -462,6 +475,13 @@
             </td>
             <td>
               <input type="checkbox" ${staff.locked?"checked":""}>
+            </td>
+            <!-- [HHMD-ELIGIBLE CHANGE] new select for HHMD Eligible -->
+            <td>
+              <select>
+                <option value="Yes" ${hhmdVal==="Yes" ? "selected" : ""}>Yes</option>
+                <option value="No"  ${hhmdVal==="No"  ? "selected" : ""}>No</option>
+              </select>
             </td>
             <td><button class="remove-btn roster-btn">Remove</button></td>
           </tr>
@@ -491,7 +511,12 @@
       
       addStaff() {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
-        tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML({ breakTime:"22:00-00:00", attendance:"Yes" }));
+        // By default, new staff is attendance "Yes", HHMD Eligible "No"
+        tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML({ 
+          breakTime:"22:00-00:00", 
+          attendance:"Yes", 
+          hhmdEligible:"No" 
+        }));
         this.addListenersToAllRows();
         this.saveStaffList();
       },
@@ -692,6 +717,7 @@
             shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff`);
           }
         }
+        // Check HHMD for each slot
         for (const slot of ROSTER_TIMES) {
           if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
             shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned`);
@@ -737,6 +763,23 @@
         return displayData;
       },
       
+      // [HHMD-ELIGIBLE CHANGE] Filter out staff who are not HHMD-eligible if location is HHMD
+      findAvailableStaff(staffList, slot, loc) {
+        return staffList.find(st => {
+          // Must be HHMD-eligible if the location is HHMD
+          if (loc === "HHMD" && st.hhmdEligible !== "Yes") {
+            return false;
+          }
+          // Must be attendance=Yes, not locked, not on break, not double-booked
+          if (st.attendance !== "Yes") return false;
+          if (st.locked) return false;
+          if (this.isOnBreak(st, slot)) return false;
+          if (this.isDoubleBooked(st, slot)) return false;
+          if (!this.locationApplies(loc, slot)) return false;
+          return true;
+        });
+      },
+      
       wouldCauseConflict(roster, staff, slot, loc) {
         if (this.isOnBreak(staff, slot) || this.isDoubleBooked(staff, slot)) {
           return true;
@@ -755,16 +798,6 @@
           }
         }
         return false;
-      },
-      
-      findAvailableStaff(staffList, slot, loc) {
-        return staffList.find(st =>
-          st.attendance === "Yes" &&
-          !st.locked &&
-          !this.isOnBreak(st, slot) &&
-          !this.isDoubleBooked(st, slot) &&
-          this.locationApplies(loc, slot)
-        );
       },
       
       isOnBreak(st, slot) {
@@ -1147,3 +1180,4 @@
   </script>
 </body>
 </html>
+  
