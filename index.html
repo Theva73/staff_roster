@@ -429,10 +429,8 @@
           const formatTime = t => t ? t.padStart(5, "0") : "00:00";
           const breakTime = formatTime(startTime) + "-" + formatTime(endTime);
           
-          // [HHMD-ELIGIBLE CHANGE] we read the new cell’s select or checkbox
-          const hhmdCellIndex = 5; // Because it's the 6th column (0-based indexing)
-          const hhmdEligibleSelect = row.cells[hhmdCellIndex].querySelector("select");
-          // If you prefer a checkbox, you can adjust accordingly. For a select, we do:
+          // [HHMD-ELIGIBLE CHANGE] read the HHMD Eligible select (6th column)
+          const hhmdEligibleSelect = row.cells[5].querySelector("select");
           const hhmdEligible = hhmdEligibleSelect ? hhmdEligibleSelect.value : "No";
           
           staffList.push({
@@ -441,7 +439,7 @@
             breakTime: breakTime,
             attendance: row.cells[3].querySelector("select").value,
             locked: row.cells[4].querySelector("input[type='checkbox']").checked,
-            hhmdEligible: hhmdEligible, // store "Yes"/"No"
+            hhmdEligible: hhmdEligible, // store "Yes" or "No"
             assigned: row.dataset.assigned ? JSON.parse(row.dataset.assigned) : []
           });
         }
@@ -453,9 +451,8 @@
         if (staff.breakTime && staff.breakTime.includes("-")) {
           [startVal, endVal] = staff.breakTime.split("-");
         }
-        // [HHMD-ELIGIBLE CHANGE] default to "No" if missing
+        // [HHMD-ELIGIBLE CHANGE] default value is "No"
         const hhmdVal = staff.hhmdEligible === "Yes" ? "Yes" : "No";
-        
         return `
           <tr data-assigned='${JSON.stringify(staff.assigned || [])}'>
             <td><input type="text" value="${staff.staffID || ''}" placeholder="ID"></td>
@@ -476,11 +473,11 @@
             <td>
               <input type="checkbox" ${staff.locked?"checked":""}>
             </td>
-            <!-- [HHMD-ELIGIBLE CHANGE] new select for HHMD Eligible -->
+            <!-- [HHMD-ELIGIBLE CHANGE] New select for HHMD Eligible -->
             <td>
               <select>
-                <option value="Yes" ${hhmdVal==="Yes" ? "selected" : ""}>Yes</option>
-                <option value="No"  ${hhmdVal==="No"  ? "selected" : ""}>No</option>
+                <option value="Yes" ${hhmdVal==="Yes"?"selected":""}>Yes</option>
+                <option value="No" ${hhmdVal==="No"?"selected":""}>No</option>
               </select>
             </td>
             <td><button class="remove-btn roster-btn">Remove</button></td>
@@ -511,7 +508,7 @@
       
       addStaff() {
         const tbody = document.getElementById("staffTable").querySelector("tbody");
-        // By default, new staff is attendance "Yes", HHMD Eligible "No"
+        // By default, new staff has attendance "Yes" and HHMD Eligible "No"
         tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML({ 
           breakTime:"22:00-00:00", 
           attendance:"Yes", 
@@ -557,8 +554,7 @@
         URL.revokeObjectURL(url);
         this.showSuccess("Exported data successfully.");
       },
-      
-      /**************************************************************
+            /**************************************************************
        * SHUFFLE BREAK TIMES
        **************************************************************/
       shuffleBreakTimes() {
@@ -763,14 +759,12 @@
         return displayData;
       },
       
-      // [HHMD-ELIGIBLE CHANGE] Filter out staff who are not HHMD-eligible if location is HHMD
+      // [HHMD-ELIGIBLE CHANGE] When assigning for HHMD, only choose staff with hhmdEligible === "Yes"
       findAvailableStaff(staffList, slot, loc) {
         return staffList.find(st => {
-          // Must be HHMD-eligible if the location is HHMD
           if (loc === "HHMD" && st.hhmdEligible !== "Yes") {
             return false;
           }
-          // Must be attendance=Yes, not locked, not on break, not double-booked
           if (st.attendance !== "Yes") return false;
           if (st.locked) return false;
           if (this.isOnBreak(st, slot)) return false;
@@ -1073,12 +1067,23 @@
         return (h - 20) * 60 + m;
       },
       
+      // Update locationApplies to allow 07:00 for all locations except Vertical Patrol and Report Room.
       locationApplies(loc, slot) {
-        if (loc === "Tango Papa") return slot === "07:00";
+        // Tango Papa only at 07:00.
+        if (loc === "Tango Papa") {
+          return slot === "07:00";
+        }
+        // Vertical Patrol has specific allowed times.
         if (loc === "Vertical Patrol") {
           return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
         }
-        if (slot === "06:30" || slot === "07:00") return false;
+        // Report Room should exclude 07:00 (and 06:30 if desired).
+        if (loc === "Report Room") {
+          if (slot === "07:00" || slot === "06:30") return false;
+          return true;
+        }
+        // For other locations (Pass Counter, HHMD, Guard House, Lobby), only exclude 06:30.
+        if (slot === "06:30") return false;
         return true;
       },
       
@@ -1180,4 +1185,8 @@
   </script>
 </body>
 </html>
+
+      
+  
+  
   
