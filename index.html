@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.2)</title>
+  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.3)</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
   <style>
-    /* [Existing CSS remains unchanged] */
     /* =================== Global Style Variables =================== */
     :root {
       --primary-color: #4f46e5;
@@ -151,7 +150,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System CP (v3.2)</h2>
+    <h2>Staff Roster Management System CP (v3.3)</h2>
 
     <!-- Date & Gap Policy Section -->
     <div class="card">
@@ -237,9 +236,9 @@
 
   <script>
     /**************************************************************
-     * Global Constants & Variables (v3.2)
+     * Global Constants & Variables (v3.3)
      **************************************************************/
-    const STORAGE_KEY = 'staffListData_v3.2';
+    const STORAGE_KEY = 'staffListData_v3.3';
     const ROSTER_TIMES = [
       "20:00", "20:30", "21:00", "22:00", "23:00", "00:00",
       "01:00", "01:30", "02:00", "03:00", "04:00", "05:00",
@@ -265,7 +264,7 @@
     };
 
     /**************************************************************
-     * Roster System Object (v3.2)
+     * Roster System Object (v3.3)
      **************************************************************/
     const rosterSystem = {
       generatedRosterData: null,
@@ -275,11 +274,11 @@
       previousRosterHTML: null,
 
       init: function() {
-        console.log("Initializing roster system (v3.2)...");
+        console.log("Initializing roster system (v3.3)...");
         this.initializeDateAndDay();
         this.setupEventListeners();
         this.loadStaffList();
-        this.showSuccess("System initialized successfully (v3.2). Using dashboard data for staff matters without auto-adjusting breaks.");
+        this.showSuccess("System initialized successfully (v3.3). Using dashboard data for staff matters with strict break time compliance in Phase 1.");
       },
 
       initializeDateAndDay: function() {
@@ -318,10 +317,10 @@
           try {
             const staffList = JSON.parse(stored);
             staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
-            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.2).`);
+            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.3).`);
           } catch (e) {
             console.error(e);
-            this.showWarning("Error loading dashboard staff data (v3.2). Starting empty.");
+            this.showWarning("Error loading dashboard staff data (v3.3). Starting empty.");
             this.addStaff();
           }
         } else {
@@ -336,7 +335,7 @@
           const staffList = this.getCurrentStaffList();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
         } catch (e) {
-          this.showError("Failed to save dashboard staff list (v3.2): " + e.message);
+          this.showError("Failed to save dashboard staff list (v3.3): " + e.message);
         }
       },
 
@@ -466,9 +465,9 @@
             }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
-            this.showSuccess("Imported dashboard data successfully (v3.2)!");
+            this.showSuccess("Imported dashboard data successfully (v3.3)!");
           } catch (err) {
-            this.showError("Import error (v3.2): " + err.message);
+            this.showError("Import error (v3.3): " + err.message);
           }
         };
         fileInput.click();
@@ -478,7 +477,7 @@
         try {
           const staffList = this.getCurrentStaffList();
           if (!staffList.length) {
-            this.showWarning("No dashboard data to export (v3.2).");
+            this.showWarning("No dashboard data to export (v3.3).");
             return;
           }
           const jsonStr = JSON.stringify(staffList, null, 2);
@@ -489,9 +488,9 @@
           a.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
-          this.showSuccess("Exported dashboard data successfully (v3.2).");
+          this.showSuccess("Exported dashboard data successfully (v3.3).");
         } catch (err) {
-          this.showError("Export error (v3.2): " + err.message);
+          this.showError("Export error (v3.3): " + err.message);
         }
       },
 
@@ -499,7 +498,7 @@
       shuffleBreakTimes: function() {
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
         if (staffList.length < 2) {
-          this.showWarning("Not enough staff in dashboard to shuffle break times (v3.2).");
+          this.showWarning("Not enough staff in dashboard to shuffle break times (v3.3).");
           return;
         }
         let breaks = staffList.map(st => st.breakTime);
@@ -522,7 +521,7 @@
           }
         });
         this.saveStaffList();
-        this.showSuccess("Shuffled break times from dashboard among staff (v3.2).");
+        this.showSuccess("Shuffled break times from dashboard among staff (v3.3).");
       },
 
       /******************** Roster Generation & Conflict Resolution ********************/
@@ -531,7 +530,7 @@
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
         let staffList = this.getCurrentStaffList();
         if (!staffList.length) {
-          this.showError("Add staff to the dashboard before generating roster (v3.2).");
+          this.showError("Add staff to the dashboard before generating roster (v3.3).");
           return;
         }
         staffList.forEach(st => { if (!st.locked) st.assigned = []; });
@@ -545,7 +544,7 @@
 
         this.generatedRosterData = this.createDisplayData(roster);
         const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
-        let { issues, conflicts } = this.validateRoster(this.generatedRosterData, gapThreshold);
+        let { issues, conflicts } = this.validateRoster(this.generatedRosterData, gapThreshold, false);
         this.lastValidationConflicts = conflicts;
 
         let iteration = 0;
@@ -555,7 +554,7 @@
             this.showWarning("Auto-correction limited by unresolved conflicts. Manual adjustment recommended.");
             break;
           }
-          ({ issues, conflicts } = this.validateRoster(this.generatedRosterData, gapThreshold));
+          ({ issues, conflicts } = this.validateRoster(this.generatedRosterData, gapThreshold, false));
           this.lastValidationConflicts = conflicts;
           iteration++;
         }
@@ -564,11 +563,10 @@
 
         const creationTime = new Date();
         this.displayRoster(this.generatedRosterData, this.lastValidationConflicts, creationTime);
-        const breakViolations = issues.filter(issue => issue.includes("during break")).length;
         this.showSuccess(
           shortfalls.length === 0 && issues.length === 0
-            ? "Optimal roster generated (v3.2) - Phase 1 complete!"
-            : `Roster generated with ${shortfalls.length} shortfalls and ${issues.length} issues (v3.2) - ${breakViolations} break violations marked in red. Proceed to Phase 2 for manual adjustments if needed.`
+            ? "Optimal roster generated with strict break time compliance (v3.3) - Phase 1 complete!"
+            : `Roster generated with ${shortfalls.length} shortfalls and ${issues.length} issues (v3.3) - Break times strictly enforced. Proceed to Phase 2 for manual adjustments if needed.`
         );
         return { roster: this.generatedRosterData, shortfalls };
       },
@@ -587,16 +585,27 @@
             if (!this.locationApplies(loc, slot, isWeekend)) continue;
             if (!roster[loc][slot]) roster[loc][slot] = "";
 
-            let chosen = this.findAvailableStaff(staffList, slot, loc);
-            if (chosen) {
-              let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-              roster[loc][slot] += (roster[loc][slot] ? separator : "") + chosen.staffID;
-              chosen.assigned.push({ slot, location: loc });
-            } else {
-              shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot} based on dashboard data (v3.2)`);
+            let needed = PRIORITY.find(p => p.location === loc).needed || 1;
+            let tempAssignments = [];
+            for (let i = 0; i < needed; i++) {
+              let chosen = this.findAvailableStaff(staffList, slot, loc);
+              if (chosen && !this.isOnBreak(chosen, slot) && !this.wouldCauseConflict(roster, chosen, slot, loc)) {
+                tempAssignments.push(chosen.staffID);
+                chosen.assigned.push({ slot, location: loc });
+              } else {
+                tempAssignments = [];
+                staffList.forEach(st => {
+                  st.assigned = st.assigned.filter(a => !(a.slot === slot && a.location === loc));
+                });
+                shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot} due to break time constraints (v3.3)`);
+                break;
+              }
             }
+            let separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+            roster[loc][slot] = tempAssignments.join(separator);
           }
         }
+
         for (const loc in roster) {
           let allEmpty = true;
           for (const slot in roster[loc]) {
@@ -605,7 +614,7 @@
               break;
             }
           }
-          if (allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments (v3.2)`);
+          if (allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments due to break constraints (v3.3)`);
         }
       },
 
@@ -613,19 +622,19 @@
         const vpTimes = ["20:30", "23:00", "01:30", "04:00", "06:30"];
         for (let time of vpTimes) {
           if (!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0) {
-            shortfalls.push(`Missing Vertical Patrol at ${time} (v3.2)`);
+            shortfalls.push(`Missing Vertical Patrol at ${time} (v3.3)`);
           }
         }
         if (!isWeekend) {
           const reportTimes = ["20:00", "21:00"];
           for (let time of reportTimes) {
             if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0) {
-              shortfalls.push(`Missing Report Room at ${time} (v3.2)`);
+              shortfalls.push(`Missing Report Room at ${time} (v3.3)`);
             }
           }
         }
         if (!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0) {
-          shortfalls.push(`Missing Tango Papa at 07:00 (v3.2)`);
+          shortfalls.push(`Missing Tango Papa at 07:00 (v3.3)`);
         }
         for (const slot of ROSTER_TIMES) {
           if (slot === "07:00") continue;
@@ -633,12 +642,12 @@
             ? roster["Pass Counter"][slot].split(" | ").filter(Boolean).length
             : 0;
           if (count < 2) {
-            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff (v3.2)`);
+            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff (v3.3)`);
           }
         }
         for (const slot of ROSTER_TIMES) {
           if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
-            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned (v3.2)`);
+            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned (v3.3)`);
           }
         }
       },
@@ -655,20 +664,22 @@
             const stillNeeded = needed - assignedIDs.length;
             if (stillNeeded <= 0) continue;
 
+            let tempAssignments = [...assignedIDs];
             for (let i = 0; i < stillNeeded; i++) {
               const available = this.findAvailableStaff(staffList, slot, loc);
-              if (available && !this.wouldCauseConflict(roster, available, slot, loc)) {
-                roster[loc][slot] += (roster[loc][slot] ? separator : "") + available.staffID;
+              if (available && !this.isOnBreak(available, slot) && !this.wouldCauseConflict(roster, available, slot, loc)) {
+                tempAssignments.push(available.staffID);
                 available.assigned.push({ slot, location: loc });
               } else {
-                if (assignedIDs.length + i === 0) {
-                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot} based on dashboard data (v3.2)`);
-                } else {
-                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${assignedIDs.length + i}/${needed} staff (v3.2)`);
+                if (tempAssignments.length === 0) {
+                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot} due to break time constraints (v3.3)`);
+                } else if (tempAssignments.length < needed) {
+                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${tempAssignments.length}/${needed} staff due to break time constraints (v3.3)`);
                 }
                 break;
               }
             }
+            roster[loc][slot] = tempAssignments.join(separator);
           }
         }
       },
@@ -681,30 +692,7 @@
               let st = staffList.find(s => s.staffID === staffID);
               if (!st) continue;
               const conflictTypes = conflicts[loc][slot][staffID];
-              if (conflictTypes.includes("breakViolation")) {
-                this.removeAssignment(roster, st, slot, loc);
-                let sep = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-                let current = roster[loc][slot].split(sep).map(s => s.trim()).filter(Boolean);
-                roster[loc][slot] = [...new Set(current)].join(sep);
-
-                let newSt = this.findAvailableStaff(
-                  staffList.filter(s => s.staffID !== staffID && !this.isOnBreak(s, slot)),
-                  slot, loc
-                );
-                if (!newSt) {
-                  newSt = this.findEmergencyStaff(
-                    staffList.filter(s => s.staffID !== staffID && !this.isOnBreak(s, slot)),
-                    slot, loc
-                  );
-                }
-                if (newSt && !this.wouldCauseConflict(roster, newSt, slot, loc)) {
-                  roster[loc][slot] = roster[loc][slot]
-                    ? roster[loc][slot] + sep + newSt.staffID
-                    : newSt.staffID;
-                  newSt.assigned.push({ slot, location: loc });
-                  correctionsMade = true;
-                }
-              } else if (conflictTypes.includes("doubleBooked") || conflictTypes.includes("twoHourGap")) {
+              if (conflictTypes.includes("doubleBooked") || conflictTypes.includes("twoHourGap")) {
                 this.removeAssignment(roster, st, slot, loc);
                 let sep = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
                 let current = roster[loc][slot].split(sep).map(s => s.trim()).filter(Boolean);
@@ -790,24 +778,38 @@
         for (let i = 0; i < potential.length - 1; i++) {
           const curr = potential[i], next = potential[i + 1];
           if (curr.location === next.location) {
-            const diff = this.timeToMinutes(next.slot) - this.timeToMinutes(curr.slot);
-            if (diff > 0 && diff < gapThreshold) return true;
+            const ct = this.timeToMinutes(curr.slot);
+            const nt = this.timeToMinutes(next.slot);
+            if (nt - ct < gapThreshold && nt - ct > 0) return true;
           }
         }
         return false;
       },
 
-      removeAssignment: function(roster, staff, slot, loc) {
-        staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
-        if (roster[loc] && roster[loc][slot]) {
-          let sep = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-          let ids = roster[loc][slot].split(sep).map(s => s.trim()).filter(Boolean);
-          ids = ids.filter(id => id !== staff.staffID);
-          roster[loc][slot] = ids.join(sep);
-        }
+      timeToMinutes: function(timeStr) {
+        let [h, m] = timeStr.split(":").map(Number);
+        if (h < 20) h += 24;
+        return (h - 20) * 60 + m;
       },
 
-      validateRoster: function(roster, gapThreshold = 120) {
+      locationApplies: function(location, slot, isWeekend) {
+        if (location === "Report Room" && isWeekend) return false;
+        if (CRITICAL_LOCATIONS[location]) return CRITICAL_LOCATIONS[location].includes(slot);
+        return true;
+      },
+
+      createDisplayData: function(roster) {
+        let displayData = {};
+        OUTPUT_ORDER.forEach(loc => {
+          displayData[loc] = {};
+          ROSTER_TIMES.forEach(slot => {
+            displayData[loc][slot] = roster[loc][slot] || "";
+          });
+        });
+        return displayData;
+      },
+
+      validateRoster: function(roster, gapThreshold = 120, checkBreaks = false) {
         const staffAssignments = {};
         const issues = [];
         const conflicts = {};
@@ -859,15 +861,16 @@
           const assignments = staffAssignments[id].sort(
             (a, b) => ROSTER_TIMES.indexOf(a.slot) - ROSTER_TIMES.indexOf(b.slot)
           );
-          for (let assign of assignments) {
-            const slot = assign.slot;
-            const loc = assign.location;
-            if (this.isOnBreak(st, slot)) {
-              issues.push(`Staff ${id} assigned during break (${st.breakTime}) at ${loc} for ${slot}`);
-              addConflict(loc, slot, id, "breakViolation");
+          if (checkBreaks) {
+            for (let assign of assignments) {
+              const slot = assign.slot;
+              const loc = assign.location;
+              if (this.isOnBreak(st, slot)) {
+                issues.push(`Staff ${id} assigned during break (${st.breakTime}) at ${loc} for ${slot}`);
+                addConflict(loc, slot, id, "breakViolation");
+              }
             }
           }
-
           for (let i = 0; i < assignments.length - 1; i++) {
             const curr = assignments[i], next = assignments[i + 1];
             if (curr.location === next.location && Math.abs(ROSTER_TIMES.indexOf(next.slot) - ROSTER_TIMES.indexOf(curr.slot)) === 1) {
@@ -891,26 +894,13 @@
       },
 
       saveAssignedToRows: function(staffList) {
-        const rows = document.getElementById("staffTable").querySelector("tbody").rows;
+        const tbody = document.getElementById("staffTable").querySelector("tbody");
+        const rows = tbody.rows;
         for (let i = 0; i < rows.length; i++) {
-          const id = rows[i].cells[0].querySelector("input").value.trim();
-          const st = staffList.find(x => x.staffID === id);
-          if (st) {
-            rows[i].dataset.assigned = JSON.stringify(st.assigned);
-          }
+          const staffID = rows[i].cells[0].querySelector("input").value.trim();
+          const st = staffList.find(s => s.staffID === staffID);
+          if (st) rows[i].dataset.assigned = JSON.stringify(st.assigned || []);
         }
-        this.saveStaffList();
-      },
-
-      createDisplayData: function(roster) {
-        const displayData = {};
-        OUTPUT_ORDER.forEach(loc => {
-          displayData[loc] = {};
-          ROSTER_TIMES.forEach(slot => {
-            displayData[loc][slot] = roster[loc] && roster[loc][slot] !== undefined ? roster[loc][slot] : "";
-          });
-        });
-        return displayData;
       },
 
       displayRoster: function(roster, conflicts, creationTime) {
@@ -948,7 +938,7 @@
             } else if (conflicts[loc] && conflicts[loc][slot]) {
               const hasBreakViolation = ids.some(id => conflicts[loc][slot][id]?.includes("breakViolation"));
               if (hasBreakViolation) {
-                style = "background-color:#ffcccc; color:#fff;"; // Red background with white text
+                style = "background-color:#ffcccc; color:#fff;";
               } else if (Object.keys(conflicts[loc][slot]).length > 0) {
                 style = "background-color:#ffd2d2;";
               }
@@ -994,123 +984,83 @@
         });
       },
 
-      setupLongPress: function(cell) {
-        let pressTimer = null;
-        const LONG_PRESS_MS = 600;
-        const startPress = () => {
-          pressTimer = setTimeout(() => {
-            this.copyStaffFromCell(cell);
-          }, LONG_PRESS_MS);
-        };
-        const cancelPress = () => {
-          if (pressTimer) clearTimeout(pressTimer);
-        };
-        cell.addEventListener("mousedown", startPress);
-        cell.addEventListener("mouseup", cancelPress);
-        cell.addEventListener("mouseleave", cancelPress);
-        cell.addEventListener("touchstart", startPress);
-        cell.addEventListener("touchend", cancelPress);
-        cell.addEventListener("touchmove", cancelPress);
-        cell.addEventListener("contextmenu", e => e.preventDefault());
-      },
+      getEditableRosterData: function() {
+        const table = document.getElementById("editableRoster");
+        if (!table) return null;
 
-      copyStaffFromCell: function(cell) {
-        const loc = cell.parentElement.getAttribute("data-loc");
-        const slot = cell.getAttribute("data-slot");
-        if (!loc || !slot) return;
-        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? "|" : ",";
-        let content = cell.textContent.trim();
-        if (!content) {
-          this.showWarning("No staff ID in this cell to copy (v3.2).");
-          return;
-        }
-        let ids = content.split(delimiter).map(x => x.trim()).filter(Boolean);
-        this.clonedStaffID = ids[0];
-        this.showSuccess(`Cloned Staff ID: ${this.clonedStaffID}. Now click another cell to paste (v3.2).`);
-      },
+        let roster = {};
+        OUTPUT_ORDER.forEach(loc => {
+          roster[loc] = {};
+          ROSTER_TIMES.forEach(slot => roster[loc][slot] = "");
+        });
 
-      pasteClonedStaff: function(cell) {
-        const loc = cell.parentElement.getAttribute("data-loc");
-        const slot = cell.getAttribute("data-slot");
-        if (!loc || !slot) return;
+        const rows = table.querySelectorAll("tbody tr");
+        rows.forEach(row => {
+          const loc = row.getAttribute("data-loc");
+          const cells = row.querySelectorAll("td[data-slot]");
+          cells.forEach(cell => {
+            const slot = cell.getAttribute("data-slot");
+            roster[loc][slot] = cell.textContent.trim();
+          });
+        });
 
-        let delimiter = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
-        let currentText = cell.textContent.trim();
-        if (!currentText) {
-          cell.textContent = this.clonedStaffID;
-        } else {
-          cell.textContent = currentText + delimiter + this.clonedStaffID;
-        }
-
-        let staff = this.getCurrentStaffList().find(s => s.staffID === this.clonedStaffID);
-        if (staff && !staff.locked && staff.attendance === "Yes") {
-          let alreadyAssigned = staff.assigned.some(a => a.slot === slot && a.location === loc);
-          if (!alreadyAssigned) {
-            staff.assigned.push({ slot, location: loc });
-            this.saveAssignedToRows(this.getCurrentStaffList());
-          }
-        }
-        this.showSuccess(`Pasted Staff ID ${this.clonedStaffID} into ${loc} @ ${slot} (v3.2).`);
-        this.clonedStaffID = null;
-
-        const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
-        const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
-        this.lastValidationConflicts = conflicts;
+        return roster;
       },
 
       toggleEditMode: function() {
+        const table = document.getElementById("editableRoster");
+        if (!table) {
+          this.showError("No roster to edit (v3.3).");
+          return;
+        }
         this.editMode = !this.editMode;
-        const container = document.getElementById("rosterContainer");
-        const table = container.querySelector("table");
-        if (this.editMode) {
-          this.previousRosterHTML = container.innerHTML;
-          container.style.overflow = "visible";
-          container.style.width = "100%";
-          container.style.backgroundColor = "rgba(0,0,0,0.1)";
-          if (table) {
-            table.classList.add("edit-mode");
-          }
-          document.getElementById("toggleEditModeBtn").textContent = "Disable Edit Mode";
-        } else {
-          container.style.overflow = "auto";
-          container.style.width = "";
-          container.style.backgroundColor = "";
-          if (table) {
-            table.classList.remove("edit-mode");
-          }
-          document.getElementById("toggleEditModeBtn").textContent = "Enable Edit Mode";
+        this.previousRosterHTML = this.editMode ? table.parentElement.innerHTML : this.previousRosterHTML;
+        table.classList.toggle("edit-mode", this.editMode);
+        document.getElementById("toggleEditModeBtn").textContent = this.editMode ? "Disable Edit Mode" : "Enable Edit Mode";
+        this.showSuccess(this.editMode ? "Edit mode enabled (v3.3)." : "Edit mode disabled (v3.3).");
+      },
+
+      clearRoster: function() {
+        if (confirm("Clear the current roster and generate a new one?")) {
+          this.generatedRosterData = null;
+          this.lastValidationConflicts = {};
+          this.editMode = false;
+          this.previousRosterHTML = null;
+          document.getElementById("rosterContainer").innerHTML = "";
+          this.generateRoster();
         }
       },
 
       undoEdits: function() {
-        const container = document.getElementById("rosterContainer");
-        if (this.previousRosterHTML) {
-          container.innerHTML = this.previousRosterHTML;
-          this.showSuccess("Undo successful. Reverted to previous state (v3.2).");
-          document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
-          document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
-          document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
-          document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
-          document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
-          container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
-            this.setupLongPress(cell);
-            cell.addEventListener("click", () => {
-              if (this.clonedStaffID) {
-                this.pasteClonedStaff(cell);
-              }
-            });
-            cell.addEventListener("contextmenu", e => e.preventDefault());
-          });
-        } else {
-          this.showWarning("No previous state to revert to (v3.2).");
+        if (!this.previousRosterHTML) {
+          this.showWarning("No previous state to undo (v3.3).");
+          return;
         }
+        const container = document.getElementById("rosterContainer");
+        container.innerHTML = this.previousRosterHTML;
+        this.editMode = false;
+        this.showSuccess("Reverted to previous roster state (v3.3).");
+
+        container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
+          this.setupLongPress(cell);
+          cell.addEventListener("click", () => {
+            if (this.clonedStaffID) this.pasteClonedStaff(cell);
+          });
+          cell.addEventListener("contextmenu", e => e.preventDefault());
+        });
+
+        document.getElementById("toggleEditModeBtn").addEventListener("click", () => this.toggleEditMode());
+        document.getElementById("clearRosterBtn").addEventListener("click", () => this.clearRoster());
+        document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadRoster('pdf'));
+        document.getElementById("undoEditsBtn").addEventListener("click", () => this.undoEdits());
+        document.getElementById("saveEditsBtn").addEventListener("click", () => this.saveEditedRoster());
       },
 
       saveEditedRoster: function() {
         try {
           const table = document.getElementById("editableRoster");
           if (!table) {
-            this.showError("No roster table found (v3.2).");
+            this.showError("No roster table found (v3.3).");
             return;
           }
           const staffList = this.getCurrentStaffList();
@@ -1138,196 +1088,166 @@
           this.saveAssignedToRows(staffList);
 
           const gapThreshold = parseInt(document.getElementById("gapThreshold").value, 10) || 120;
-          const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold);
+          const { issues, conflicts } = this.validateRoster(this.getEditableRosterData(), gapThreshold, true);
           this.lastValidationConflicts = conflicts;
 
           this.displayRoster(this.getEditableRosterData(), conflicts, new Date());
           const breakViolations = issues.filter(issue => issue.includes("during break")).length;
           this.showSuccess(
             issues.length === 0
-              ? "Roster edits saved successfully (v3.2) - Phase 2 complete!"
-              : `Roster edits saved with ${issues.length} issues (v3.2) - ${breakViolations} break violations marked in red. Manual correction recommended.`
+              ? "Roster edits saved successfully (v3.3) - Phase 2 complete!"
+              : `Roster edits saved with ${issues.length} issues (v3.3) - ${breakViolations} break violations marked in red. Manual correction recommended.`
           );
         } catch (e) {
           console.error(e);
-          this.showError("Failed to save roster edits (v3.2): " + e.message);
+          this.showError("Failed to save roster edits (v3.3): " + e.message);
         }
       },
 
-      getEditableRosterData: function() {
-        const table = document.getElementById("editableRoster");
-        if (!table) return {};
-        const data = {};
-        const rows = table.querySelectorAll("tbody tr");
-        rows.forEach(row => {
-          const loc = row.getAttribute("data-loc");
-          data[loc] = {};
-          const cells = row.querySelectorAll("td[data-slot]");
-          cells.forEach(cell => {
-            const slot = cell.getAttribute("data-slot");
-            data[loc][slot] = cell.textContent.trim();
-          });
+      setupLongPress: function(cell) {
+        let timer;
+        cell.addEventListener("mousedown", () => {
+          timer = setTimeout(() => {
+            const text = cell.textContent.trim();
+            if (text) {
+              const id = text.split(/[,|]/)[0].trim();
+              this.clonedStaffID = id;
+              this.showSuccess(`Staff ID ${id} copied. Click a cell to paste (v3.3).`);
+            }
+          }, 500);
         });
-        return data;
+        cell.addEventListener("mouseup", () => clearTimeout(timer));
+        cell.addEventListener("mouseleave", () => clearTimeout(timer));
       },
 
-      getTableData: function() {
-        const table = document.getElementById("editableRoster");
-        if (!table) return [];
-        const data = [];
-        table.querySelectorAll("tr").forEach(row => {
-          const rowData = [];
-          row.querySelectorAll("th, td").forEach(cell => {
-            rowData.push(cell.textContent.trim());
-          });
-          data.push(rowData);
-        });
-        return data;
+      pasteClonedStaff: function(cell) {
+        if (!this.clonedStaffID) return;
+        const loc = cell.closest("tr").getAttribute("data-loc");
+        const separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+        const current = cell.textContent.trim();
+        const ids = current ? current.split(separator).map(s => s.trim()) : [];
+        if (!ids.includes(this.clonedStaffID)) {
+          cell.textContent = current ? `${current}${separator}${this.clonedStaffID}` : this.clonedStaffID;
+          this.showSuccess(`Pasted staff ID ${this.clonedStaffID} (v3.3).`);
+        }
+        this.clonedStaffID = null;
       },
 
+      removeAssignment: function(roster, staff, slot, loc) {
+        const separator = (loc === "Pass Counter" || loc === "Lobby") ? " | " : ", ";
+        const ids = roster[loc][slot].split(separator).map(s => s.trim()).filter(Boolean);
+        roster[loc][slot] = ids.filter(id => id !== staff.staffID).join(separator);
+        staff.assigned = staff.assigned.filter(a => !(a.slot === slot && a.location === loc));
+      },
+
+      /******************** Export Roster ********************/
       copyTSV: function() {
-        const data = this.getTableData();
-        const tsv = data.map(r => r.join("\t")).join("\n");
-        navigator.clipboard.writeText(tsv)
-          .then(() => this.showSuccess("Copied as TSV (v3.2)"))
-          .catch(() => this.showError("Copy failed (v3.2)"));
+        if (!this.generatedRosterData) {
+          this.showError("No roster to copy (v3.3).");
+          return;
+        }
+        let tsv = "Location\t" + ROSTER_TIMES.join("\t") + "\n";
+        OUTPUT_ORDER.forEach(loc => {
+          tsv += loc + "\t";
+          ROSTER_TIMES.forEach(slot => {
+            tsv += (this.generatedRosterData[loc][slot] || "") + "\t";
+          });
+          tsv += "\n";
+        });
+        navigator.clipboard.writeText(tsv).then(() => {
+          this.showSuccess("Roster copied as TSV (v3.3).");
+        }).catch(err => {
+          this.showError("Failed to copy roster (v3.3): " + err.message);
+        });
       },
 
-      downloadRoster: function(fmt) {
-        if (fmt === "csv") this.downloadAsCSV();
-        else if (fmt === "pdf") this.downloadAsPDF();
-      },
+      downloadRoster: function(format) {
+        if (!this.generatedRosterData) {
+          this.showError("No roster to download (v3.3).");
+          return;
+        }
+        const date = document.getElementById("rosterDate").value;
+        const day = document.getElementById("rosterDay").value;
+        const filename = `roster_${date}_${day}.${format}`;
 
-      downloadAsCSV: function() {
-        const data = this.getTableData();
-        const header = [
-          `Roster Date: ${document.getElementById("rosterDate").value}`,
-          `Generated: ${new Date().toLocaleString()}`
-        ];
-        const csv = [header, ...data].map(r => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `roster_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        this.showSuccess("CSV downloaded (v3.2)!");
-      },
-
-      downloadAsPDF: function() {
-        try {
+        if (format === "csv") {
+          let csv = "Location," + ROSTER_TIMES.join(",") + "\n";
+          OUTPUT_ORDER.forEach(loc => {
+            csv += `"${loc}",`;
+            ROSTER_TIMES.forEach(slot => {
+              const val = this.generatedRosterData[loc][slot] || "";
+              csv += `"${val}",`;
+            });
+            csv = csv.slice(0, -1) + "\n";
+          });
+          const blob = new Blob([csv], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          this.showSuccess("Roster downloaded as CSV (v3.3).");
+        } else if (format === "pdf") {
           const { jsPDF } = window.jspdf;
-          const doc = new jsPDF({ unit: 'pt', format: 'A4' });
-          doc.setFontSize(14);
-          const date = document.getElementById("rosterDate").value;
-          const day = document.getElementById("rosterDay").value;
-          const creation = new Date().toLocaleString();
-          doc.text(`Roster Date: ${date} (${day})`, 40, 40);
-          doc.setFontSize(10);
-          doc.text(`Generated: ${creation}`, 40, 55);
-          const tableData = this.getTableData();
+          const doc = new jsPDF({ orientation: "landscape" });
 
-          doc.autoTable({
-            head: [tableData[0]],
-            body: tableData.slice(1),
-            startY: 70,
-            margin: { left: 40, right: 40 },
-            styles: { fontSize: 8, halign: 'center', cellPadding: 3 },
-            headStyles: { fillColor: [108, 117, 125], halign: 'center', textColor: 255 }
+          const tableData = OUTPUT_ORDER.map(loc => {
+            const row = [loc];
+            ROSTER_TIMES.forEach(slot => {
+              row.push(this.generatedRosterData[loc][slot] || "");
+            });
+            return row;
           });
 
-          const staffList = this.getCurrentStaffList();
-          const breakData = staffList
-            .filter(st => st.attendance === "Yes")
-            .map(st => [st.staffID, st.name, st.breakTime.replace("-", " to ")]);
-          if (breakData.length) {
-            const finalY = doc.autoTable.previous.finalY + 30;
-            doc.setFontSize(12);
-            doc.text("Staff Break Times", 40, finalY);
-            doc.autoTable({
-              head: [["Staff ID", "Name", "Break Time"]],
-              body: breakData,
-              startY: finalY + 10,
-              margin: { left: 40, right: 40 },
-              styles: { fontSize: 8, halign: 'center', cellPadding: 3, overflow: 'linebreak' },
-              headStyles: { fillColor: [108, 117, 125], textColor: 255, halign: 'center' }
-            });
-          }
-          doc.save(`roster_${new Date().toISOString().split('T')[0]}.pdf`);
-          this.showSuccess("PDF downloaded (v3.2)!");
-        } catch (e) {
-          console.error(e);
-          this.showError("PDF download failed (v3.2): " + e.message);
+          doc.text(`Roster Date: ${date} (${day})`, 14, 15);
+          doc.autoTable({
+            head: [["Location", ...ROSTER_TIMES]],
+            body: tableData,
+            startY: 20,
+            theme: "grid",
+            styles: { fontSize: 8, cellPadding: 2 },
+            columnStyles: { 0: { fontStyle: "bold" } }
+          });
+
+          doc.save(filename);
+          this.showSuccess("Roster downloaded as PDF (v3.3).");
         }
       },
 
-      timeToMinutes: function(timeStr) {
-        if (!timeStr || !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) return 0;
-        let [h, m] = timeStr.split(":").map(Number);
-        if (h < 8) h += 24;
-        return (h - 20) * 60 + m;
-      },
-
-      locationApplies: function(loc, slot, isWeekend) {
-        if (slot === "07:00") {
-          return !(loc === "Report Room" || loc === "Vertical Patrol");
-        }
-        if (loc === "Report Room") {
-          return (slot === "20:00" || slot === "21:00") && !isWeekend;
-        }
-        if (loc === "Vertical Patrol") {
-          return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(slot);
-        }
-        if (loc === "Tango Papa") {
-          return slot === "07:00";
-        }
-        return true;
-      },
-
-      clearRoster: function() {
-        const container = document.getElementById("rosterContainer");
-        container.innerHTML = "";
-        this.generatedRosterData = null;
-        this.lastValidationConflicts = {};
-        this.showSuccess("Roster cleared. Generating new arrangement (v3.2)...");
-        this.generateNewArrangement();
-      },
-
-      generateNewArrangement: function() {
-        this.shuffleBreakTimes();
-        this.generateRoster();
-      },
-
-      showSuccess: function(msg) {
+      /******************** Notifications ********************/
+      showSuccess: function(message) {
+        const div = document.createElement("div");
+        div.className = "notification success";
+        div.textContent = message;
         const container = document.getElementById("notification-container");
-        const n = document.createElement("div");
-        n.className = `notification success`;
-        n.textContent = "✅ " + msg;
-        container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 3000);
+        container.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
       },
 
-      showError: function(msg) {
+      showError: function(message) {
+        const div = document.createElement("div");
+        div.className = "notification error";
+        div.textContent = message;
         const container = document.getElementById("notification-container");
-        const n = document.createElement("div");
-        n.className = `notification error`;
-        n.textContent = "❌ " + msg;
-        container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 4000);
+        container.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
       },
 
-      showWarning: function(msg) {
+      showWarning: function(message) {
+        const div = document.createElement("div");
+        div.className = "notification warning";
+        div.textContent = message;
         const container = document.getElementById("notification-container");
-        const n = document.createElement("div");
-        n.className = `notification warning`;
-        n.textContent = "⚠️ " + msg;
-        container.appendChild(n);
-        setTimeout(() => container.removeChild(n), 4000);
+        container.appendChild(div);
+        setTimeout(() => div.remove(), 5000);
       }
     };
 
-    window.addEventListener("DOMContentLoaded", () => rosterSystem.init());
+    /**************************************************************
+     * Initialize the System (v3.3)
+     **************************************************************/
+    rosterSystem.init();
   </script>
 </body>
 </html>
