@@ -11,10 +11,6 @@
     /* =================== Global Style Variables =================== */
     :root {
       --primary-color: #4f46e5;
-      --primary-hover: #4338ca;
-      --button-color: #7f8c8d;
-      --button-hover: #5d6d71;
-      --button-active: #4a565a;
       --secondary-color: #6B7280;
       --success-color: #10B981;
       --warning-color: #F59E0B;
@@ -49,16 +45,11 @@
       padding: 0 15px;
     }
     .card {
-      background: linear-gradient(135deg, #ffffff 0%, #e6f0fa 100%);
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      border-radius: 8px;
       padding: 20px;
       margin-bottom: 20px;
-      border: none;
-      transition: transform 0.2s ease;
-    }
-    .card:hover {
-      transform: translateY(-2px);
+      border: 1px solid var(--border-color);
     }
     .card-title {
       font-size: 1.5rem;
@@ -66,11 +57,9 @@
       color: #2c3e50;
       margin-bottom: 20px;
       text-align: left;
-      padding-left: 10px;
-      background: linear-gradient(90deg, #3498db, #2980b9);
-      color: white;
       padding: 10px;
-      border-radius: 8px;
+      background-color: #f0f0f0; /* Simplified background */
+      border: 1px solid #ddd; /* Simple border */
     }
     .date-container, .gap-policy-container {
       margin: 20px 0;
@@ -190,7 +179,6 @@
       font-size: 14px;
       border: 1px solid var(--border-color);
       border-radius: 4px;
-      transition: border-color 0.2s;
       background-color: #fff;
       color: var(--text-color);
     }
@@ -199,8 +187,7 @@
     }
     input:focus, select:focus {
       outline: none;
-      border-color: var(--button-color);
-      box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.25);
+      border-color: var(--secondary-color);
     }
     input[type="checkbox"] {
       width: 18px;
@@ -208,56 +195,41 @@
       cursor: pointer;
     }
     .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      display: flex;
       gap: 10px;
       margin: 15px 0;
       justify-content: center;
+      flex-wrap: wrap;
     }
     .roster-btn {
-      background-color: var(--button-color);
+      background-color: #6B7280; /* Simplified button color */
       color: #fff;
       padding: 10px 15px;
       font-size: 14px;
-      border-radius: 8px;
-      border: none;
+      border: 1px solid #ddd;
+      border-radius: 4px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin: 5px;
       white-space: nowrap;
     }
-    .roster-btn:hover {
-      background-color: var(--button-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
+    .roster-btn:hover,
     .roster-btn:active {
-      background-color: var(--button-active);
-      transform: translateY(0);
+      background-color: #6B7280; /* No change on hover/active */
+      transform: none;
       box-shadow: none;
     }
     .show-more-btn {
       background-color: #3498db !important;
-      grid-column: span 2;
-    }
-    .show-more-btn:hover {
-      background-color: #2980b9 !important;
     }
     #toggleEditModeBtn.edit-active {
       background-color: #28a745 !important;
-    }
-    #toggleEditModeBtn.edit-active:hover {
-      background-color: #218838 !important;
     }
     @media (max-width: 768px) {
       .card-title {
         font-size: 1.2rem;
       }
       .button-grid {
-        grid-template-columns: 1fr;
-      }
-      .show-more-btn {
-        grid-column: span 1;
+        flex-direction: column;
       }
       .roster-btn {
         width: 100%;
@@ -454,12 +426,11 @@
           if (this.generatedRosterData) this.generateRoster();
         });
 
-        // Add event listener for the Show More Options button
         document.getElementById("toggleOptionsBtn").addEventListener("click", () => {
           const options = document.getElementById("additionalOptions");
           const button = document.getElementById("toggleOptionsBtn");
           const isHidden = options.style.display === "none" || options.style.display === "";
-          options.style.display = isHidden ? "grid" : "none";
+          options.style.display = isHidden ? "flex" : "none";
           button.textContent = isHidden ? "Hide Options" : "Show More Options";
         });
       },
