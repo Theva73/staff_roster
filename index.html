@@ -100,11 +100,6 @@
     .button-row {
       display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
     }
-    .button-row.collapsible {
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-    }
     .roster-btn {
       background-color: var(--button-color);
       color: #fff;
@@ -122,26 +117,10 @@
     .roster-btn:active {
       background-color: var(--button-active); transform: translateY(1px); box-shadow: none;
     }
-    .show-more-btn {
-      background-color: var(--primary-color) !important;
-    }
-    .show-more-btn:hover {
-      background-color: var(--primary-hover) !important;
-    }
-    #toggleEditModeBtn.edit-active {
-      background-color: #28a745 !important;
-    }
-    #toggleEditModeBtn.edit-active:hover {
-      background-color: #218838 !important;
-    }
     @media (max-width: 768px) {
       .button-row {
         flex-direction: row; flex-wrap: wrap; justify-content: space-between;
         width: 100%; max-width: 320px;
-      }
-      .button-row.collapsible {
-        flex-direction: column;
-        align-items: center;
       }
       .roster-btn {
         flex: 1 1 45%; margin-bottom: 8px;
@@ -227,18 +206,17 @@
       </table>
       <div class="button-container">
         <div class="button-row">
-          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
-          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
-        </div>
-        <div class="button-row collapsible" id="additionalOptions" style="display: none;">
           <button class="roster-btn" id="addStaffBtn">Add Staff</button>
           <button class="roster-btn" id="importDataBtn">Import</button>
           <button class="roster-btn" id="exportDataBtn">Export</button>
-          <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
-          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
         </div>
         <div class="button-row">
-          <button class="roster-btn show-more-btn" id="toggleOptionsBtn">Show More Options</button>
+          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
+          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
+          <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
+        </div>
+        <div class="button-row">
+          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
         </div>
       </div>
       <!-- Hidden file input for Import -->
@@ -327,15 +305,6 @@
         document.getElementById("downloadCSVBtn").addEventListener("click", () => this.downloadRoster('csv'));
         document.getElementById("rosterDay").addEventListener("change", () => {
           if (this.generatedRosterData) this.generateRoster();
-        });
-
-        // Add event listener for the Show More Options button
-        document.getElementById("toggleOptionsBtn").addEventListener("click", () => {
-          const options = document.getElementById("additionalOptions");
-          const button = document.getElementById("toggleOptionsBtn");
-          const isHidden = options.style.display === "none" || options.style.display === "";
-          options.style.display = isHidden ? "flex" : "none";
-          button.textContent = isHidden ? "Hide Options" : "Show More Options";
         });
       },
 
@@ -1039,51 +1008,27 @@
       },
 
       toggleEditMode: function() {
-        const container = document.getElementById("rosterContainer");
         const table = document.getElementById("editableRoster");
         if (!table) {
           this.showError("No roster to edit (v3.3).");
           return;
         }
         this.editMode = !this.editMode;
-        const button = document.getElementById("toggleEditModeBtn");
-        if (this.editMode) {
-          this.previousRosterHTML = container.innerHTML;
-          container.style.overflow = "visible";
-          container.style.width = "100%";
-          container.style.backgroundColor = "rgba(0,0,0,0.1)";
-          table.classList.add("edit-mode");
-          button.classList.add("edit-active");
-        } else {
-          container.style.overflow = "auto";
-          container.style.width = "";
-          container.style.backgroundColor = "";
-          table.classList.remove("edit-mode");
-          button.classList.remove("edit-active");
-        }
-        button.textContent = this.editMode ? "Disable Edit Mode" : "Enable Edit Mode";
+        this.previousRosterHTML = this.editMode ? table.parentElement.innerHTML : this.previousRosterHTML;
+        table.classList.toggle("edit-mode", this.editMode);
+        document.getElementById("toggleEditModeBtn").textContent = this.editMode ? "Disable Edit Mode" : "Enable Edit Mode";
+        this.showSuccess(this.editMode ? "Edit mode enabled (v3.3)." : "Edit mode disabled (v3.3).");
       },
 
       clearRoster: function() {
-        const container = document.getElementById("rosterContainer");
-        container.innerHTML = "";
-        this.generatedRosterData = null;
-        this.lastValidationConflicts = {};
-        this.previousRosterHTML = null;
-        const wasEditMode = this.editMode;
-        this.editMode = false; // Temporarily disable to prevent issues during generation
-        this.generateRoster();
-        // Restore edit mode state
-        if (wasEditMode) {
-          this.editMode = true;
-          const table = document.getElementById("editableRoster");
-          if (table) {
-            table.classList.add("edit-mode");
-            document.getElementById("toggleEditModeBtn").classList.add("edit-active");
-            document.getElementById("toggleEditModeBtn").textContent = "Disable Edit Mode";
-          }
+        if (confirm("Clear the current roster and generate a new one?")) {
+          this.generatedRosterData = null;
+          this.lastValidationConflicts = {};
+          this.editMode = false;
+          this.previousRosterHTML = null;
+          document.getElementById("rosterContainer").innerHTML = "";
+          this.generateRoster();
         }
-        this.showSuccess("Roster cleared. Generating new arrangement (v3.3)...");
       },
 
       undoEdits: function() {
