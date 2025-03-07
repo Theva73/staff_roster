@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System - No Auto Buffer + 04:00 Vertical Patrol (v3.5)</title>
+  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.5)</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -12,9 +12,9 @@
     :root {
       --primary-color: #4f46e5;
       --primary-hover: #4338ca;
-      --button-color: #6c757d;
-      --button-hover: #5a6268;
-      --button-active: #545b62;
+      --button-color: #7f8c8d;
+      --button-hover: #5d6d71;
+      --button-active: #4a565a;
       --secondary-color: #6B7280;
       --success-color: #10B981;
       --warning-color: #F59E0B;
@@ -24,7 +24,9 @@
       --text-color: #343a40;
     }
     * {
-      box-sizing: border-box; margin: 0; padding: 0;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -35,41 +37,78 @@
       text-align: center;
     }
     h2 {
-      margin-bottom: 25px; font-weight: 600;
+      margin-bottom: 25px;
+      font-weight: 600;
     }
     h3 {
       margin: 20px 0 10px;
     }
     .container {
-      max-width: 1200px; margin: 0 auto; padding: 0 15px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 15px;
     }
     .card {
-      background: #fff; border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      padding: 20px; margin-bottom: 20px;
-      border: 1px solid var(--border-color);
+      background: linear-gradient(135deg, #ffffff 0%, #e6f0fa 100%);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+      border: none;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+    }
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #2c3e50;
+      margin-bottom: 20px;
+      text-align: left;
+      padding-left: 10px;
+      background: linear-gradient(90deg, #3498db, #2980b9);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
     }
     .date-container, .gap-policy-container {
-      margin: 20px 0; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
     }
     .date-container > div, .gap-policy-container > div {
-      display: flex; align-items: center; gap: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     table {
-      width: 100%; border-collapse: collapse; margin: 20px 0;
-      background: #fff; border-radius: 6px; overflow: hidden;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 20px 0;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
     }
     th, td {
-      border: 1px solid var(--border-color); padding: 10px 8px; text-align: center;
+      border: 1px solid var(--border-color);
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 14px;
     }
     th {
-      background-color: var(--light-bg); font-weight: 600;
+      background-color: #3498db;
+      color: white;
+      font-weight: 600;
     }
     tr:nth-child(even) {
-      background-color: rgba(0,0,0,0.05);
+      background-color: #f8f9fa;
     }
     tr:hover {
-      background-color: rgba(0,0,0,0.075);
+      background-color: #ecf0f1;
     }
     #rosterContainer {
       overflow-x: auto;
@@ -79,13 +118,13 @@
       position: sticky;
       left: 0;
       top: 0;
-      background-color: var(--light-bg);
+      background-color: #3498db;
       z-index: 30;
     }
     #editableRoster thead th {
       position: sticky;
       top: 0;
-      background-color: var(--light-bg);
+      background-color: #3498db;
       z-index: 20;
     }
     #editableRoster tbody td:first-child {
@@ -98,85 +137,111 @@
       width: 100%;
       table-layout: auto;
     }
-    #staffTable thead th:first-child {
+    .staff-table-container {
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+    #staffTable {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #staffTable th,
+    #staffTable td {
+      border: 1px solid #dee2e6;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 14px;
+    }
+    #staffTable th {
+      background-color: #3498db;
+      color: white;
       position: sticky;
-      left: 0;
       top: 0;
-      background-color: var(--light-bg);
+      z-index: 1;
+    }
+    .sticky-header {
+      background: #3498db;
+    }
+    #staffTable tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+    #staffTable tr:hover {
+      background-color: #ecf0f1;
+    }
+    #staffTable thead th:first-child {
+      left: 0;
       z-index: 30;
     }
     #staffTable thead th {
-      position: sticky;
-      top: 0;
-      background-color: var(--light-bg);
       z-index: 20;
     }
     #staffTable tbody td:first-child {
-      position: sticky;
       left: 0;
       background: #fff;
       z-index: 10;
     }
-    #staffTable {
-      width: 100%;
-      table-layout: auto;
-    }
     input, select {
-      padding: 8px 12px; text-align: center;
-      font-size: 14px; border: 1px solid var(--border-color);
-      border-radius: 4px; transition: border-color 0.2s;
-      background-color: #fff; color: var(--text-color);
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      transition: border-color 0.2s;
+      background-color: #fff;
+      color: var(--text-color);
     }
     input::placeholder, select::placeholder {
       color: #6c757d;
     }
     input:focus, select:focus {
-      outline: none; border-color: var(--button-color);
-      box-shadow: 0 0 0 2px rgba(108,117,125,0.25);
+      outline: none;
+      border-color: var(--button-color);
+      box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.25);
     }
     input[type="checkbox"] {
-      width: 18px; height: 18px; cursor: pointer;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
     }
-    .button-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin: 20px 0;
-      align-items: center;
-    }
-    .button-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 15px 0;
       justify-content: center;
     }
     .roster-btn {
       background-color: var(--button-color);
       color: #fff;
-      padding: 6px 12px;
-      font-size: 13px;
-      border-radius: 4px;
+      padding: 10px 15px;
+      font-size: 14px;
+      border-radius: 8px;
       border: none;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.1s;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       white-space: nowrap;
-      flex: 0 1 auto;
     }
     .roster-btn:hover {
       background-color: var(--button-hover);
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     }
     .roster-btn:active {
       background-color: var(--button-active);
-      transform: translateY(1px);
+      transform: translateY(0);
       box-shadow: none;
     }
     .show-more-btn {
-      background-color: var(--primary-color) !important;
+      background-color: #3498db !important;
+      grid-column: span 2;
     }
     .show-more-btn:hover {
-      background-color: var(--primary-hover) !important;
+      background-color: #2980b9 !important;
     }
     #toggleEditModeBtn.edit-active {
       background-color: #28a745 !important;
@@ -185,36 +250,47 @@
       background-color: #218838 !important;
     }
     @media (max-width: 768px) {
-      .button-row {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        width: 100%;
-        max-width: 320px;
+      .card-title {
+        font-size: 1.2rem;
+      }
+      .button-grid {
+        grid-template-columns: 1fr;
+      }
+      .show-more-btn {
+        grid-column: span 1;
       }
       .roster-btn {
-        flex: 1 1 45%;
+        width: 100%;
         margin-bottom: 8px;
+      }
+      #editableRoster th, #editableRoster td {
+        font-size: 12px;
+        padding: 8px 4px;
       }
     }
     .notification {
-      margin: 5px; padding: 8px; border-radius: 4px; font-size: 14px;
+      margin: 5px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 14px;
     }
     .notification.success {
-      background-color: #d4edda; color: #155724;
+      background-color: #d4edda;
+      color: #155724;
     }
     .notification.error {
-      background-color: #f8d7da; color: #721c24;
+      background-color: #f8d7da;
+      color: #721c24;
     }
     .notification.warning {
-      background-color: #fff3cd; color: #856404;
+      background-color: #fff3cd;
+      color: #856404;
     }
     td[contenteditable="true"] {
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       user-select: none;
     }
-    /* Updated rule to only bold the Staff ID input in edit mode */
     .edit-mode td:first-child input {
       font-weight: bold;
     }
@@ -222,7 +298,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System (v3.5)</h2>
+    <h2>Staff Roster Management System CP (v3.5)</h2>
 
     <!-- Date & Gap Policy Section -->
     <div class="card">
@@ -259,38 +335,36 @@
 
     <!-- Staff Management Section -->
     <div class="card">
-      <h3>Staff Management</h3>
-      <table id="staffTable">
-        <thead>
-          <tr>
-            <th>Staff ID</th>
-            <th>Name</th>
-            <th>Break Time</th>
-            <th>HHMD Eligible</th>
-            <th>Attendance</th>
-            <th>Lock</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Staff rows inserted dynamically -->
-        </tbody>
-      </table>
-      <div class="button-container">
-        <div class="button-row">
-          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
-          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
-        </div>
-        <div class="button-row collapsible" id="additionalOptions" style="display: none;">
-          <button class="roster-btn" id="addStaffBtn">Add Staff</button>
-          <button class="roster-btn" id="importDataBtn">Import</button>
-          <button class="roster-btn" id="exportDataBtn">Export</button>
-          <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
-          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
-        </div>
-        <div class="button-row">
-          <button class="roster-btn show-more-btn" id="toggleOptionsBtn">Show More Options</button>
-        </div>
+      <h3 class="card-title">Staff Management</h3>
+      <div class="staff-table-container">
+        <table id="staffTable">
+          <thead class="sticky-header">
+            <tr>
+              <th>Staff ID</th>
+              <th>Name</th>
+              <th>Break Time</th>
+              <th>HHMD Eligible</th>
+              <th>Attendance</th>
+              <th>Lock</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Staff rows inserted dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div class="button-grid">
+        <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
+        <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
+        <button class="roster-btn show-more-btn" id="toggleOptionsBtn">Show More Options</button>
+      </div>
+      <div class="button-grid collapsible" id="additionalOptions" style="display: none;">
+        <button class="roster-btn" id="addStaffBtn">Add Staff</button>
+        <button class="roster-btn" id="importDataBtn">Import</button>
+        <button class="roster-btn" id="exportDataBtn">Export</button>
+        <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
+        <button class="roster-btn" id="downloadCSVBtn">CSV</button>
       </div>
       <!-- Hidden file input for Import -->
       <input type="file" id="importFile" accept=".json" style="display:none;" />
@@ -298,7 +372,7 @@
 
     <!-- Generated Roster Section -->
     <div class="card">
-      <h3>Generated Roster</h3>
+      <h3 class="card-title">Generated Roster</h3>
       <div id="rosterContainer">
         <!-- Roster table generated dynamically -->
       </div>
@@ -385,7 +459,7 @@
           const options = document.getElementById("additionalOptions");
           const button = document.getElementById("toggleOptionsBtn");
           const isHidden = options.style.display === "none" || options.style.display === "";
-          options.style.display = isHidden ? "flex" : "none";
+          options.style.display = isHidden ? "grid" : "none";
           button.textContent = isHidden ? "Hide Options" : "Show More Options";
         });
       },
@@ -400,7 +474,6 @@
             const staffList = JSON.parse(stored);
             staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
             this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.5).`);
-            // Adjust table width after import
             const table = document.getElementById("staffTable");
             table.style.width = "100%";
           } catch (e) {
@@ -1042,14 +1115,12 @@
         tableHTML += "</tbody></table>";
 
         let btnHTML = `
-          <div class="button-container" style="margin-top:15px; text-align:center;">
-            <div class="button-row">
-              <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
-              <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
-              <button class="roster-btn" id="downloadPDFBtn">PDF</button>
-              <button class="roster-btn" id="undoEditsBtn">Undo</button>
-              <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
-            </div>
+          <div class="button-grid" style="margin-top:15px; text-align:center;">
+            <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
+            <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
+            <button class="roster-btn" id="downloadPDFBtn">PDF</button>
+            <button class="roster-btn" id="undoEditsBtn">Undo</button>
+            <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
           </div>`;
 
         container.innerHTML = headerHTML + tableHTML + btnHTML;
@@ -1132,17 +1203,17 @@
         this.generateRoster();
 
         if (wasEditMode) {
-            this.editMode = true;
-            const table = document.getElementById("editableRoster");
-            const button = document.getElementById("toggleEditModeBtn");
-            if (table && button) {
-                table.classList.add("edit-mode");
-                button.classList.add("edit-active");
-                button.textContent = "Disable Edit Mode";
-                container.style.overflow = "visible";
-                container.style.width = "100%";
-                container.style.backgroundColor = "rgba(0,0,0,0.1)";
-            }
+          this.editMode = true;
+          const table = document.getElementById("editableRoster");
+          const button = document.getElementById("toggleEditModeBtn");
+          if (table && button) {
+            table.classList.add("edit-mode");
+            button.classList.add("edit-active");
+            button.textContent = "Disable Edit Mode";
+            container.style.overflow = "visible";
+            container.style.width = "100%";
+            container.style.backgroundColor = "rgba(0,0,0,0.1)";
+          }
         }
 
         this.showSuccess("Roster cleared. Generating new arrangement (v3.5)...");
