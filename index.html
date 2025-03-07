@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.3)</title>
+  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.4)</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -73,10 +73,53 @@
     }
     #rosterContainer {
       overflow-x: auto;
+      max-width: 100%;
     }
-    #editableRoster thead th:first-child,
+    #editableRoster thead th:first-child {
+      position: sticky;
+      left: 0;
+      top: 0;
+      background-color: var(--light-bg);
+      z-index: 30;
+    }
+    #editableRoster thead th {
+      position: sticky;
+      top: 0;
+      background-color: var(--light-bg);
+      z-index: 20;
+    }
     #editableRoster tbody td:first-child {
-      position: sticky; left: 0; background: #fff; z-index: 10;
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 10;
+    }
+    #editableRoster {
+      width: 100%;
+      table-layout: auto;
+    }
+    #staffTable thead th:first-child {
+      position: sticky;
+      left: 0;
+      top: 0;
+      background-color: var(--light-bg);
+      z-index: 30;
+    }
+    #staffTable thead th {
+      position: sticky;
+      top: 0;
+      background-color: var(--light-bg);
+      z-index: 20;
+    }
+    #staffTable tbody td:first-child {
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 10;
+    }
+    #staffTable {
+      width: 100%;
+      table-layout: auto;
     }
     input, select {
       padding: 8px 12px; text-align: center;
@@ -95,10 +138,17 @@
       width: 18px; height: 18px; cursor: pointer;
     }
     .button-container {
-      display: flex; flex-direction: column; gap: 12px; margin: 20px 0; align-items: center;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 20px 0;
+      align-items: center;
     }
     .button-row {
-      display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     .roster-btn {
       background-color: var(--button-color);
@@ -106,24 +156,45 @@
       padding: 6px 12px;
       font-size: 13px;
       border-radius: 4px;
-      border: none; cursor: pointer;
+      border: none;
+      cursor: pointer;
       transition: background-color 0.2s, transform 0.1s;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       white-space: nowrap;
+      flex: 0 1 auto;
     }
     .roster-btn:hover {
-      background-color: var(--button-hover); transform: translateY(-1px);
+      background-color: var(--button-hover);
+      transform: translateY(-1px);
     }
     .roster-btn:active {
-      background-color: var(--button-active); transform: translateY(1px); box-shadow: none;
+      background-color: var(--button-active);
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+    .show-more-btn {
+      background-color: var(--primary-color) !important;
+    }
+    .show-more-btn:hover {
+      background-color: var(--primary-hover) !important;
+    }
+    #toggleEditModeBtn.edit-active {
+      background-color: #28a745 !important;
+    }
+    #toggleEditModeBtn.edit-active:hover {
+      background-color: #218838 !important;
     }
     @media (max-width: 768px) {
       .button-row {
-        flex-direction: row; flex-wrap: wrap; justify-content: space-between;
-        width: 100%; max-width: 320px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+        max-width: 320px;
       }
       .roster-btn {
-        flex: 1 1 45%; margin-bottom: 8px;
+        flex: 1 1 45%;
+        margin-bottom: 8px;
       }
     }
     .notification {
@@ -143,14 +214,15 @@
       -webkit-touch-callout: none;
       user-select: none;
     }
-    .edit-mode td {
+    /* Updated rule to only bold the Staff ID input in edit mode */
+    .edit-mode td:first-child input {
       font-weight: bold;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System CP (v3.3)</h2>
+    <h2>Staff Roster Management System CP (v3.4)</h2>
 
     <!-- Date & Gap Policy Section -->
     <div class="card">
@@ -206,17 +278,18 @@
       </table>
       <div class="button-container">
         <div class="button-row">
+          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
+          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
+        </div>
+        <div class="button-row collapsible" id="additionalOptions" style="display: none;">
           <button class="roster-btn" id="addStaffBtn">Add Staff</button>
           <button class="roster-btn" id="importDataBtn">Import</button>
           <button class="roster-btn" id="exportDataBtn">Export</button>
-        </div>
-        <div class="button-row">
-          <button class="roster-btn" id="shuffleBreaksBtn">Shuffle Break Times</button>
-          <button class="roster-btn" id="generateRosterBtn">Generate Roster</button>
           <button class="roster-btn" id="copyTSVBtn">Copy Roster</button>
+          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
         </div>
         <div class="button-row">
-          <button class="roster-btn" id="downloadCSVBtn">CSV</button>
+          <button class="roster-btn show-more-btn" id="toggleOptionsBtn">Show More Options</button>
         </div>
       </div>
       <!-- Hidden file input for Import -->
@@ -236,9 +309,9 @@
 
   <script>
     /**************************************************************
-     * Global Constants & Variables (v3.3)
+     * Global Constants & Variables (v3.4)
      **************************************************************/
-    const STORAGE_KEY = 'staffListData_v3.3';
+    const STORAGE_KEY = 'staffListData_v3.4';
     const ROSTER_TIMES = [
       "20:00", "20:30", "21:00", "22:00", "23:00", "00:00",
       "01:00", "01:30", "02:00", "03:00", "04:00", "05:00",
@@ -264,7 +337,7 @@
     };
 
     /**************************************************************
-     * Roster System Object (v3.3)
+     * Roster System Object (v3.4)
      **************************************************************/
     const rosterSystem = {
       generatedRosterData: null,
@@ -274,11 +347,11 @@
       previousRosterHTML: null,
 
       init: function() {
-        console.log("Initializing roster system (v3.3)...");
+        console.log("Initializing roster system (v3.4)...");
         this.initializeDateAndDay();
         this.setupEventListeners();
         this.loadStaffList();
-        this.showSuccess("System initialized successfully (v3.3). Using dashboard data for staff matters with strict break time compliance in Phase 1.");
+        this.showSuccess("System initialized successfully (v3.4). Using dashboard data for staff matters with strict break time compliance in Phase 1.");
       },
 
       initializeDateAndDay: function() {
@@ -306,6 +379,15 @@
         document.getElementById("rosterDay").addEventListener("change", () => {
           if (this.generatedRosterData) this.generateRoster();
         });
+
+        // Add event listener for the Show More Options button
+        document.getElementById("toggleOptionsBtn").addEventListener("click", () => {
+          const options = document.getElementById("additionalOptions");
+          const button = document.getElementById("toggleOptionsBtn");
+          const isHidden = options.style.display === "none" || options.style.display === "";
+          options.style.display = isHidden ? "flex" : "none";
+          button.textContent = isHidden ? "Hide Options" : "Show More Options";
+        });
       },
 
       /******************** Staff Management ********************/
@@ -317,10 +399,13 @@
           try {
             const staffList = JSON.parse(stored);
             staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
-            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.3).`);
+            this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.4).`);
+            // Adjust table width after import
+            const table = document.getElementById("staffTable");
+            table.style.width = "100%";
           } catch (e) {
             console.error(e);
-            this.showWarning("Error loading dashboard staff data (v3.3). Starting empty.");
+            this.showWarning("Error loading dashboard staff data (v3.4). Starting empty.");
             this.addStaff();
           }
         } else {
@@ -335,7 +420,7 @@
           const staffList = this.getCurrentStaffList();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
         } catch (e) {
-          this.showError("Failed to save dashboard staff list (v3.3): " + e.message);
+          this.showError("Failed to save dashboard staff list (v3.4): " + e.message);
         }
       },
 
@@ -465,9 +550,9 @@
             }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(imported));
             this.loadStaffList();
-            this.showSuccess("Imported dashboard data successfully (v3.3)!");
+            this.showSuccess("Imported dashboard data successfully (v3.4)!");
           } catch (err) {
-            this.showError("Import error (v3.3): " + err.message);
+            this.showError("Import error (v3.4): " + err.message);
           }
         };
         fileInput.click();
@@ -477,7 +562,7 @@
         try {
           const staffList = this.getCurrentStaffList();
           if (!staffList.length) {
-            this.showWarning("No dashboard data to export (v3.3).");
+            this.showWarning("No dashboard data to export (v3.4).");
             return;
           }
           const jsonStr = JSON.stringify(staffList, null, 2);
@@ -488,9 +573,9 @@
           a.download = `staff_data_${new Date().toISOString().split('T')[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
-          this.showSuccess("Exported dashboard data successfully (v3.3).");
+          this.showSuccess("Exported dashboard data successfully (v3.4).");
         } catch (err) {
-          this.showError("Export error (v3.3): " + err.message);
+          this.showError("Export error (v3.4): " + err.message);
         }
       },
 
@@ -498,7 +583,7 @@
       shuffleBreakTimes: function() {
         let staffList = this.getCurrentStaffList().filter(st => st.attendance === "Yes" && !st.locked);
         if (staffList.length < 2) {
-          this.showWarning("Not enough staff in dashboard to shuffle break times (v3.3).");
+          this.showWarning("Not enough staff in dashboard to shuffle break times (v3.4).");
           return;
         }
         let breaks = staffList.map(st => st.breakTime);
@@ -521,7 +606,7 @@
           }
         });
         this.saveStaffList();
-        this.showSuccess("Shuffled break times from dashboard among staff (v3.3).");
+        this.showSuccess("Shuffled break times from dashboard among staff (v3.4).");
       },
 
       /******************** Roster Generation & Conflict Resolution ********************/
@@ -530,7 +615,7 @@
         const isWeekend = ["Saturday", "Sunday"].includes(dayValue);
         let staffList = this.getCurrentStaffList();
         if (!staffList.length) {
-          this.showError("Add staff to the dashboard before generating roster (v3.3).");
+          this.showError("Add staff to the dashboard before generating roster (v3.4).");
           return;
         }
         staffList.forEach(st => { if (!st.locked) st.assigned = []; });
@@ -565,8 +650,8 @@
         this.displayRoster(this.generatedRosterData, this.lastValidationConflicts, creationTime);
         this.showSuccess(
           shortfalls.length === 0 && issues.length === 0
-            ? "Optimal roster generated with strict break time compliance (v3.3) - Phase 1 complete!"
-            : `Roster generated with ${shortfalls.length} shortfalls and ${issues.length} issues (v3.3) - Break times strictly enforced. Proceed to Phase 2 for manual adjustments if needed.`
+            ? "Optimal roster generated with strict break time compliance (v3.4) - Phase 1 complete!"
+            : `Roster generated with ${shortfalls.length} shortfalls and ${issues.length} issues (v3.4) - Break times strictly enforced. Proceed to Phase 2 for manual adjustments if needed.`
         );
         return { roster: this.generatedRosterData, shortfalls };
       },
@@ -597,7 +682,7 @@
                 staffList.forEach(st => {
                   st.assigned = st.assigned.filter(a => !(a.slot === slot && a.location === loc));
                 });
-                shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot} due to break time constraints (v3.3)`);
+                shortfalls.push(`CRITICAL: Could not fill ${loc} at ${slot} due to break time constraints (v3.4)`);
                 break;
               }
             }
@@ -614,7 +699,7 @@
               break;
             }
           }
-          if (allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments due to break constraints (v3.3)`);
+          if (allEmpty) shortfalls.push(`CRITICAL: ${loc} has zero assignments due to break constraints (v3.4)`);
         }
       },
 
@@ -622,19 +707,19 @@
         const vpTimes = ["20:30", "23:00", "01:30", "04:00", "06:30"];
         for (let time of vpTimes) {
           if (!roster["Vertical Patrol"][time] || roster["Vertical Patrol"][time].length === 0) {
-            shortfalls.push(`Missing Vertical Patrol at ${time} (v3.3)`);
+            shortfalls.push(`Missing Vertical Patrol at ${time} (v3.4)`);
           }
         }
         if (!isWeekend) {
           const reportTimes = ["20:00", "21:00"];
           for (let time of reportTimes) {
             if (!roster["Report Room"][time] || roster["Report Room"][time].length === 0) {
-              shortfalls.push(`Missing Report Room at ${time} (v3.3)`);
+              shortfalls.push(`Missing Report Room at ${time} (v3.4)`);
             }
           }
         }
         if (!roster["Tango Papa"]["07:00"] || roster["Tango Papa"]["07:00"].length === 0) {
-          shortfalls.push(`Missing Tango Papa at 07:00 (v3.3)`);
+          shortfalls.push(`Missing Tango Papa at 07:00 (v3.4)`);
         }
         for (const slot of ROSTER_TIMES) {
           if (slot === "07:00") continue;
@@ -642,12 +727,12 @@
             ? roster["Pass Counter"][slot].split(" | ").filter(Boolean).length
             : 0;
           if (count < 2) {
-            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff (v3.3)`);
+            shortfalls.push(`CRITICAL: Pass Counter at ${slot} has ${count}/2 staff (v3.4)`);
           }
         }
         for (const slot of ROSTER_TIMES) {
           if (!roster["HHMD"][slot] || roster["HHMD"][slot].length === 0) {
-            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned (v3.3)`);
+            shortfalls.push(`CRITICAL: HHMD at ${slot} has no staff assigned (v3.4)`);
           }
         }
       },
@@ -672,9 +757,9 @@
                 available.assigned.push({ slot, location: loc });
               } else {
                 if (tempAssignments.length === 0) {
-                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot} due to break time constraints (v3.3)`);
+                  shortfalls.push(`CRITICAL: No staff available for ${loc} at ${slot} due to break time constraints (v3.4)`);
                 } else if (tempAssignments.length < needed) {
-                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${tempAssignments.length}/${needed} staff due to break time constraints (v3.3)`);
+                  shortfalls.push(`Shortfall: ${loc} at ${slot} has only ${tempAssignments.length}/${needed} staff due to break time constraints (v3.4)`);
                 }
                 break;
               }
@@ -957,12 +1042,14 @@
         tableHTML += "</tbody></table>";
 
         let btnHTML = `
-          <div style="margin-top:15px; text-align:right;">
-            <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
-            <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
-            <button class="roster-btn" id="downloadPDFBtn">PDF</button>
-            <button class="roster-btn" id="undoEditsBtn">Undo</button>
-            <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
+          <div class="button-container" style="margin-top:15px; text-align:center;">
+            <div class="button-row">
+              <button class="roster-btn" id="toggleEditModeBtn">${this.editMode ? "Disable Edit Mode" : "Enable Edit Mode"}</button>
+              <button class="roster-btn" id="clearRosterBtn">Clear & New Roster</button>
+              <button class="roster-btn" id="downloadPDFBtn">PDF</button>
+              <button class="roster-btn" id="undoEditsBtn">Undo</button>
+              <button class="roster-btn" id="saveEditsBtn">Save Edits</button>
+            </div>
           </div>`;
 
         container.innerHTML = headerHTML + tableHTML + btnHTML;
@@ -1008,38 +1095,68 @@
       },
 
       toggleEditMode: function() {
+        const container = document.getElementById("rosterContainer");
         const table = document.getElementById("editableRoster");
         if (!table) {
-          this.showError("No roster to edit (v3.3).");
+          this.showError("No roster to edit (v3.4).");
           return;
         }
         this.editMode = !this.editMode;
-        this.previousRosterHTML = this.editMode ? table.parentElement.innerHTML : this.previousRosterHTML;
-        table.classList.toggle("edit-mode", this.editMode);
-        document.getElementById("toggleEditModeBtn").textContent = this.editMode ? "Disable Edit Mode" : "Enable Edit Mode";
-        this.showSuccess(this.editMode ? "Edit mode enabled (v3.3)." : "Edit mode disabled (v3.3).");
+        const button = document.getElementById("toggleEditModeBtn");
+        if (this.editMode) {
+          this.previousRosterHTML = container.innerHTML;
+          container.style.overflow = "visible";
+          container.style.width = "100%";
+          container.style.backgroundColor = "rgba(0,0,0,0.1)";
+          table.classList.add("edit-mode");
+          button.classList.add("edit-active");
+        } else {
+          container.style.overflow = "auto";
+          container.style.width = "";
+          container.style.backgroundColor = "";
+          table.classList.remove("edit-mode");
+          button.classList.remove("edit-active");
+        }
+        button.textContent = this.editMode ? "Disable Edit Mode" : "Enable Edit Mode";
       },
 
       clearRoster: function() {
-        if (confirm("Clear the current roster and generate a new one?")) {
-          this.generatedRosterData = null;
-          this.lastValidationConflicts = {};
-          this.editMode = false;
-          this.previousRosterHTML = null;
-          document.getElementById("rosterContainer").innerHTML = "";
-          this.generateRoster();
+        const container = document.getElementById("rosterContainer");
+        container.innerHTML = "";
+        this.generatedRosterData = null;
+        this.lastValidationConflicts = {};
+        this.previousRosterHTML = null;
+
+        const wasEditMode = this.editMode;
+        this.editMode = false;
+        this.generateRoster();
+
+        if (wasEditMode) {
+            this.editMode = true;
+            const table = document.getElementById("editableRoster");
+            const button = document.getElementById("toggleEditModeBtn");
+            if (table && button) {
+                table.classList.add("edit-mode");
+                button.classList.add("edit-active");
+                button.textContent = "Disable Edit Mode";
+                container.style.overflow = "visible";
+                container.style.width = "100%";
+                container.style.backgroundColor = "rgba(0,0,0,0.1)";
+            }
         }
+
+        this.showSuccess("Roster cleared. Generating new arrangement (v3.4)...");
       },
 
       undoEdits: function() {
         if (!this.previousRosterHTML) {
-          this.showWarning("No previous state to undo (v3.3).");
+          this.showWarning("No previous state to undo (v3.4).");
           return;
         }
         const container = document.getElementById("rosterContainer");
         container.innerHTML = this.previousRosterHTML;
         this.editMode = false;
-        this.showSuccess("Reverted to previous roster state (v3.3).");
+        this.showSuccess("Reverted to previous roster state (v3.4).");
 
         container.querySelectorAll("td[contenteditable='true']").forEach(cell => {
           this.setupLongPress(cell);
@@ -1060,7 +1177,7 @@
         try {
           const table = document.getElementById("editableRoster");
           if (!table) {
-            this.showError("No roster table found (v3.3).");
+            this.showError("No roster table found (v3.4).");
             return;
           }
           const staffList = this.getCurrentStaffList();
@@ -1095,12 +1212,12 @@
           const breakViolations = issues.filter(issue => issue.includes("during break")).length;
           this.showSuccess(
             issues.length === 0
-              ? "Roster edits saved successfully (v3.3) - Phase 2 complete!"
-              : `Roster edits saved with ${issues.length} issues (v3.3) - ${breakViolations} break violations marked in red. Manual correction recommended.`
+              ? "Roster edits saved successfully (v3.4) - Phase 2 complete!"
+              : `Roster edits saved with ${issues.length} issues (v3.4) - ${breakViolations} break violations marked in red. Manual correction recommended.`
           );
         } catch (e) {
           console.error(e);
-          this.showError("Failed to save roster edits (v3.3): " + e.message);
+          this.showError("Failed to save roster edits (v3.4): " + e.message);
         }
       },
 
@@ -1112,7 +1229,7 @@
             if (text) {
               const id = text.split(/[,|]/)[0].trim();
               this.clonedStaffID = id;
-              this.showSuccess(`Staff ID ${id} copied. Click a cell to paste (v3.3).`);
+              this.showSuccess(`Staff ID ${id} copied. Click a cell to paste (v3.4).`);
             }
           }, 500);
         });
@@ -1128,7 +1245,7 @@
         const ids = current ? current.split(separator).map(s => s.trim()) : [];
         if (!ids.includes(this.clonedStaffID)) {
           cell.textContent = current ? `${current}${separator}${this.clonedStaffID}` : this.clonedStaffID;
-          this.showSuccess(`Pasted staff ID ${this.clonedStaffID} (v3.3).`);
+          this.showSuccess(`Pasted staff ID ${this.clonedStaffID} (v3.4).`);
         }
         this.clonedStaffID = null;
       },
@@ -1143,7 +1260,7 @@
       /******************** Export Roster ********************/
       copyTSV: function() {
         if (!this.generatedRosterData) {
-          this.showError("No roster to copy (v3.3).");
+          this.showError("No roster to copy (v3.4).");
           return;
         }
         let tsv = "Location\t" + ROSTER_TIMES.join("\t") + "\n";
@@ -1155,15 +1272,15 @@
           tsv += "\n";
         });
         navigator.clipboard.writeText(tsv).then(() => {
-          this.showSuccess("Roster copied as TSV (v3.3).");
+          this.showSuccess("Roster copied as TSV (v3.4).");
         }).catch(err => {
-          this.showError("Failed to copy roster (v3.3): " + err.message);
+          this.showError("Failed to copy roster (v3.4): " + err.message);
         });
       },
 
       downloadRoster: function(format) {
         if (!this.generatedRosterData) {
-          this.showError("No roster to download (v3.3).");
+          this.showError("No roster to download (v3.4).");
           return;
         }
         const date = document.getElementById("rosterDate").value;
@@ -1187,7 +1304,7 @@
           a.download = filename;
           a.click();
           URL.revokeObjectURL(url);
-          this.showSuccess("Roster downloaded as CSV (v3.3).");
+          this.showSuccess("Roster downloaded as CSV (v3.4).");
         } else if (format === "pdf") {
           const { jsPDF } = window.jspdf;
           const doc = new jsPDF({ orientation: "landscape" });
@@ -1211,7 +1328,7 @@
           });
 
           doc.save(filename);
-          this.showSuccess("Roster downloaded as PDF (v3.3).");
+          this.showSuccess("Roster downloaded as PDF (v3.4).");
         }
       },
 
@@ -1245,7 +1362,7 @@
     };
 
     /**************************************************************
-     * Initialize the System (v3.3)
+     * Initialize the System (v3.4)
      **************************************************************/
     rosterSystem.init();
   </script>
