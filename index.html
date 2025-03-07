@@ -40,9 +40,12 @@
       margin: 20px 0 10px;
     }
     .container {
-      max-width: 1200px;
+      max-width: 100%; /* Allow full width */
       margin: 0 auto;
       padding: 0 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     .card {
       background: #ffffff;
@@ -50,6 +53,8 @@
       padding: 20px;
       margin-bottom: 20px;
       border: 1px solid var(--border-color);
+      width: 100%; /* Ensure card takes full width */
+      box-sizing: border-box;
     }
     .card-title {
       font-size: 1.5rem;
@@ -58,8 +63,8 @@
       margin-bottom: 20px;
       text-align: left;
       padding: 10px;
-      background-color: #f0f0f0; /* Simplified background */
-      border: 1px solid #ddd; /* Simple border */
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
     }
     .date-container, .gap-policy-container {
       margin: 20px 0;
@@ -81,12 +86,15 @@
       background: #fff;
       border-radius: 8px;
       overflow: hidden;
+      table-layout: auto; /* Allow columns to adjust */
     }
     th, td {
       border: 1px solid var(--border-color);
       padding: 12px 8px;
       text-align: center;
       font-size: 14px;
+      min-width: 60px; /* Minimum width for columns */
+      white-space: nowrap; /* Prevent text wrapping */
     }
     th {
       background-color: #3498db;
@@ -99,9 +107,10 @@
     tr:hover {
       background-color: #ecf0f1;
     }
-    #rosterContainer {
-      overflow-x: auto;
-      max-width: 100%;
+    #rosterContainer, .staff-table-container {
+      overflow-x: auto; /* Allow horizontal scrolling if needed */
+      width: 100%;
+      max-width: 100%; /* Ensure it fits the container */
     }
     #editableRoster thead th:first-child {
       position: sticky;
@@ -126,10 +135,6 @@
       width: 100%;
       table-layout: auto;
     }
-    .staff-table-container {
-      overflow-x: auto;
-      margin-bottom: 20px;
-    }
     #staffTable {
       width: 100%;
       border-collapse: separate;
@@ -144,6 +149,7 @@
       padding: 12px 8px;
       text-align: center;
       font-size: 14px;
+      min-width: 60px; /* Minimum width for columns */
     }
     #staffTable th {
       background-color: #3498db;
@@ -181,6 +187,8 @@
       border-radius: 4px;
       background-color: #fff;
       color: var(--text-color);
+      width: 100%; /* Ensure inputs fit their cells */
+      box-sizing: border-box;
     }
     input::placeholder, select::placeholder {
       color: #6c757d;
@@ -199,10 +207,11 @@
       gap: 10px;
       margin: 15px 0;
       justify-content: center;
-      flex-wrap: wrap;
+      flex-wrap: wrap; /* Allow buttons to wrap */
+      width: 100%; /* Ensure it takes full width */
     }
     .roster-btn {
-      background-color: #6B7280; /* Simplified button color */
+      background-color: #6B7280;
       color: #fff;
       padding: 10px 15px;
       font-size: 14px;
@@ -211,10 +220,13 @@
       cursor: pointer;
       margin: 5px;
       white-space: nowrap;
+      flex: 1 1 auto; /* Allow buttons to grow/shrink */
+      min-width: 120px; /* Minimum width for buttons */
+      max-width: 200px; /* Maximum width to prevent stretching */
     }
     .roster-btn:hover,
     .roster-btn:active {
-      background-color: #6B7280; /* No change on hover/active */
+      background-color: #6B7280;
       transform: none;
       box-shadow: none;
     }
@@ -230,14 +242,31 @@
       }
       .button-grid {
         flex-direction: column;
+        align-items: center;
       }
       .roster-btn {
         width: 100%;
+        max-width: 100%; /* Allow buttons to take full width on small screens */
         margin-bottom: 8px;
       }
-      #editableRoster th, #editableRoster td {
+      #editableRoster th, #editableRoster td,
+      #staffTable th, #staffTable td {
         font-size: 12px;
         padding: 8px 4px;
+        min-width: 50px; /* Smaller minimum width for mobile */
+      }
+      .date-container, .gap-policy-container {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+    @media (min-width: 769px) {
+      /* Ensure tables fit within viewport on larger screens */
+      #editableRoster, #staffTable {
+        width: 100%;
+      }
+      th, td {
+        min-width: 80px; /* Slightly larger columns on desktop */
       }
     }
     .notification {
@@ -245,6 +274,9 @@
       padding: 8px;
       border-radius: 4px;
       font-size: 14px;
+      width: 100%;
+      max-width: 500px;
+      margin: 5px auto;
     }
     .notification.success {
       background-color: #d4edda;
