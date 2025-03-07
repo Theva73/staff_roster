@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Staff Roster Management System - No Auto Buffer + 04:00 Vertical Patrol (v3.5)</title>
+  <title>Staff Roster Management System CP - No Auto Buffer + 04:00 Vertical Patrol (v3.5)</title>
   <!-- External Libraries for PDF Export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -40,7 +40,7 @@
       margin: 20px 0 10px;
     }
     .container {
-      max-width: 100%; /* Allow full width */
+      max-width: 100%;
       margin: 0 auto;
       padding: 0 15px;
       display: flex;
@@ -53,7 +53,7 @@
       padding: 20px;
       margin-bottom: 20px;
       border: 1px solid var(--border-color);
-      width: 100%; /* Ensure card takes full width */
+      width: 100%;
       box-sizing: border-box;
     }
     .card-title {
@@ -86,15 +86,14 @@
       background: #fff;
       border-radius: 8px;
       overflow: hidden;
-      table-layout: auto; /* Allow columns to adjust */
+      table-layout: auto;
     }
     th, td {
       border: 1px solid var(--border-color);
-      padding: 12px 8px;
+      padding: 6px 4px; /* Reduced padding for smaller rows */
       text-align: center;
-      font-size: 14px;
-      min-width: 60px; /* Minimum width for columns */
-      white-space: nowrap; /* Prevent text wrapping */
+      font-size: 12px; /* Reduced font size for smaller rows */
+      min-width: 60px;
     }
     th {
       background-color: #3498db;
@@ -108,9 +107,9 @@
       background-color: #ecf0f1;
     }
     #rosterContainer, .staff-table-container {
-      overflow-x: auto; /* Allow horizontal scrolling if needed */
+      overflow-x: auto;
       width: 100%;
-      max-width: 100%; /* Ensure it fits the container */
+      max-width: 100%;
     }
     #editableRoster thead th:first-child {
       position: sticky;
@@ -146,10 +145,10 @@
     #staffTable th,
     #staffTable td {
       border: 1px solid #dee2e6;
-      padding: 12px 8px;
+      padding: 6px 4px; /* Reduced padding for smaller rows */
       text-align: center;
-      font-size: 14px;
-      min-width: 60px; /* Minimum width for columns */
+      font-size: 12px; /* Reduced font size for smaller rows */
+      min-width: 60px;
     }
     #staffTable th {
       background-color: #3498db;
@@ -179,15 +178,22 @@
       background: #fff;
       z-index: 10;
     }
+    /* Specific styling for Name column to allow wrapping */
+    #staffTable td:nth-child(2), /* Name column */
+    #staffTable th:nth-child(2) {
+      white-space: normal; /* Allow wrapping */
+      word-wrap: break-word; /* Break long words */
+      max-width: 150px; /* Set a reasonable max width for wrapping */
+    }
     input, select {
-      padding: 8px 12px;
+      padding: 4px 6px; /* Reduced padding for inputs */
       text-align: center;
-      font-size: 14px;
+      font-size: 12px; /* Reduced font size */
       border: 1px solid var(--border-color);
       border-radius: 4px;
       background-color: #fff;
       color: var(--text-color);
-      width: 100%; /* Ensure inputs fit their cells */
+      width: 100%;
       box-sizing: border-box;
     }
     input::placeholder, select::placeholder {
@@ -198,31 +204,31 @@
       border-color: var(--secondary-color);
     }
     input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       cursor: pointer;
     }
     .button-grid {
       display: flex;
-      gap: 10px;
+      gap: 5px; /* Reduced gap between buttons */
       margin: 15px 0;
       justify-content: center;
-      flex-wrap: wrap; /* Allow buttons to wrap */
-      width: 100%; /* Ensure it takes full width */
+      flex-wrap: wrap;
+      width: 100%;
     }
     .roster-btn {
       background-color: #6B7280;
       color: #fff;
-      padding: 10px 15px;
-      font-size: 14px;
+      padding: 6px 10px; /* Reduced padding for smaller buttons */
+      font-size: 12px; /* Reduced font size */
       border: 1px solid #ddd;
       border-radius: 4px;
       cursor: pointer;
-      margin: 5px;
+      margin: 3px;
       white-space: nowrap;
-      flex: 1 1 auto; /* Allow buttons to grow/shrink */
-      min-width: 120px; /* Minimum width for buttons */
-      max-width: 200px; /* Maximum width to prevent stretching */
+      flex: 1 1 auto;
+      min-width: 90px; /* Reduced minimum width */
+      max-width: 150px; /* Reduced maximum width */
     }
     .roster-btn:hover,
     .roster-btn:active {
@@ -246,14 +252,14 @@
       }
       .roster-btn {
         width: 100%;
-        max-width: 100%; /* Allow buttons to take full width on small screens */
-        margin-bottom: 8px;
+        max-width: 100%;
+        margin-bottom: 5px;
       }
       #editableRoster th, #editableRoster td,
       #staffTable th, #staffTable td {
-        font-size: 12px;
-        padding: 8px 4px;
-        min-width: 50px; /* Smaller minimum width for mobile */
+        font-size: 10px; /* Even smaller on mobile */
+        padding: 4px 2px; /* Further reduced padding */
+        min-width: 50px;
       }
       .date-container, .gap-policy-container {
         flex-direction: column;
@@ -261,19 +267,18 @@
       }
     }
     @media (min-width: 769px) {
-      /* Ensure tables fit within viewport on larger screens */
       #editableRoster, #staffTable {
         width: 100%;
       }
       th, td {
-        min-width: 80px; /* Slightly larger columns on desktop */
+        min-width: 60px;
       }
     }
     .notification {
       margin: 5px;
       padding: 8px;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 12px;
       width: 100%;
       max-width: 500px;
       margin: 5px auto;
@@ -302,7 +307,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Staff Roster Management System (v3.5)</h2>
+    <h2>Staff Roster Management System CP (v3.5)</h2>
 
     <!-- Date & Gap Policy Section -->
     <div class="card">
