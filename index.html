@@ -73,53 +73,10 @@
     }
     #rosterContainer {
       overflow-x: auto;
-      max-width: 100%;
     }
-    #editableRoster thead th:first-child {
-      position: sticky;
-      left: 0;
-      top: 0;
-      background-color: var(--light-bg);
-      z-index: 30;
-    }
-    #editableRoster thead th {
-      position: sticky;
-      top: 0;
-      background-color: var(--light-bg);
-      z-index: 20;
-    }
+    #editableRoster thead th:first-child,
     #editableRoster tbody td:first-child {
-      position: sticky;
-      left: 0;
-      background: #fff;
-      z-index: 10;
-    }
-    #editableRoster {
-      width: 100%;
-      table-layout: auto;
-    }
-    #staffTable thead th:first-child {
-      position: sticky;
-      left: 0;
-      top: 0;
-      background-color: var(--light-bg);
-      z-index: 30;
-    }
-    #staffTable thead th {
-      position: sticky;
-      top: 0;
-      background-color: var(--light-bg);
-      z-index: 20;
-    }
-    #staffTable tbody td:first-child {
-      position: sticky;
-      left: 0;
-      background: #fff;
-      z-index: 10;
-    }
-    #staffTable {
-      width: 100%;
-      table-layout: auto;
+      position: sticky; left: 0; background: #fff; z-index: 10;
     }
     input, select {
       padding: 8px 12px; text-align: center;
@@ -392,9 +349,6 @@
             const staffList = JSON.parse(stored);
             staffList.forEach(st => tbody.insertAdjacentHTML("beforeend", this.getStaffRowHTML(st)));
             this.showSuccess(`Loaded ${staffList.length} staff members from dashboard data (v3.3).`);
-            // Adjust table width after import
-            const table = document.getElementById("staffTable");
-            table.style.width = "100%";
           } catch (e) {
             console.error(e);
             this.showWarning("Error loading dashboard staff data (v3.3). Starting empty.");
