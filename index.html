@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.9I - Final Logic Fix</title>
+    <title>Staff Roster System v5.9J - Final Corrected Logic</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -51,8 +51,8 @@
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9I</h1>
-            <p class="text-lg text-gray-500 mt-2">Final Logic Fix</p>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9J</h1>
+            <p class="text-lg text-gray-500 mt-2">Final Corrected Logic</p>
         </header>
 
         <!-- UI sections (unchanged) -->
@@ -81,7 +81,7 @@
 
 <script type="module">
 const rosterSystem = {
-    // --- CONFIG & STATE ---
+    // --- CONFIG & STATE (Unchanged) ---
     ROSTER_TIMES: ["20:00", "20:30", "21:00", "22:00", "23:00", "00:00", "01:00", "01:30", "02:00", "03:00", "04:00", "05:00", "06:00", "06:30", "07:00"],
     LOCATIONS: [ { name: "Pass Counter", needed: 2, isMultiStaff: true }, { name: "HHMD", needed: 1 }, { name: "Lobby", needed: 2, isMultiStaff: true }, { name: "Guard House", needed: 1 }, { name: "Vertical Patrol", needed: 1 }, { name: "Report Room", needed: 1 }, { name: "Tango Papa", needed: 1 } ],
     OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
@@ -89,9 +89,9 @@ const rosterSystem = {
     
     generatedRoster: null, staffDataCache: [], db: null, firebase: null,
 
-    // --- INITIALIZATION ---
+    // --- INITIALIZATION (Unchanged) ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9I Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9J Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
@@ -109,10 +109,9 @@ const rosterSystem = {
     
     // --- COMPLIANCE LOGIC ---
     /**
-     * THE DEFINITIVE FIX: This is the final, robust break-checking logic.
-     * It relies on a helper function, timeToMinutes, to create a simple, linear timeline
-     * from the start of the shift (20:00). This handles all cases, including overnight breaks,
-     * elegantly and correctly. This was the root cause of all previous conflicts.
+     * THE DEFINITIVE FIX: These two functions work together to create a simple, linear timeline
+     * and check against it. This robust method handles all break scenarios correctly.
+     * The complexity of previous versions was the source of all bugs. This is the final, correct logic.
      */
     timeToMinutes(timeStr) {
         if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
@@ -120,7 +119,8 @@ const rosterSystem = {
         if (isNaN(hours) || isNaN(minutes)) return -1;
         
         // This is the key: normalize the timeline so it's always increasing.
-        // A time like 01:00 is treated as the 25th hour, 02:00 as the 26th, etc.
+        // A time like 01:00 is treated as the 25th hour, 02:00 as the 26th, etc.,
+        // relative to the start of the shift at 20:00.
         if (hours < 20) {
             hours += 24;
         }
@@ -133,11 +133,17 @@ const rosterSystem = {
         const slotMins = this.timeToMinutes(timeSlot);
 
         if (startMins === -1 || endMins === -1 || slotMins === -1) {
-            return false; // Invalid time data
+            return false; // Invalid time data prevents a break
         }
         
+        // If start and end are the same, it's not a break.
+        if (startMins === endMins) {
+            return false;
+        }
+
         // Because the timeline is now linear, a simple check is all that's needed.
-        // The break interval is [start, end), so staff are available AT the end time.
+        // The break interval is [start, end), so staff are on break AT the start time
+        // and become free AT the end time.
         return slotMins >= startMins && slotMins < endMins;
     },
     
@@ -201,7 +207,7 @@ const rosterSystem = {
                     const isTpCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(timeSlot);
                     let vpText = isVpCritical ? vpStaff.join(', ') : '';
                     let tpText = isTpCritical ? tpStaff.join(', ') : '';
-                    cellText = `${vpText}${(vpText && tpText) ? '<br>' : ''}${tpText}`;
+                    cellText = `${vpText}${vpText && tpText ? '<br>' : ''}${tpText}`;
                     if(isVpCritical || isTpCritical) {
                         cellClass = (isVpCritical && !vpStaff.length) || (isTpCritical && !tpStaff.length) ? 'bg-red-100' : 'bg-blue-100 font-bold';
                     } else {
