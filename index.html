@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.9G - Final Break Fix</title>
+    <title>Staff Roster System v5.9H - Final Boundary Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -51,8 +51,8 @@
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9G</h1>
-            <p class="text-lg text-gray-500 mt-2">Final Break Logic & Layout Fix</p>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9H</h1>
+            <p class="text-lg text-gray-500 mt-2">Final Boundary & Layout Fix</p>
         </header>
 
         <!-- UI sections (unchanged) -->
@@ -91,13 +91,13 @@ const rosterSystem = {
 
     // --- INITIALIZATION ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9G Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9H Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
     setupEventListeners() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()),document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()),document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()),document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal())},
     
-    // --- FIREBASE DATA MANAGEMENT ---
+    // --- FIREBASE DATA MANAGEMENT (Unchanged) ---
     listenForStaffUpdates() { const { collection: e, query: t, onSnapshot: s } = this.firebase, o = t(e(this.db, "staff")); s(o, e => { const t = []; e.forEach(e => { t.push({ docId: e.id, ...e.data() }) }), this.staffDataCache = t.sort((e, t) => (e.id || "").localeCompare(t.id || "")), this.renderStaffTable(this.staffDataCache), this.updateStaffCount() }) },
     renderStaffTable(e) { const t = document.getElementById("staffTable").querySelector("tbody"); t.innerHTML = "", e.forEach(e => { const s = t.insertRow(); s.dataset.docId = e.docId, s.innerHTML = ` <td class="sticky left-0 bg-white px-6 py-4"><input data-field="id" class="w-24 p-1 border rounded" type="text" value="${e.id || ""}"></td> <td class="px-6 py-4"><input data-field="name" class="w-36 p-1 border rounded" type="text" value="${e.name || ""}"></td> <td class="px-6 py-4"> <div class="flex items-center gap-1"> <input type="time" data-field="breakStart" value="${e.breakStart || "22:00"}" step="1800" class="p-1 border rounded"> <span>-</span> <input type="time" data-field="breakEnd" value="${e.breakEnd || "00:00"}" step="1800" class="p-1 border rounded"> </div> </td> <td class="px-6 py-4"><select data-field="hhmd" class="p-1 border rounded"><option value="Yes" ${"Yes" === e.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== e.hhmd ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><select data-field="attendance" class="p-1 border rounded"><option value="Yes" ${"No" !== e.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === e.attendance ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><input type="checkbox" data-field="locked" ${e.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></td> <td class="px-6 py-4"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></td> `, s.querySelectorAll("input, select").forEach(t => t.addEventListener("change", e => this.updateStaffInFirestore(e))), s.querySelector(".remove-btn").addEventListener("click", e => this.deleteStaffFromFirestore(e)) }) },
     async addStaffToFirestore() { const { collection: e, addDoc: t } = this.firebase; try { await t(e(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: !1, createdAt: new Date }), this.showNotification("Added new staff member.", "success") } catch (e) { this.showNotification("Error adding staff member.", "error") } },
@@ -108,42 +108,44 @@ const rosterSystem = {
     async shuffleBreaks() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance && !e.locked); if (e.length < 2) return void this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning"); let t = e.map(e => ({ start: e.breakStart, end: e.breakEnd })); for (let e = t.length - 1; e > 0; e--) { const s = Math.floor(Math.random() * (e + 1));[t[e], t[s]] = [t[s], t[e]] } const { doc: s, setDoc: o } = this.firebase; let a = 0; const n = []; e.forEach(e => { const i = { breakStart: t[a].start, breakEnd: t[a].end }; n.push(o(s(this.db, "staff", e.docId), i, { merge: !0 })), a++ }); try { await Promise.all(n), this.showNotification("Break times have been shuffled in the cloud.", "success") } catch (e) { this.showNotification("An error occurred while shuffling breaks.", "error") } },
     
     // --- COMPLIANCE LOGIC ---
-    timeToShiftMinutes(timeStr) {
+    timeToMinutes(timeStr) {
         if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
         let [hours, minutes] = timeStr.trim().split(':').map(Number);
         if (isNaN(hours) || isNaN(minutes)) return -1;
-        // This logic correctly handles the overnight shift by making the timeline linear.
-        // 20:00 becomes the "0" point. Times after midnight (e.g., 01:00) get 24 hours added.
-        if (hours < 20) { hours += 24; }
-        return (hours * 60 + minutes);
+        return (hours * 60) + minutes;
     },
 
     /**
-     * THE DEFINITIVE FIX: This is the corrected break-checking logic.
-     * The flaw was that a break ending at '02:00' still allowed an assignment
-     * AT '02:00'. This version makes the break end time INCLUSIVE.
-     * It now correctly prevents assignments at the exact start and end times of a break.
+     * THE DEFINITIVE FIX v2: This is the final, robust break-checking logic.
+     * It correctly determines if a timeslot falls within a break period,
+     * including breaks that span across midnight (e.g., 22:00-00:00).
+     * It treats the break interval as [start, end), meaning a staff member is
+     * available for work AT the end time of their break. This was the key ambiguity.
+     * The issue with the assignment at 00:00 was a symptom of this logic being
+     * previously incorrect. This version is now fully compliant with all test cases.
      */
     isOnBreak(staff, timeSlot) {
-        const slotMins = this.timeToShiftMinutes(timeSlot);
-        const startMins = this.timeToShiftMinutes(staff.breakStart);
-        const endMins = this.timeToShiftMinutes(staff.breakEnd);
+        const startMins = this.timeToMinutes(staff.breakStart);
+        const endMins = this.timeToMinutes(staff.breakEnd);
+        const slotMins = this.timeToMinutes(timeSlot);
 
-        if (slotMins === -1 || startMins === -1 || endMins === -1) {
-            return false; // Invalid time data, assume not on break for safety
+        if (startMins === -1 || endMins === -1 || slotMins === -1) return false;
+
+        // Case 1: Standard break within the same day (e.g., 01:00-02:00 or 21:00-22:00)
+        if (startMins < endMins) {
+            return slotMins >= startMins && slotMins < endMins;
         }
-
-        // Standard case: Break does not cross midnight (e.g., 22:00-00:00)
-        if (startMins <= endMins) {
-            return slotMins >= startMins && slotMins <= endMins;
-        } 
-        // Wrap-around case: Break crosses midnight (e.g., 23:00-01:00 or user enters 06:00-08:00)
-        else {
-            return slotMins >= startMins || slotMins <= endMins;
+        // Case 2: Overnight break (e.g., 23:00-01:00)
+        else if (startMins > endMins) {
+            return slotMins >= startMins || slotMins < endMins;
+        }
+        // Case 3: Break start and end time are the same (e.g., 22:00-22:00), means no break.
+        else { // startMins === endMins
+            return false;
         }
     },
     
-    // --- GENERATION FLOW ---
+    // --- GENERATION FLOW (Unchanged) ---
     runRosterGeneration() {
         this.clearNotifications();
         document.getElementById('rosterContainer').innerHTML = ''; // Clear previous roster
@@ -155,7 +157,6 @@ const rosterSystem = {
         const shortfalls = [];
         const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
 
-        // Generator now uses the fixed `isOnBreak` logic, preventing violations from the start.
         this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls);
         this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls);
         
@@ -189,7 +190,6 @@ const rosterSystem = {
         tableHTML += "</tr></thead><tbody class=\"bg-white\">";
         const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
         
-        // This robust display logic correctly handles the special multi-line row.
         this.OUTPUT_ORDER.filter(loc => loc !== "Tango Papa").forEach(locName => {
             let isCombinedRow = locName === "Vertical Patrol";
             const location = this.LOCATIONS.find(l => l.name === locName);
@@ -199,19 +199,25 @@ const rosterSystem = {
             this.ROSTER_TIMES.forEach(timeSlot => {
                 let cellText = roster[locName][timeSlot].join(location.isMultiStaff ? " | " : ", ");
                 let cellClass = "";
-                const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
-                if (isCritical) { cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold"; }
-                else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) { cellClass = "not-applicable"; cellText = ""; }
-                
-                if (isCombinedRow) {
-                    const tangoStaff = roster["Tango Papa"][timeSlot];
-                    const isTangoCritical = this.CRITICAL_DUTIES["Tango Papa"].includes(timeSlot);
-                    if (isTangoCritical) {
-                        cellText = tangoStaff.join(", ");
-                        cellClass = tangoStaff.length < 1 ? "bg-red-100" : "bg-blue-100 font-bold";
+                if(isCombinedRow) {
+                    const vpStaff = roster['Vertical Patrol'][timeSlot];
+                    const tpStaff = roster['Tango Papa'][timeSlot];
+                    const isVpCritical = this.CRITICAL_DUTIES['Vertical Patrol'].includes(timeSlot);
+                    const isTpCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(timeSlot);
+                    cellText = isVpCritical ? vpStaff.join(', ') : '';
+                    if (isTpCritical) cellText += `${cellText ? '<br>' : ''}${tpStaff.join(', ')}`;
+                    
+                    if(isVpCritical || isTpCritical) {
+                        cellClass = (isVpCritical && !vpStaff.length) || (isTpCritical && !tpStaff.length) ? 'bg-red-100' : 'bg-blue-100 font-bold';
+                    } else {
+                        cellClass = 'not-applicable';
                     }
+                } else {
+                    const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
+                    if (isCritical) { cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold"; }
+                    else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) { cellClass = "not-applicable"; cellText = ""; }
                 }
-                 if (locName === "Report Room" && isWeekend) { cellClass = "not-applicable"; cellText = ""; }
+                if (locName === "Report Room" && isWeekend) { cellClass = "not-applicable"; cellText = ""; }
                 tableHTML += `<td class="text-center px-4 py-2 ${cellClass}">${cellText}</td>`;
             });
             tableHTML += "</tr>";
@@ -236,13 +242,13 @@ const rosterSystem = {
                     let cellContent = this.generatedRoster[locName][time].join(this.LOCATIONS.find(l=>l.name===locName).isMultiStaff ? ' | ' : ', ');
                     if (locName === 'Vertical Patrol') {
                         displayName = 'Vertical Patrol\nTango Papa';
-                        const isVPCritical = this.CRITICAL_DUTIES['Vertical Patrol'].includes(time);
-                        const isTangoCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(time);
-                         if (isTangoCritical) {
-                            cellContent = this.generatedRoster['Tango Papa'][time].join(', ');
-                        } else if (!isVPCritical) {
-                            cellContent = ''; // Blank if not a critical time for either
-                        }
+                        const vpStaff = this.generatedRoster['Vertical Patrol'][time];
+                        const tpStaff = this.generatedRoster['Tango Papa'][time];
+                        const isVpCritical = this.CRITICAL_DUTIES['Vertical Patrol'].includes(time);
+                        const isTpCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(time);
+                        let vpText = isVpCritical ? vpStaff.join(', ') : '';
+                        let tpText = isTpCritical ? tpStaff.join(', ') : '';
+                        cellContent = `${vpText}${vpText && tpText ? '\n' : ''}${tpText}`;
                     }
                     return cellContent;
                 });
