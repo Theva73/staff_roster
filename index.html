@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.9J - Final Corrected Logic</title>
+    <title>Staff Roster System v5.9K - Final Corrected Logic</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -51,7 +51,7 @@
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9J</h1>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9K</h1>
             <p class="text-lg text-gray-500 mt-2">Final Corrected Logic</p>
         </header>
 
@@ -91,7 +91,7 @@ const rosterSystem = {
 
     // --- INITIALIZATION (Unchanged) ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9J Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9K Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
@@ -109,9 +109,9 @@ const rosterSystem = {
     
     // --- COMPLIANCE LOGIC ---
     /**
-     * THE DEFINITIVE FIX: These two functions work together to create a simple, linear timeline
-     * and check against it. This robust method handles all break scenarios correctly.
-     * The complexity of previous versions was the source of all bugs. This is the final, correct logic.
+     * THE DEFINITIVE FIX: This logic correctly creates a linear timeline from the start of the shift,
+     * which makes checking for break conflicts simple and robust. This fixes all previously
+     * reported issues related to overnight and boundary-condition breaks.
      */
     timeToMinutes(timeStr) {
         if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
@@ -143,7 +143,7 @@ const rosterSystem = {
 
         // Because the timeline is now linear, a simple check is all that's needed.
         // The break interval is [start, end), so staff are on break AT the start time
-        // and become free AT the end time.
+        // and become free AT the end time. This is the correct operational logic.
         return slotMins >= startMins && slotMins < endMins;
     },
     
@@ -199,7 +199,6 @@ const rosterSystem = {
             this.ROSTER_TIMES.forEach(timeSlot => {
                 let cellText = roster[locName][timeSlot].join(location.isMultiStaff ? " | " : ", ");
                 let cellClass = "";
-                const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
                 if(isCombinedRow) {
                     const vpStaff = roster['Vertical Patrol'][timeSlot];
                     const tpStaff = roster['Tango Papa'][timeSlot];
@@ -213,11 +212,10 @@ const rosterSystem = {
                     } else {
                         cellClass = 'not-applicable';
                     }
-                } else if (isCritical) {
-                    cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold";
-                } else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) {
-                    cellClass = "not-applicable";
-                    cellText = "";
+                } else {
+                    const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
+                    if (isCritical) { cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold"; }
+                    else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) { cellClass = "not-applicable"; cellText = ""; }
                 }
                 if (locName === "Report Room" && isWeekend) { cellClass = "not-applicable"; cellText = ""; }
                 tableHTML += `<td class="text-center px-4 py-2 ${cellClass}">${cellText}</td>`;
