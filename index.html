@@ -77,13 +77,14 @@
             <div id="rosterContainer" class="mt-2 overflow-x-auto"></div>
         </div>
     </div>
-    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh]"></iframe></div></div>
+    <!-- Modal is no longer used for download, but kept for potential future use (e.g., preview only) -->
+    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><button id="closePdfBtn" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button></div><iframe id="pdfPreview" class="w-full h-[75vh]"></iframe></div></div>
 
 <script type="module">
 // --- V5.9 ---
-// FINAL PDF FIX: The `downloadPDF` function now generates a `datauristring`
-// which embeds the PDF data directly into the download link. This is the most
-// compatible method for triggering downloads in secure/sandboxed environments.
+// FINAL PDF FIX: The `downloadPDF` function now triggers a direct download
+// by creating a temporary link and clicking it programmatically. This is the most
+// reliable method and avoids issues with browser security blocking pop-ups or data URIs.
 
 const rosterSystem = {
     // --- CONFIG & STATE ---
@@ -132,7 +133,7 @@ const rosterSystem = {
     copyTSV() { if(!this.generatedRoster)return void this.showNotification("No roster to copy.","error");let e="Location\t"+this.ROSTER_TIMES.join("\t")+"\n";this.OUTPUT_ORDER.forEach(t=>{const s=this.LOCATIONS.find(e=>e.name===t);e+=t+"\t"+this.ROSTER_TIMES.map(e=>this.generatedRoster[t][e].join(s.isMultiStaff?" | ":", ")).join("\t")+"\n"}),navigator.clipboard.writeText(e).then(()=>this.showNotification("Roster copied to clipboard!","success"),()=>this.showNotification("Failed to copy.","error"))},
     
     /**
-     * UPDATED: The definitive PDF download fix.
+     * DEFINITIVE PDF FIX
      */
     downloadPDF() {
         if (!this.generatedRoster) { this.showNotification('No roster to download.', 'error'); return; }
@@ -153,17 +154,24 @@ const rosterSystem = {
             const staffBody = presentStaff.map(staff => [ staff.id, staff.name, `${staff.breakStart} - ${staff.breakEnd}` ]);
             doc.autoTable({ head: staffHead, body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
             
-            // --- NEW Download Logic using DataURI ---
-            const dataUri = doc.output('datauristring');
+            // --- New Download Logic ---
+            const pdfBlob = doc.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+
+            // Create a temporary link element
+            const a = document.createElement('a');
+            a.href = pdfUrl;
+            a.download = `roster_${rosterDate}.pdf`;
             
-            // Populate the elements in the modal
-            const downloadLink = document.getElementById('pdfDownloadLink');
-            downloadLink.href = dataUri;
-            downloadLink.download = `roster_${rosterDate}.pdf`;
+            // Append the link to the body, click it, and then remove it.
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            // Clean up the object URL
+            URL.revokeObjectURL(pdfUrl);
             
-            document.getElementById('pdfPreview').src = dataUri;
-            document.getElementById('pdfModal').style.display = 'block';
-            this.showNotification('PDF is ready for preview and download.', 'success');
+            this.showNotification('PDF Download initiated.', 'success');
 
         } catch (e) {
             console.error("PDF Generation/Download Error:", e);
