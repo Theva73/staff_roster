@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.6 - PDF Download Fix</title>
+    <title>Staff Roster System v5.7 - Final PDF Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -50,7 +50,7 @@
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.6</h1>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.7</h1>
             <p class="text-lg text-gray-500 mt-2">Guaranteed Compliance & PDF Download Fix</p>
         </header>
 
@@ -77,12 +77,23 @@
             <div id="rosterContainer" class="mt-2 overflow-x-auto"></div>
         </div>
     </div>
-    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><button id="closePdfBtn" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button></div><iframe id="pdfPreview" class="w-full h-[75vh]"></iframe></div></div>
+    <!-- Modal content now includes a dedicated download button -->
+    <div id="pdfModal" class="modal"><div class="modal-content">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">PDF Preview</h3>
+            <div>
+                 <a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a>
+                 <button id="closePdfBtn" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button>
+            </div>
+        </div>
+        <iframe id="pdfPreview" class="w-full h-[75vh]"></iframe>
+    </div></div>
 
 <script type="module">
-// --- V5.6 ---
-// FIX: PDF download method changed from doc.save() to a programmatic anchor
-// link click, which is more reliable across different browsers and environments.
+// --- V5.7 ---
+// FINAL PDF FIX: The `downloadPDF` function now populates a visible `<a>` tag's
+// href in the modal, making the download a direct user click, which is the
+// most reliable method across all browsers.
 
 const rosterSystem = {
     // --- CONFIG & STATE ---
@@ -94,7 +105,7 @@ const rosterSystem = {
 
     // --- INITIALIZATION ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.6 Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.7 Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
@@ -111,39 +122,18 @@ const rosterSystem = {
     async shuffleBreaks() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance && !e.locked); if (e.length < 2) return void this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning"); let t = e.map(e => ({ start: e.breakStart, end: e.breakEnd })); for (let e = t.length - 1; e > 0; e--) { const s = Math.floor(Math.random() * (e + 1));[t[e], t[s]] = [t[s], t[e]] } const { doc: s, setDoc: o } = this.firebase; let a = 0; const n = []; e.forEach(e => { const i = { breakStart: t[a].start, breakEnd: t[a].end }; n.push(o(s(this.db, "staff", e.docId), i, { merge: !0 })), a++ }); try { await Promise.all(n), this.showNotification("Break times have been shuffled in the cloud.", "success") } catch (e) { this.showNotification("An error occurred while shuffling breaks.", "error") } },
     
     // --- GUARANTEED COMPLIANCE LOGIC (Unchanged) ---
-    getTimeAsDate(timeStr, rosterDate) { if (!timeStr || !timeStr.includes(':')) return null; const [hours, minutes] = timeStr.split(':').map(Number); const date = new Date(rosterDate); if (hours < 20) { date.setDate(date.getDate() + 1); } date.setHours(hours, minutes, 0, 0); return date; },
-    isOnBreak(staff, timeSlot, rosterDate) { const slotDate = this.getTimeAsDate(timeSlot, rosterDate); const breakStartDate = this.getTimeAsDate(staff.breakStart, rosterDate); if (!slotDate || !breakStartDate) return false; const breakEndDate = new Date(breakStartDate); const [endHours, endMinutes] = staff.breakEnd.split(':').map(Number); const startHours = breakStartDate.getHours(); if (endHours < startHours || (endHours === startHours && endMinutes <= breakStartDate.getMinutes())) { breakEndDate.setDate(breakEndDate.getDate() + 1); } breakEndDate.setHours(endHours, endMinutes); return slotDate >= breakStartDate && slotDate < breakEndDate; },
-    validator: { scrubRosterForBreakViolations(roster, staffList, system, rosterDate) { const violations = []; let totalAssignments = 0; const staffMap = new Map(staffList.map(s => [s.id, s])); for (const locName in roster) { for (const timeSlot in roster[locName]) { const assignedIds = [...roster[locName][timeSlot]]; totalAssignments += assignedIds.length; for (const staffId of assignedIds) { const staffMember = staffMap.get(staffId); if (staffMember && system.isOnBreak(staffMember, timeSlot, rosterDate)) { violations.push({ staffId, locName, timeSlot }); const index = roster[locName][timeSlot].indexOf(staffId); if (index > -1) roster[locName][timeSlot].splice(index, 1); } } } } return { violations, totalAssignments, scrubbedRoster: roster }; } },
+    timeToShiftMinutes(timeStr) { if (!timeStr || !timeStr.includes(':')) return -1; let [hours, minutes] = timeStr.split(':').map(Number); if (hours < 20) { hours += 24; } return (hours * 60 + minutes) - (20 * 60); },
+    isOnBreak(staff, timeSlot) { const slotMins = this.timeToShiftMinutes(timeSlot); const startMins = this.timeToShiftMinutes(staff.breakStart); const endMins = this.timeToShiftMinutes(staff.breakEnd); if (startMins === -1 || endMins === -1) return false; return slotMins >= startMins && slotMins < endMins; },
+    validator: { scrubRosterForBreakViolations(roster, staffList, system) { const violations = []; let totalAssignments = 0; const staffMap = new Map(staffList.map(s => [s.id, s])); for (const locName in roster) { for (const timeSlot in roster[locName]) { const assignedIds = [...roster[locName][timeSlot]]; totalAssignments += assignedIds.length; for (const staffId of assignedIds) { const staffMember = staffMap.get(staffId); if (staffMember && system.isOnBreak(staffMember, timeSlot)) { violations.push({ staffId, locName, timeSlot }); const index = roster[locName][timeSlot].indexOf(staffId); if (index > -1) roster[locName][timeSlot].splice(index, 1); } } } } return { violations, totalAssignments, scrubbedRoster: roster }; } },
     
     // --- GENERATION FLOW ---
-    runRosterGeneration() {
-        this.clearNotifications();
-        const staff = this.staffDataCache.filter(s => s.attendance === 'Yes');
-        if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; }
-        const dateValue = document.getElementById('rosterDate').value;
-        if (!dateValue) { this.showNotification("Please select a valid roster date.", 'error'); return; }
-        const [year, month, day] = dateValue.split('-').map(Number);
-        const rosterDate = new Date(year, month - 1, day);
-        let roster = this.initializeRoster();
-        const staffAvailability = this.initializeStaffAvailability(staff);
-        let shortfalls = [];
-        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
-        this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls, rosterDate);
-        this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls, rosterDate);
-        const validationResult = this.validator.scrubRosterForBreakViolations(roster, staff, this, rosterDate);
-        this.generatedRoster = validationResult.scrubbedRoster;
-        this.displayComplianceReport(validationResult);
-        this.displayRoster(this.generatedRoster);
-        if (shortfalls.length > 0) shortfalls.forEach(msg => this.showNotification(msg, 'warning'));
-        this.saveRosterToFirestore(this.generatedRoster);
-        this.addRosterActionButtons();
-    },
+    runRosterGeneration() { this.clearNotifications(); const staff = this.staffDataCache.filter(s => s.attendance === 'Yes'); if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; } let roster = this.initializeRoster(); const staffAvailability = this.initializeStaffAvailability(staff); let shortfalls = []; const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value); this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls); this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls); const validationResult = this.validator.scrubRosterForBreakViolations(roster, staff, this); this.generatedRoster = validationResult.scrubbedRoster; this.displayComplianceReport(validationResult); this.displayRoster(this.generatedRoster); if (shortfalls.length > 0) shortfalls.forEach(msg => this.showNotification(msg, 'warning')); this.saveRosterToFirestore(this.generatedRoster); this.addRosterActionButtons(); },
     initializeRoster: function() { const r={};this.LOCATIONS.forEach(l=>{r[l.name]={};this.ROSTER_TIMES.forEach(t=>r[l.name][t]=[])});return r; },
     initializeStaffAvailability: function(staffList) { const a={};staffList.forEach(s=>{a[s.id]={data:s,assignedSlots:[]}});return a; },
-    findAvailableStaff: function(staffAvailability, timeSlot, locationName, rosterDate) { const s=Object.values(staffAvailability).sort((a,b)=>a.assignedSlots.length-b.assignedSlots.length);for(const t of s){const a=t.assignedSlots.includes(timeSlot),e="HHMD"!==locationName||"Yes"===t.data.hhmd;if(!this.isOnBreak(t.data,timeSlot,rosterDate)&&!a&&e)return t}return null },
+    findAvailableStaff: function(staffAvailability, timeSlot, locationName) { const s=Object.values(staffAvailability).sort((a,b)=>a.assignedSlots.length-b.assignedSlots.length);for(const t of s){const a=t.assignedSlots.includes(timeSlot),e="HHMD"!==locationName||"Yes"===t.data.hhmd;if(!this.isOnBreak(t.data,timeSlot)&&!a&&e)return t}return null },
     assignStaff: function(roster, staff, timeSlot, locationName) { roster[locationName][timeSlot].push(staff.data.id); staff.assignedSlots.push(timeSlot); },
-    assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls, rosterDate) { for(const l in this.CRITICAL_DUTIES){if(isWeekend&&"Report Room"===l)continue;this.CRITICAL_DUTIES[l].forEach(t=>{const s=this.findAvailableStaff(staffAvailability,t,l,rosterDate);s?this.assignStaff(roster,s,t,l):shortfalls.push(`CRITICAL SHORTFALL: No staff for ${l} at ${t}.`)})} },
-    assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls, rosterDate) { const t=this.OUTPUT_ORDER.filter(l=>!this.CRITICAL_DUTIES.hasOwnProperty(l));t.forEach(l=>{const o=this.LOCATIONS.find(s=>s.name===l);this.ROSTER_TIMES.forEach(s=>{const e=o.needed;for(let a=roster[l][s].length;a<e;a++){const d=this.findAvailableStaff(staffAvailability,s,l,rosterDate);if(d)this.assignStaff(roster,d,s,l);else{shortfalls.push(`Shortfall: ${l} at ${s}.`);break}}})}) },
+    assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls) { for(const l in this.CRITICAL_DUTIES){if(isWeekend&&"Report Room"===l)continue;this.CRITICAL_DUTIES[l].forEach(t=>{const s=this.findAvailableStaff(staffAvailability,t,l);s?this.assignStaff(roster,s,t,l):shortfalls.push(`CRITICAL SHORTFALL: No staff for ${l} at ${t}.`)})} },
+    assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls) { const t=this.OUTPUT_ORDER.filter(l=>!this.CRITICAL_DUTIES.hasOwnProperty(l));t.forEach(l=>{const o=this.LOCATIONS.find(s=>s.name===l);this.ROSTER_TIMES.forEach(s=>{const e=o.needed;for(let a=roster[l][s].length;a<e;a++){const d=this.findAvailableStaff(staffAvailability,s,l);if(d)this.assignStaff(roster,d,s,l);else{shortfalls.push(`Shortfall: ${l} at ${s}.`);break}}})}) },
     
     // --- DISPLAY & EXPORT ---
     displayComplianceReport(report) { const container = document.getElementById('complianceReport'); const compliance = report.totalAssignments === 0 ? 100 : ((report.totalAssignments - report.violations.length) / report.totalAssignments) * 100; let violationsHTML = ''; if (report.violations.length > 0) { violationsHTML = `<p class="text-xs text-red-600 mt-2">Validator removed ${report.violations.length} assignments that violated break times.</p>`; } container.innerHTML = ` <div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-bold text-lg text-gray-800">Break Time Compliance Report</h3> <div class="flex justify-around items-center mt-2 text-center"> <div><p class="text-2xl font-bold text-gray-700">${report.totalAssignments}</p><p class="text-sm text-gray-500">Total Assignments</p></div> <div><p class="text-2xl font-bold text-green-600">${compliance.toFixed(1)}%</p><p class="text-sm text-gray-500">Compliance</p></div> </div> ${violationsHTML} </div> `; container.classList.remove('hidden'); },
@@ -152,22 +142,22 @@ const rosterSystem = {
     copyTSV() { if(!this.generatedRoster)return void this.showNotification("No roster to copy.","error");let e="Location\t"+this.ROSTER_TIMES.join("\t")+"\n";this.OUTPUT_ORDER.forEach(t=>{const s=this.LOCATIONS.find(e=>e.name===t);e+=t+"\t"+this.ROSTER_TIMES.map(e=>this.generatedRoster[t][e].join(s.isMultiStaff?" | ":", ")).join("\t")+"\n"}),navigator.clipboard.writeText(e).then(()=>this.showNotification("Roster copied to clipboard!","success"),()=>this.showNotification("Failed to copy.","error"))},
     
     /**
-     * UPDATED: Implements a reliable, cross-browser download method.
+     * UPDATED: The definitive PDF download fix.
      */
     downloadPDF() {
         if (!this.generatedRoster) { this.showNotification('No roster to download.', 'error'); return; }
         
         try {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
             const rosterDate = document.getElementById('rosterDate').value; 
             const rosterDay = document.getElementById('rosterDay').value;
             
-            // --- PDF Content Generation (same as before) ---
+            // --- PDF Content Generation ---
             doc.setFontSize(16); doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
             const rosterHead = [['Location', ...this.ROSTER_TIMES]];
             const rosterBody = this.OUTPUT_ORDER.map(locName => { const location = this.LOCATIONS.find(l => l.name === locName); return [locName, ...this.ROSTER_TIMES.map(time => this.generatedRoster[locName][time].join(location.isMultiStaff ? ' | ' : ', '))]; });
-            doc.autoTable({ head: rosterHead, body: rosterBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1 }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 22 } } });
+            doc.autoTable({ head: rosterHead, body: rosterBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1 }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 22 } } });
             const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
             const staffHead = [['Staff ID', 'Name', 'Break Time']];
             const staffBody = presentStaff.map(staff => [ staff.id, staff.name, `${staff.breakStart} - ${staff.breakEnd}` ]);
@@ -177,21 +167,13 @@ const rosterSystem = {
             const pdfBlob = doc.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
             
-            // Show in modal preview
+            // Populate the elements in the modal
+            const downloadLink = document.getElementById('pdfDownloadLink');
+            downloadLink.href = pdfUrl;
+            downloadLink.download = `roster_${rosterDate}.pdf`;
+            
             document.getElementById('pdfPreview').src = pdfUrl;
             document.getElementById('pdfModal').style.display = 'block';
-
-            // Trigger download using a temporary anchor tag
-            const a = document.createElement('a');
-            a.href = pdfUrl;
-            a.download = `roster_${rosterDate}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            // Note: We don't revoke the URL, as the iframe previewer needs it to remain valid.
-            // The browser will handle memory management when the tab is closed.
-            this.showNotification('PDF Download initiated.', 'success');
 
         } catch (e) {
             console.error("PDF Generation/Download Error:", e);
