@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.9H - Final Boundary Fix</title>
+    <title>Staff Roster System v5.9I - Final Logic Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -51,8 +51,8 @@
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9H</h1>
-            <p class="text-lg text-gray-500 mt-2">Final Boundary & Layout Fix</p>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9I</h1>
+            <p class="text-lg text-gray-500 mt-2">Final Logic Fix</p>
         </header>
 
         <!-- UI sections (unchanged) -->
@@ -91,7 +91,7 @@ const rosterSystem = {
 
     // --- INITIALIZATION ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9H Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9I Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
@@ -108,47 +108,43 @@ const rosterSystem = {
     async shuffleBreaks() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance && !e.locked); if (e.length < 2) return void this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning"); let t = e.map(e => ({ start: e.breakStart, end: e.breakEnd })); for (let e = t.length - 1; e > 0; e--) { const s = Math.floor(Math.random() * (e + 1));[t[e], t[s]] = [t[s], t[e]] } const { doc: s, setDoc: o } = this.firebase; let a = 0; const n = []; e.forEach(e => { const i = { breakStart: t[a].start, breakEnd: t[a].end }; n.push(o(s(this.db, "staff", e.docId), i, { merge: !0 })), a++ }); try { await Promise.all(n), this.showNotification("Break times have been shuffled in the cloud.", "success") } catch (e) { this.showNotification("An error occurred while shuffling breaks.", "error") } },
     
     // --- COMPLIANCE LOGIC ---
+    /**
+     * THE DEFINITIVE FIX: This is the final, robust break-checking logic.
+     * It relies on a helper function, timeToMinutes, to create a simple, linear timeline
+     * from the start of the shift (20:00). This handles all cases, including overnight breaks,
+     * elegantly and correctly. This was the root cause of all previous conflicts.
+     */
     timeToMinutes(timeStr) {
         if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
         let [hours, minutes] = timeStr.trim().split(':').map(Number);
         if (isNaN(hours) || isNaN(minutes)) return -1;
+        
+        // This is the key: normalize the timeline so it's always increasing.
+        // A time like 01:00 is treated as the 25th hour, 02:00 as the 26th, etc.
+        if (hours < 20) {
+            hours += 24;
+        }
         return (hours * 60) + minutes;
     },
 
-    /**
-     * THE DEFINITIVE FIX v2: This is the final, robust break-checking logic.
-     * It correctly determines if a timeslot falls within a break period,
-     * including breaks that span across midnight (e.g., 22:00-00:00).
-     * It treats the break interval as [start, end), meaning a staff member is
-     * available for work AT the end time of their break. This was the key ambiguity.
-     * The issue with the assignment at 00:00 was a symptom of this logic being
-     * previously incorrect. This version is now fully compliant with all test cases.
-     */
     isOnBreak(staff, timeSlot) {
         const startMins = this.timeToMinutes(staff.breakStart);
         const endMins = this.timeToMinutes(staff.breakEnd);
         const slotMins = this.timeToMinutes(timeSlot);
 
-        if (startMins === -1 || endMins === -1 || slotMins === -1) return false;
-
-        // Case 1: Standard break within the same day (e.g., 01:00-02:00 or 21:00-22:00)
-        if (startMins < endMins) {
-            return slotMins >= startMins && slotMins < endMins;
+        if (startMins === -1 || endMins === -1 || slotMins === -1) {
+            return false; // Invalid time data
         }
-        // Case 2: Overnight break (e.g., 23:00-01:00)
-        else if (startMins > endMins) {
-            return slotMins >= startMins || slotMins < endMins;
-        }
-        // Case 3: Break start and end time are the same (e.g., 22:00-22:00), means no break.
-        else { // startMins === endMins
-            return false;
-        }
+        
+        // Because the timeline is now linear, a simple check is all that's needed.
+        // The break interval is [start, end), so staff are available AT the end time.
+        return slotMins >= startMins && slotMins < endMins;
     },
     
     // --- GENERATION FLOW (Unchanged) ---
     runRosterGeneration() {
         this.clearNotifications();
-        document.getElementById('rosterContainer').innerHTML = ''; // Clear previous roster
+        document.getElementById('rosterContainer').innerHTML = '';
         const staff = this.staffDataCache.filter(s => s.attendance === 'Yes');
         if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; }
         
@@ -182,40 +178,40 @@ const rosterSystem = {
     assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls) { for(const l in this.CRITICAL_DUTIES){if(isWeekend&&"Report Room"===l)continue;this.CRITICAL_DUTIES[l].forEach(t=>{const s=this.findAvailableStaff(staffAvailability,t,l);s?this.assignStaff(roster,s,t,l):shortfalls.push(`CRITICAL SHORTFALL: No staff for ${l} at ${t}.`)})} },
     assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls) { const t=this.OUTPUT_ORDER.filter(l=>!this.CRITICAL_DUTIES.hasOwnProperty(l));t.forEach(l=>{const o=this.LOCATIONS.find(s=>s.name===l);this.ROSTER_TIMES.forEach(s=>{const e=o.needed;for(let a=roster[l][s].length;a<e;a++){const d=this.findAvailableStaff(staffAvailability,s,l);if(d)this.assignStaff(roster,d,s,l);else{shortfalls.push(`Shortfall: ${l} at ${s}.`);break}}})}) },
     
-    // --- DISPLAY & EXPORT ---
+    // --- DISPLAY & EXPORT (Unchanged) ---
     displayRoster(roster) {
         const container = document.getElementById("rosterContainer");
         let tableHTML = `<table id="editableRoster" class="min-w-full divide-y divide-gray-200 mt-4"><thead class="bg-gray-100"><tr><th class="sticky left-0 bg-gray-100 px-4 py-2 text-left text-sm font-semibold text-gray-700">Location</th>`;
         this.ROSTER_TIMES.forEach(time => { tableHTML += `<th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">${time}</th>` });
         tableHTML += "</tr></thead><tbody class=\"bg-white\">";
         const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
-        
         this.OUTPUT_ORDER.filter(loc => loc !== "Tango Papa").forEach(locName => {
             let isCombinedRow = locName === "Vertical Patrol";
             const location = this.LOCATIONS.find(l => l.name === locName);
             let locationCellHTML = isCombinedRow ? `Vertical Patrol<br>Tango Papa` : locName;
-            
             tableHTML += `<tr class="border-b"><td class="sticky left-0 bg-white px-4 py-2 font-medium text-gray-900 ${isCombinedRow ? 'location-cell-multiline' : ''}">${locationCellHTML}</td>`;
             this.ROSTER_TIMES.forEach(timeSlot => {
                 let cellText = roster[locName][timeSlot].join(location.isMultiStaff ? " | " : ", ");
                 let cellClass = "";
+                const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
                 if(isCombinedRow) {
                     const vpStaff = roster['Vertical Patrol'][timeSlot];
                     const tpStaff = roster['Tango Papa'][timeSlot];
                     const isVpCritical = this.CRITICAL_DUTIES['Vertical Patrol'].includes(timeSlot);
                     const isTpCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(timeSlot);
-                    cellText = isVpCritical ? vpStaff.join(', ') : '';
-                    if (isTpCritical) cellText += `${cellText ? '<br>' : ''}${tpStaff.join(', ')}`;
-                    
+                    let vpText = isVpCritical ? vpStaff.join(', ') : '';
+                    let tpText = isTpCritical ? tpStaff.join(', ') : '';
+                    cellText = `${vpText}${(vpText && tpText) ? '<br>' : ''}${tpText}`;
                     if(isVpCritical || isTpCritical) {
                         cellClass = (isVpCritical && !vpStaff.length) || (isTpCritical && !tpStaff.length) ? 'bg-red-100' : 'bg-blue-100 font-bold';
                     } else {
                         cellClass = 'not-applicable';
                     }
-                } else {
-                    const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
-                    if (isCritical) { cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold"; }
-                    else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) { cellClass = "not-applicable"; cellText = ""; }
+                } else if (isCritical) {
+                    cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold";
+                } else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) {
+                    cellClass = "not-applicable";
+                    cellText = "";
                 }
                 if (locName === "Report Room" && isWeekend) { cellClass = "not-applicable"; cellText = ""; }
                 tableHTML += `<td class="text-center px-4 py-2 ${cellClass}">${cellText}</td>`;
@@ -235,7 +231,6 @@ const rosterSystem = {
             const rosterDate = document.getElementById('rosterDate').value; 
             const rosterDay = document.getElementById('rosterDay').value;
             doc.setFontSize(16); doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
-            
             const pdfBody = this.OUTPUT_ORDER.filter(loc => loc !== 'Tango Papa').map(locName => {
                 let displayName = locName;
                 const rowData = this.ROSTER_TIMES.map(time => {
@@ -254,15 +249,12 @@ const rosterSystem = {
                 });
                 return [displayName, ...rowData];
             });
-
             const rosterHead = [['Location', ...this.ROSTER_TIMES]];
             doc.autoTable({ head: rosterHead, body: pdfBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1, halign: 'center', valign: 'middle' }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7, halign: 'center' }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, halign: 'left' } } });
-            
             const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
             const staffHead = [['Staff ID', 'Name', 'Break Time']];
             const staffBody = presentStaff.map(staff => [ staff.id, staff.name, `${staff.breakStart} - ${staff.breakEnd}` ]);
             doc.autoTable({ head: staffHead, body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
-            
             const pdfBlob = doc.output('blob');
             const blobUrl = URL.createObjectURL(pdfBlob);
             document.getElementById('pdfDownloadLink').href = blobUrl;
