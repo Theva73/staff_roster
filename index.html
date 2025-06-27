@@ -27,6 +27,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Make db and firebase utilities globally available for the main script
         window.db = db;
         window.firebase = {
              collection, getDocs, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
@@ -60,7 +61,7 @@
             <p class="text-lg text-gray-500 mt-2">Manual Editing & Live Validation</p>
         </header>
 
-        <!-- UI sections (unchanged) -->
+        <!-- UI sections -->
         <div class="card p-6 mb-8">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                 <div><label for="rosterDate" class="font-semibold text-gray-700">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
@@ -92,34 +93,206 @@ const rosterSystem = {
     OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
     CRITICAL_DUTIES: { "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"], "Report Room": ["20:00", "21:00"], "Tango Papa": ["07:00"] },
     
-    generatedRoster: null, staffDataCache: [], db: null, firebase: null,
+    generatedRoster: null, 
+    staffDataCache: [], 
+    db: null, 
+    firebase: null,
 
     // --- INITIALIZATION ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9M Initialized"); r(); } }, 50); });
-        this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
+        // Wait until the firebase objects are available on the window
+        await new Promise(resolve => { 
+            const interval = setInterval(() => { 
+                if (window.db && window.firebase) { 
+                    clearInterval(interval); 
+                    this.db = window.db; 
+                    this.firebase = window.firebase; 
+                    console.log("Roster System v5.9M Initialized"); 
+                    resolve(); 
+                } 
+            }, 50); 
+        });
+        this.setupEventListeners(); 
+        this.initializeDate(); 
+        this.listenForStaffUpdates();
     },
-    initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
-    setupEventListeners() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()),document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()),document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()),document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal())},
+
+    initializeDate() { 
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        document.getElementById("rosterDate").value = `${yyyy}-${mm}-${dd}`;
+        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        document.getElementById("rosterDay").value = days[today.getDay()];
+    },
+
+    setupEventListeners() { 
+        document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore());
+        document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration());
+        document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks());
+        document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal());
+    },
     
     // --- FIREBASE DATA MANAGEMENT ---
-    listenForStaffUpdates() { const { collection: e, query: t, onSnapshot: s } = this.firebase, o = t(e(this.db, "staff")); s(o, e => { const t = []; e.forEach(e => { t.push({ docId: e.id, ...e.data() }) }), this.staffDataCache = t.sort((e, t) => (e.id || "").localeCompare(t.id || "")), this.renderStaffTable(this.staffDataCache), this.updateStaffCount() }) },
-    renderStaffTable(e) { const t = document.getElementById("staffTable").querySelector("tbody"); t.innerHTML = "", e.forEach(e => { const s = t.insertRow(); s.dataset.docId = e.docId, s.innerHTML = ` <td class="sticky left-0 bg-white px-6 py-4"><input data-field="id" class="w-24 p-1 border rounded" type="text" value="${e.id || ""}"></td> <td class="px-6 py-4"><input data-field="name" class="w-36 p-1 border rounded" type="text" value="${e.name || ""}"></td> <td class="px-6 py-4"> <div class="flex items-center gap-1"> <input type="time" data-field="breakStart" value="${e.breakStart || "22:00"}" step="1800" class="p-1 border rounded"> <span>-</span> <input type="time" data-field="breakEnd" value="${e.breakEnd || "00:00"}" step="1800" class="p-1 border rounded"> </div> </td> <td class="px-6 py-4"><select data-field="hhmd" class="p-1 border rounded"><option value="Yes" ${"Yes" === e.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== e.hhmd ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><select data-field="attendance" class="p-1 border rounded"><option value="Yes" ${"No" !== e.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === e.attendance ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><input type="checkbox" data-field="locked" ${e.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></td> <td class="px-6 py-4"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></td> `, s.querySelectorAll("input, select").forEach(t => t.addEventListener("change", e => this.updateStaffInFirestore(e))), s.querySelector(".remove-btn").addEventListener("click", e => this.deleteStaffFromFirestore(e)) }) },
-    async addStaffToFirestore() { const { collection: e, addDoc: t } = this.firebase; try { await t(e(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: !1, createdAt: new Date }), this.showNotification("Added new staff member.", "success") } catch (e) { this.showNotification("Error adding staff member.", "error") } },
-    async updateStaffInFirestore(e) { const { doc: t, setDoc: s } = this.firebase, o = e.target.closest("tr"), a = o.dataset.docId, n = { id: o.querySelector('[data-field="id"]').value, name: o.querySelector('[data-field="name"]').value, breakStart: o.querySelector('[data-field="breakStart"]').value, breakEnd: o.querySelector('[data-field="breakEnd"]').value, hhmd: o.querySelector('[data-field="hhmd"]').value, attendance: o.querySelector('[data-field="attendance"]').value, locked: o.querySelector('[data-field="locked"]').checked }; try { await s(t(this.db, "staff", a), n, { merge: !0 }) } catch (e) { this.showNotification("Error updating staff member.", "error") } },
-    async deleteStaffFromFirestore(e) { const { doc: t, deleteDoc: s } = this.firebase, o = e.target.closest("tr"), a = o.dataset.docId; if (window.confirm(`Are you sure you want to remove staff member ${o.querySelector("[data-field=id]").value}?`)) { await s(t(this.db, "staff", a)) } },
-    async saveRosterToFirestore(e) { const { doc: t, setDoc: s } = this.firebase, o = document.getElementById("rosterDate").value; if (o) { const a = { date: o, day: document.getElementById("rosterDay").value, roster: e, createdAt: new Date }; try { await s(t(this.db, "rosters", o), a), this.showNotification(`Roster for ${o} saved to cloud successfully!`, "success") } catch (e) { this.showNotification("Could not save roster to the cloud.", "error") } } else this.showNotification("Please select a valid date before saving.", "error") },
-    updateStaffCount() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance).length; document.getElementById("staffCount").textContent = e },
-    async shuffleBreaks() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance && !e.locked); if (e.length < 2) return void this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning"); let t = e.map(e => ({ start: e.breakStart, end: e.breakEnd })); for (let e = t.length - 1; e > 0; e--) { const s = Math.floor(Math.random() * (e + 1));[t[e], t[s]] = [t[s], t[e]] } const { doc: s, setDoc: o } = this.firebase; let a = 0; const n = []; e.forEach(e => { const i = { breakStart: t[a].start, breakEnd: t[a].end }; n.push(o(s(this.db, "staff", e.docId), i, { merge: !0 })), a++ }); try { await Promise.all(n), this.showNotification("Break times have been shuffled in the cloud.", "success") } catch (e) { this.showNotification("An error occurred while shuffling breaks.", "error") } },
+    listenForStaffUpdates() {
+        const { collection, query, onSnapshot } = this.firebase;
+        const staffCollection = query(collection(this.db, "staff"));
+        onSnapshot(staffCollection, (querySnapshot) => {
+            const staffList = [];
+            querySnapshot.forEach(doc => {
+                staffList.push({ docId: doc.id, ...doc.data() });
+            });
+            this.staffDataCache = staffList.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+            this.renderStaffTable(this.staffDataCache);
+            this.updateStaffCount();
+        });
+    },
+
+    renderStaffTable(staffList) {
+        const tableBody = document.getElementById("staffTable").querySelector("tbody");
+        tableBody.innerHTML = "";
+        staffList.forEach(staff => {
+            const row = tableBody.insertRow();
+            row.dataset.docId = staff.docId;
+            row.innerHTML = `
+                <td class="sticky left-0 bg-white px-6 py-4"><input data-field="id" class="w-24 p-1 border rounded" type="text" value="${staff.id || ""}"></td>
+                <td class="px-6 py-4"><input data-field="name" class="w-36 p-1 border rounded" type="text" value="${staff.name || ""}"></td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-1">
+                        <input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="p-1 border rounded">
+                        <span>-</span>
+                        <input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="p-1 border rounded">
+                    </div>
+                </td>
+                <td class="px-6 py-4"><select data-field="hhmd" class="p-1 border rounded"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></td>
+                <td class="px-6 py-4"><select data-field="attendance" class="p-1 border rounded"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></td>
+                <td class="px-6 py-4"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></td>
+                <td class="px-6 py-4"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></td>
+            `;
+            row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaffInFirestore(e)));
+            row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaffFromFirestore(e));
+        });
+    },
+
+    async addStaffToFirestore() {
+        const { collection, addDoc } = this.firebase;
+        try {
+            await addDoc(collection(this.db, "staff"), {
+                id: `S${Date.now().toString().slice(-4)}`,
+                name: "New Staff",
+                breakStart: "22:00",
+                breakEnd: "00:00",
+                hhmd: "No",
+                attendance: "Yes",
+                locked: false,
+                createdAt: new Date()
+            });
+            this.showNotification("Added new staff member.", "success");
+        } catch (error) {
+            console.error("Error adding staff:", error);
+            this.showNotification("Error adding staff member.", "error");
+        }
+    },
+
+    async updateStaffInFirestore(event) {
+        const { doc, setDoc } = this.firebase;
+        const row = event.target.closest("tr");
+        const docId = row.dataset.docId;
+        const updatedData = {
+            id: row.querySelector('[data-field="id"]').value,
+            name: row.querySelector('[data-field="name"]').value,
+            breakStart: row.querySelector('[data-field="breakStart"]').value,
+            breakEnd: row.querySelector('[data-field="breakEnd"]').value,
+            hhmd: row.querySelector('[data-field="hhmd"]').value,
+            attendance: row.querySelector('[data-field="attendance"]').value,
+            locked: row.querySelector('[data-field="locked"]').checked
+        };
+        try {
+            await setDoc(doc(this.db, "staff", docId), updatedData, { merge: true });
+        } catch (error) {
+            console.error("Error updating staff:", error);
+            this.showNotification("Error updating staff member.", "error");
+        }
+    },
+
+    async deleteStaffFromFirestore(event) {
+        const { doc, deleteDoc } = this.firebase;
+        const row = event.target.closest("tr");
+        const docId = row.dataset.docId;
+        if (window.confirm(`Are you sure you want to remove staff member ${row.querySelector("[data-field=id]").value}?`)) {
+            await deleteDoc(doc(this.db, "staff", docId));
+        }
+    },
+
+    async saveRosterToFirestore(rosterData) {
+        const { doc, setDoc } = this.firebase;
+        const rosterDate = document.getElementById("rosterDate").value;
+        if (rosterDate) {
+            const dataToSave = {
+                date: rosterDate,
+                day: document.getElementById("rosterDay").value,
+                roster: rosterData,
+                createdAt: new Date()
+            };
+            try {
+                await setDoc(doc(this.db, "rosters", rosterDate), dataToSave);
+                this.showNotification(`Roster for ${rosterDate} saved to cloud successfully!`, "success");
+            } catch (error) {
+                console.error("Error saving roster:", error);
+                this.showNotification("Could not save roster to the cloud.", "error");
+            }
+        } else {
+            this.showNotification("Please select a valid date before saving.", "error");
+        }
+    },
+
+    updateStaffCount() {
+        const workingStaffCount = this.staffDataCache.filter(s => s.attendance === 'Yes').length;
+        document.getElementById("staffCount").textContent = workingStaffCount;
+    },
+
+    async shuffleBreaks() {
+        const presentUnlockedStaff = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked);
+        if (presentUnlockedStaff.length < 2) {
+            this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning");
+            return;
+        }
+
+        let breakTimes = presentUnlockedStaff.map(s => ({ start: s.breakStart, end: s.breakEnd }));
+        // Fisher-Yates shuffle
+        for (let i = breakTimes.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]];
+        }
+
+        const { doc, setDoc } = this.firebase;
+        const updatePromises = [];
+        presentUnlockedStaff.forEach((staff, index) => {
+            const newBreaks = { breakStart: breakTimes[index].start, breakEnd: breakTimes[index].end };
+            const staffDocRef = doc(this.db, "staff", staff.docId);
+            updatePromises.push(setDoc(staffDocRef, newBreaks, { merge: true }));
+        });
+
+        try {
+            await Promise.all(updatePromises);
+            this.showNotification("Break times have been shuffled in the cloud.", "success");
+        } catch (error) {
+            console.error("Error shuffling breaks:", error);
+            this.showNotification("An error occurred while shuffling breaks.", "error");
+        }
+    },
     
     // --- COMPLIANCE LOGIC ---
     timeToMinutes(timeStr) {
         if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
         let [hours, minutes] = timeStr.trim().split(':').map(Number);
         if (isNaN(hours) || isNaN(minutes)) return -1;
+        // Shift times for overnight calculation (e.g., 01:00 becomes 25:00)
         if (hours < 20) { hours += 24; }
         return (hours * 60) + minutes;
     },
+    
     isOnBreak(staff, timeSlot) {
         const startMins = this.timeToMinutes(staff.breakStart);
         const endMins = this.timeToMinutes(staff.breakEnd);
@@ -135,35 +308,58 @@ const rosterSystem = {
         document.getElementById('rosterContainer').innerHTML = '';
         const staff = this.staffDataCache.filter(s => s.attendance === 'Yes');
         if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; }
+
         const roster = this.initializeRoster();
         const staffAvailability = this.initializeStaffAvailability(staff);
         const shortfalls = [];
         const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
+        
         this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls);
         this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls);
+        
         this.generatedRoster = roster;
         this.displayRoster(this.generatedRoster);
-        if (shortfalls.length > 0) { shortfalls.forEach(msg => this.showNotification(msg, 'warning')); }
+        
+        if (shortfalls.length > 0) { 
+            shortfalls.forEach(msg => this.showNotification(msg, 'warning')); 
+        }
         this.saveRosterToFirestore(this.generatedRoster);
         this.addRosterActionButtons();
     },
-    initializeRoster() { const r={};this.LOCATIONS.forEach(l=>{r[l.name]={};this.ROSTER_TIMES.forEach(t=>r[l.name][t]=new Array(l.needed).fill(""))});return r; },
-    initializeStaffAvailability(staffList) { const a={};staffList.forEach(s=>{a[s.id]={data:s,assignedSlots:[]}});return a; },
+
+    initializeRoster() { 
+        const roster = {};
+        this.LOCATIONS.forEach(loc => {
+            roster[loc.name] = {};
+            this.ROSTER_TIMES.forEach(time => {
+                roster[loc.name][time] = new Array(loc.needed).fill("");
+            });
+        });
+        return roster;
+    },
+
+    initializeStaffAvailability(staffList) { 
+        const availability = {};
+        staffList.forEach(staff => {
+            availability[staff.id] = {data: staff, assignedSlots: []};
+        });
+        return availability;
+    },
 
     findAvailableStaff(staffAvailability, timeSlot, locationName) {
         const shuffledStaff = Object.values(staffAvailability).sort(() => 0.5 - Math.random());
         for (const staff of shuffledStaff) {
             const onBreak = this.isOnBreak(staff.data, timeSlot);
-            if (onBreak) {
-                continue; 
-            }
+            if (onBreak) continue;
+            
             const isAlreadyAssigned = staff.assignedSlots.includes(timeSlot);
             const isEligible = locationName !== "HHMD" || staff.data.hhmd === "Yes";
+            
             if (!isAlreadyAssigned && isEligible) {
                 return staff;
             }
         }
-        return null;
+        return null; // No staff found
     },
 
     assignStaff(roster, staff, timeSlot, locationName) {
@@ -173,15 +369,53 @@ const rosterSystem = {
             staff.assignedSlots.push(timeSlot);
         }
     },
-    assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls) { for(const l in this.CRITICAL_DUTIES){if(isWeekend&&"Report Room"===l)continue;this.CRITICAL_DUTIES[l].forEach(t=>{const loc = this.LOCATIONS.find(loc => loc.name === l); for(let i = 0; i < loc.needed; i++) {const s=this.findAvailableStaff(staffAvailability,t,l);s?this.assignStaff(roster,s,t,l):shortfalls.push(`CRITICAL SHORTFALL: No staff for ${l} at ${t}.`)}})} },
-    assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls) { const t=this.OUTPUT_ORDER.filter(l=>!this.CRITICAL_DUTIES.hasOwnProperty(l));t.forEach(l=>{const o=this.LOCATIONS.find(s=>s.name===l);this.ROSTER_TIMES.forEach(s=>{for(let a=0;a<o.needed;a++){if(roster[l][s][a] === "") {const d=this.findAvailableStaff(staffAvailability,s,l);if(d)this.assignStaff(roster,d,s,l);else{shortfalls.push(`Shortfall: ${l} at ${s}.`);break}}}})})} },
+    
+    // FIX: Replaced minified/broken version with readable, correct code.
+    assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls) {
+        for (const locName in this.CRITICAL_DUTIES) {
+            if (isWeekend && locName === "Report Room") {
+                continue;
+            }
+            const locationConfig = this.LOCATIONS.find(loc => loc.name === locName);
+            this.CRITICAL_DUTIES[locName].forEach(timeSlot => {
+                for (let i = 0; i < locationConfig.needed; i++) {
+                    const staff = this.findAvailableStaff(staffAvailability, timeSlot, locName);
+                    if (staff) {
+                        this.assignStaff(roster, staff, timeSlot, locName);
+                    } else {
+                        shortfalls.push(`CRITICAL SHORTFALL: No staff for ${locName} at ${timeSlot}.`);
+                    }
+                }
+            });
+        }
+    },
+
+    // FIX: Replaced minified/broken version with readable, correct code.
+    assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls) {
+        const standardDutyLocations = this.OUTPUT_ORDER.filter(locName => !this.CRITICAL_DUTIES.hasOwnProperty(locName));
+        standardDutyLocations.forEach(locName => {
+            const locationConfig = this.LOCATIONS.find(l => l.name === locName);
+            this.ROSTER_TIMES.forEach(timeSlot => {
+                for (let i = 0; i < locationConfig.needed; i++) {
+                    if (roster[locName][timeSlot][i] === "") { // If slot is not already filled
+                        const staff = this.findAvailableStaff(staffAvailability, timeSlot, locName);
+                        if (staff) {
+                            this.assignStaff(roster, staff, timeSlot, locName);
+                        } else {
+                            shortfalls.push(`Shortfall: ${locName} at ${timeSlot}.`);
+                            break; // Stop trying to fill this slot if no one is available
+                        }
+                    }
+                }
+            });
+        });
+    },
     
     // --- DISPLAY & EXPORT ---
     displayRoster(roster) {
         const container = document.getElementById("rosterContainer");
         const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
-        let staffOptionsHTML = '<option value="">--</option>';
-        presentStaff.forEach(s => { staffOptionsHTML += `<option value="${s.id}">${s.id}</option>`; });
+        let staffOptionsHTML = '<option value="">--</option>' + presentStaff.map(s => `<option value="${s.id}">${s.id}</option>`).join('');
 
         let tableHTML = `<table id="editableRoster" class="min-w-full divide-y divide-gray-200 mt-4"><thead class="bg-gray-100"><tr><th class="sticky left-0 bg-gray-100 px-4 py-2 text-left text-sm font-semibold text-gray-700">Location</th>`;
         this.ROSTER_TIMES.forEach(time => { tableHTML += `<th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">${time}</th>` });
@@ -262,6 +496,8 @@ const rosterSystem = {
 
         this.generatedRoster[locName][timeSlot][index] = newStaffId;
         this.validateCell(select);
+        // Also re-validate any other cells that might now have a conflict
+        this.validateAllCells(); 
         this.saveRosterToFirestore(this.generatedRoster);
     },
     
@@ -270,17 +506,43 @@ const rosterSystem = {
         const timeSlot = selectElement.dataset.time;
         const cell = selectElement.closest('td');
 
-        if (!staffId) {
-            cell.classList.remove('conflict-cell');
-            return;
-        }
+        // Reset any previous conflict state
+        cell.classList.remove('conflict-cell');
 
+        if (!staffId) return; // Empty cell is not a conflict
+
+        // Check for break conflicts
         const staffMember = this.staffDataCache.find(s => s.id === staffId);
         if (staffMember && this.isOnBreak(staffMember, timeSlot)) {
             cell.classList.add('conflict-cell');
-        } else {
-            cell.classList.remove('conflict-cell');
+            return;
         }
+
+        // Check for double-booking conflicts
+        const allSelectsInTimeslot = document.querySelectorAll(`.roster-select[data-time="${timeSlot}"]`);
+        let assignmentCount = 0;
+        allSelectsInTimeslot.forEach(sel => {
+            if (sel.value === staffId) {
+                assignmentCount++;
+            }
+        });
+        
+        if (assignmentCount > 1) {
+             allSelectsInTimeslot.forEach(sel => {
+                if (sel.value === staffId) {
+                    sel.closest('td').classList.add('conflict-cell');
+                }
+            });
+        }
+    },
+
+    validateAllCells() {
+        document.querySelectorAll('.roster-select').forEach(sel => this.validateCell(sel));
+        // A second pass is needed to clear conflicts that were resolved
+        document.querySelectorAll('td.conflict-cell').forEach(cell => {
+             const selects = cell.querySelectorAll('.roster-select');
+             selects.forEach(select => this.validateCell(select));
+        });
     },
     
     addRosterActionButtons() {
@@ -302,7 +564,22 @@ const rosterSystem = {
         document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF());
     },
 
-    copyTSV() { if(!this.generatedRoster)return void this.showNotification("No roster to copy.","error");let e="Location\t"+this.ROSTER_TIMES.join("\t")+"\n";this.OUTPUT_ORDER.forEach(t=>{const s=this.LOCATIONS.find(e=>e.name===t);e+=t+"\t"+this.ROSTER_TIMES.map(e=>this.generatedRoster[t][e].join(" | ")).join("\t")+"\n"}),navigator.clipboard.writeText(e).then(()=>this.showNotification("Roster copied to clipboard!","success"),()=>this.showNotification("Failed to copy.","error"))},
+    copyTSV() {
+        if (!this.generatedRoster) {
+            this.showNotification("No roster to copy.", "error");
+            return;
+        }
+        let tsvContent = "Location\t" + this.ROSTER_TIMES.join("\t") + "\n";
+        this.OUTPUT_ORDER.forEach(locName => {
+            const rowData = this.ROSTER_TIMES.map(time => this.generatedRoster[locName][time].join(" | ")).join("\t");
+            tsvContent += `${locName}\t${rowData}\n`;
+        });
+        navigator.clipboard.writeText(tsvContent).then(
+            () => this.showNotification("Roster copied to clipboard!", "success"),
+            () => this.showNotification("Failed to copy.", "error")
+        );
+    },
+
     downloadPDF() {
         if (!this.generatedRoster) { this.showNotification('No roster to download.', 'error'); return; }
         try {
@@ -311,6 +588,7 @@ const rosterSystem = {
             const rosterDate = document.getElementById('rosterDate').value; 
             const rosterDay = document.getElementById('rosterDay').value;
             doc.setFontSize(16); doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
+
             const pdfBody = this.OUTPUT_ORDER.filter(loc => loc !== 'Tango Papa').map(locName => {
                 let displayName = locName;
                 const rowData = this.ROSTER_TIMES.map(time => {
@@ -331,10 +609,12 @@ const rosterSystem = {
             });
             const rosterHead = [['Location', ...this.ROSTER_TIMES]];
             doc.autoTable({ head: rosterHead, body: pdfBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1, halign: 'center', valign: 'middle' }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7, halign: 'center' }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, halign: 'left' } } });
+            
             const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
             const staffHead = [['Staff ID', 'Name', 'Break Time']];
             const staffBody = presentStaff.map(staff => [ staff.id, staff.name, `${staff.breakStart} - ${staff.breakEnd}` ]);
             doc.autoTable({ head: staffHead, body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
+            
             const pdfBlob = doc.output('blob');
             const blobUrl = URL.createObjectURL(pdfBlob);
             document.getElementById('pdfDownloadLink').href = blobUrl;
@@ -342,8 +622,12 @@ const rosterSystem = {
             document.getElementById('pdfPreview').src = blobUrl;
             document.getElementById('pdfModal').style.display = 'flex';
             this.showNotification('PDF generated. Preview is ready.', 'success');
-        } catch (e) { console.error("PDF Generation/Download Error:", e); this.showNotification('An error occurred while creating the PDF.', 'error'); }
+        } catch (e) { 
+            console.error("PDF Generation/Download Error:", e); 
+            this.showNotification('An error occurred while creating the PDF.', 'error'); 
+        }
     },
+
     closePdfModal() {
         const downloadLink = document.getElementById('pdfDownloadLink');
         const previewFrame = document.getElementById('pdfPreview');
@@ -352,8 +636,24 @@ const rosterSystem = {
         previewFrame.src = 'about:blank';
         document.getElementById('pdfModal').style.display = 'none';
     },
-    clearNotifications() { document.getElementById("notification-container").innerHTML=""},
-    showNotification(e,t="info") { const s=document.getElementById("notification-container"),o={success:"green",error:"red",warning:"yellow",info:"blue"},a=document.createElement("div");a.className=`border-l-4 p-4 bg-${o[t]}-100 border-${o[t]}-500 text-${o[t]}-700`,a.innerHTML=`<p class="font-bold">${t.charAt(0).toUpperCase()+t.slice(1)}</p><p>${e}</p>`,s.appendChild(a),setTimeout(()=>{a.style.transition="opacity 0.5s ease",a.style.opacity="0",setTimeout(()=>a.remove(),500)},5e3)}
+
+    clearNotifications() { 
+        document.getElementById("notification-container").innerHTML="";
+    },
+
+    showNotification(message, type = "info") {
+        const container = document.getElementById("notification-container");
+        const colors = {success: "green", error: "red", warning: "yellow", info: "blue"};
+        const alertDiv = document.createElement("div");
+        alertDiv.className = `border-l-4 p-4 bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700`;
+        alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`;
+        container.appendChild(alertDiv);
+        setTimeout(() => {
+            alertDiv.style.transition = "opacity 0.5s ease";
+            alertDiv.style.opacity = "0";
+            setTimeout(() => alertDiv.remove(), 500);
+        }, 5000);
+    }
 };
 
 rosterSystem.init();
