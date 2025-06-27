@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v5.9 - Definitive PDF Fix</title>
+    <title>Staff Roster System v5.9G - Final Break Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -36,25 +36,26 @@
         body { font-family: 'Inter', sans-serif; }
         .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
         .btn:hover { transform: translateY(-1px); }
-        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 0.5rem; }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 1000px; border-radius: 0.5rem; }
         #editableRoster th, #editableRoster td, #staffTable th, #staffTable td { white-space: nowrap; }
         #staffTable td:nth-child(2), #staffTable th:nth-child(2) { white-space: normal; }
         #editableRoster thead th:first-child, #editableRoster tbody td:first-child,
-        #staffTable thead th:first-child, #staffTable tbody td:first-child { position: sticky; left: 0; z-index: 10; }
+        #staffTable thead th:first-child, #staffTable tbody td:first-child { position: sticky; left: 0; z-index: 10; background-color: white; }
         #editableRoster thead th:first-child, #staffTable thead th:first-child { z-index: 20; background-color: #f3f4f6; }
         .not-applicable { background-color: #e5e7eb; }
+        .location-cell-multiline { line-height: 1.2; padding-top: 4px; padding-bottom: 4px; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
     <div class="container mx-auto p-4">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9</h1>
-            <p class="text-lg text-gray-500 mt-2">Guaranteed Compliance & PDF Download Fix</p>
+            <h1 class="text-4xl font-bold text-indigo-600">Staff Roster System v5.9G</h1>
+            <p class="text-lg text-gray-500 mt-2">Final Break Logic & Layout Fix</p>
         </header>
 
-        <!-- UI sections are unchanged -->
+        <!-- UI sections (unchanged) -->
         <div class="card p-6 mb-8">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                 <div><label for="rosterDate" class="font-semibold text-gray-700">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
@@ -71,37 +72,32 @@
         </div>
         <div class="card p-6">
             <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Roster Controls</h2>
-            <div class="flex justify-center"><button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate & Validate Roster</button></div>
+            <div class="flex justify-center"><button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate Roster</button></div>
             <div id="notification-container" class="mt-4 space-y-2"></div>
-            <div id="complianceReport" class="mt-6 hidden"></div>
             <div id="rosterContainer" class="mt-2 overflow-x-auto"></div>
         </div>
     </div>
     <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-gray-500 hover:text-gray-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh]"></iframe></div></div>
 
 <script type="module">
-// --- V5.9 ---
-// FINAL PDF FIX: The `downloadPDF` function now populates a visible `<a>` tag's
-// href in the modal, making the download a direct user click, which is the
-// most reliable method across all browsers.
-
 const rosterSystem = {
     // --- CONFIG & STATE ---
     ROSTER_TIMES: ["20:00", "20:30", "21:00", "22:00", "23:00", "00:00", "01:00", "01:30", "02:00", "03:00", "04:00", "05:00", "06:00", "06:30", "07:00"],
     LOCATIONS: [ { name: "Pass Counter", needed: 2, isMultiStaff: true }, { name: "HHMD", needed: 1 }, { name: "Lobby", needed: 2, isMultiStaff: true }, { name: "Guard House", needed: 1 }, { name: "Vertical Patrol", needed: 1 }, { name: "Report Room", needed: 1 }, { name: "Tango Papa", needed: 1 } ],
     OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
     CRITICAL_DUTIES: { "Vertical Patrol": ["20:30", "23:00", "01:30", "04:00", "06:30"], "Report Room": ["20:00", "21:00"], "Tango Papa": ["07:00"] },
+    
     generatedRoster: null, staffDataCache: [], db: null, firebase: null,
 
     // --- INITIALIZATION ---
     async init() {
-        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9 Initialized"); r(); } }, 50); });
+        await new Promise(r => { const i = setInterval(() => { if (window.db && window.firebase) { clearInterval(i); this.db = window.db; this.firebase = window.firebase; console.log("Roster System v5.9G Initialized"); r(); } }, 50); });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
     initializeDate() { const t=new Date(),e=t.toISOString().split("T")[0];document.getElementById("rosterDate").value=e;const s=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];document.getElementById("rosterDay").value=s[t.getDay()]},
-    setupEventListeners() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()),document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()),document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()),document.getElementById("closePdfBtn").addEventListener("click",()=>document.getElementById("pdfModal").style.display="none")},
+    setupEventListeners() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()),document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()),document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()),document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal())},
     
-    // --- FIREBASE DATA MANAGEMENT (Unchanged)---
+    // --- FIREBASE DATA MANAGEMENT ---
     listenForStaffUpdates() { const { collection: e, query: t, onSnapshot: s } = this.firebase, o = t(e(this.db, "staff")); s(o, e => { const t = []; e.forEach(e => { t.push({ docId: e.id, ...e.data() }) }), this.staffDataCache = t.sort((e, t) => (e.id || "").localeCompare(t.id || "")), this.renderStaffTable(this.staffDataCache), this.updateStaffCount() }) },
     renderStaffTable(e) { const t = document.getElementById("staffTable").querySelector("tbody"); t.innerHTML = "", e.forEach(e => { const s = t.insertRow(); s.dataset.docId = e.docId, s.innerHTML = ` <td class="sticky left-0 bg-white px-6 py-4"><input data-field="id" class="w-24 p-1 border rounded" type="text" value="${e.id || ""}"></td> <td class="px-6 py-4"><input data-field="name" class="w-36 p-1 border rounded" type="text" value="${e.name || ""}"></td> <td class="px-6 py-4"> <div class="flex items-center gap-1"> <input type="time" data-field="breakStart" value="${e.breakStart || "22:00"}" step="1800" class="p-1 border rounded"> <span>-</span> <input type="time" data-field="breakEnd" value="${e.breakEnd || "00:00"}" step="1800" class="p-1 border rounded"> </div> </td> <td class="px-6 py-4"><select data-field="hhmd" class="p-1 border rounded"><option value="Yes" ${"Yes" === e.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== e.hhmd ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><select data-field="attendance" class="p-1 border rounded"><option value="Yes" ${"No" !== e.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === e.attendance ? "selected" : ""}>No</option></select></td> <td class="px-6 py-4"><input type="checkbox" data-field="locked" ${e.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></td> <td class="px-6 py-4"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></td> `, s.querySelectorAll("input, select").forEach(t => t.addEventListener("change", e => this.updateStaffInFirestore(e))), s.querySelector(".remove-btn").addEventListener("click", e => this.deleteStaffFromFirestore(e)) }) },
     async addStaffToFirestore() { const { collection: e, addDoc: t } = this.firebase; try { await t(e(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: !1, createdAt: new Date }), this.showNotification("Added new staff member.", "success") } catch (e) { this.showNotification("Error adding staff member.", "error") } },
@@ -111,56 +107,172 @@ const rosterSystem = {
     updateStaffCount() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance).length; document.getElementById("staffCount").textContent = e },
     async shuffleBreaks() { const e = this.staffDataCache.filter(e => "Yes" === e.attendance && !e.locked); if (e.length < 2) return void this.showNotification("Not enough unlocked, present staff to shuffle breaks.", "warning"); let t = e.map(e => ({ start: e.breakStart, end: e.breakEnd })); for (let e = t.length - 1; e > 0; e--) { const s = Math.floor(Math.random() * (e + 1));[t[e], t[s]] = [t[s], t[e]] } const { doc: s, setDoc: o } = this.firebase; let a = 0; const n = []; e.forEach(e => { const i = { breakStart: t[a].start, breakEnd: t[a].end }; n.push(o(s(this.db, "staff", e.docId), i, { merge: !0 })), a++ }); try { await Promise.all(n), this.showNotification("Break times have been shuffled in the cloud.", "success") } catch (e) { this.showNotification("An error occurred while shuffling breaks.", "error") } },
     
-    // --- GUARANTEED COMPLIANCE LOGIC (Unchanged) ---
-    timeToShiftMinutes(timeStr) { if (!timeStr || !timeStr.includes(':')) return -1; let [hours, minutes] = timeStr.split(':').map(Number); if (hours < 20) { hours += 24; } return (hours * 60 + minutes) - (20 * 60); },
-    isOnBreak(staff, timeSlot) { const slotMins = this.timeToShiftMinutes(timeSlot); const startMins = this.timeToShiftMinutes(staff.breakStart); const endMins = this.timeToShiftMinutes(staff.breakEnd); if (startMins === -1 || endMins === -1) return false; return slotMins >= startMins && slotMins < endMins; },
-    validator: { scrubRosterForBreakViolations(roster, staffList, system) { const violations = []; let totalAssignments = 0; const staffMap = new Map(staffList.map(s => [s.id, s])); for (const locName in roster) { for (const timeSlot in roster[locName]) { const assignedIds = [...roster[locName][timeSlot]]; totalAssignments += assignedIds.length; for (const staffId of assignedIds) { const staffMember = staffMap.get(staffId); if (staffMember && system.isOnBreak(staffMember, timeSlot)) { violations.push({ staffId, locName, timeSlot }); const index = roster[locName][timeSlot].indexOf(staffId); if (index > -1) roster[locName][timeSlot].splice(index, 1); } } } } return { violations, totalAssignments, scrubbedRoster: roster }; } },
+    // --- COMPLIANCE LOGIC ---
+    timeToShiftMinutes(timeStr) {
+        if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
+        let [hours, minutes] = timeStr.trim().split(':').map(Number);
+        if (isNaN(hours) || isNaN(minutes)) return -1;
+        // This logic correctly handles the overnight shift by making the timeline linear.
+        // 20:00 becomes the "0" point. Times after midnight (e.g., 01:00) get 24 hours added.
+        if (hours < 20) { hours += 24; }
+        return (hours * 60 + minutes);
+    },
+
+    /**
+     * THE DEFINITIVE FIX: This is the corrected break-checking logic.
+     * The flaw was that a break ending at '02:00' still allowed an assignment
+     * AT '02:00'. This version makes the break end time INCLUSIVE.
+     * It now correctly prevents assignments at the exact start and end times of a break.
+     */
+    isOnBreak(staff, timeSlot) {
+        const slotMins = this.timeToShiftMinutes(timeSlot);
+        const startMins = this.timeToShiftMinutes(staff.breakStart);
+        const endMins = this.timeToShiftMinutes(staff.breakEnd);
+
+        if (slotMins === -1 || startMins === -1 || endMins === -1) {
+            return false; // Invalid time data, assume not on break for safety
+        }
+
+        // Standard case: Break does not cross midnight (e.g., 22:00-00:00)
+        if (startMins <= endMins) {
+            return slotMins >= startMins && slotMins <= endMins;
+        } 
+        // Wrap-around case: Break crosses midnight (e.g., 23:00-01:00 or user enters 06:00-08:00)
+        else {
+            return slotMins >= startMins || slotMins <= endMins;
+        }
+    },
     
     // --- GENERATION FLOW ---
-    runRosterGeneration() { this.clearNotifications(); const staff = this.staffDataCache.filter(s => s.attendance === 'Yes'); if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; } let roster = this.initializeRoster(); const staffAvailability = this.initializeStaffAvailability(staff); let shortfalls = []; const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value); this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls); this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls); const validationResult = this.validator.scrubRosterForBreakViolations(roster, staff, this); this.generatedRoster = validationResult.scrubbedRoster; this.displayComplianceReport(validationResult); this.displayRoster(this.generatedRoster); if (shortfalls.length > 0) shortfalls.forEach(msg => this.showNotification(msg, 'warning')); this.saveRosterToFirestore(this.generatedRoster); this.addRosterActionButtons(); },
-    initializeRoster: function() { const r={};this.LOCATIONS.forEach(l=>{r[l.name]={};this.ROSTER_TIMES.forEach(t=>r[l.name][t]=[])});return r; },
-    initializeStaffAvailability: function(staffList) { const a={};staffList.forEach(s=>{a[s.id]={data:s,assignedSlots:[]}});return a; },
-    findAvailableStaff: function(staffAvailability, timeSlot, locationName) { const s=Object.values(staffAvailability).sort((a,b)=>a.assignedSlots.length-b.assignedSlots.length);for(const t of s){const a=t.assignedSlots.includes(timeSlot),e="HHMD"!==locationName||"Yes"===t.data.hhmd;if(!this.isOnBreak(t.data,timeSlot)&&!a&&e)return t}return null },
-    assignStaff: function(roster, staff, timeSlot, locationName) { roster[locationName][timeSlot].push(staff.data.id); staff.assignedSlots.push(timeSlot); },
+    runRosterGeneration() {
+        this.clearNotifications();
+        document.getElementById('rosterContainer').innerHTML = ''; // Clear previous roster
+        const staff = this.staffDataCache.filter(s => s.attendance === 'Yes');
+        if (staff.length === 0) { this.showNotification("Cannot generate roster. No staff marked as present.", 'error'); return; }
+        
+        const roster = this.initializeRoster();
+        const staffAvailability = this.initializeStaffAvailability(staff);
+        const shortfalls = [];
+        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
+
+        // Generator now uses the fixed `isOnBreak` logic, preventing violations from the start.
+        this.assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls);
+        this.assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls);
+        
+        this.generatedRoster = roster;
+        this.displayRoster(this.generatedRoster);
+        if (shortfalls.length > 0) { shortfalls.forEach(msg => this.showNotification(msg, 'warning')); }
+        this.saveRosterToFirestore(this.generatedRoster);
+        this.addRosterActionButtons();
+    },
+    initializeRoster() { const r={};this.LOCATIONS.forEach(l=>{r[l.name]={};this.ROSTER_TIMES.forEach(t=>r[l.name][t]=[])});return r; },
+    initializeStaffAvailability(staffList) { const a={};staffList.forEach(s=>{a[s.id]={data:s,assignedSlots:[]}});return a; },
+    findAvailableStaff(staffAvailability, timeSlot, locationName) {
+        const availableStaff = Object.values(staffAvailability).filter(staff => {
+            const isAlreadyAssigned = staff.assignedSlots.includes(timeSlot);
+            const isEligible = locationName !== "HHMD" || staff.data.hhmd === "Yes";
+            const onBreak = this.isOnBreak(staff.data, timeSlot);
+            return !onBreak && !isAlreadyAssigned && isEligible;
+        });
+        availableStaff.sort((a, b) => a.assignedSlots.length - b.assignedSlots.length);
+        return availableStaff.length > 0 ? availableStaff[0] : null;
+    },
+    assignStaff(roster, staff, timeSlot, locationName) { roster[locationName][timeSlot].push(staff.data.id); staff.assignedSlots.push(timeSlot); },
     assignCriticalDuties(roster, staffAvailability, isWeekend, shortfalls) { for(const l in this.CRITICAL_DUTIES){if(isWeekend&&"Report Room"===l)continue;this.CRITICAL_DUTIES[l].forEach(t=>{const s=this.findAvailableStaff(staffAvailability,t,l);s?this.assignStaff(roster,s,t,l):shortfalls.push(`CRITICAL SHORTFALL: No staff for ${l} at ${t}.`)})} },
     assignStandardDuties(roster, staffAvailability, isWeekend, shortfalls) { const t=this.OUTPUT_ORDER.filter(l=>!this.CRITICAL_DUTIES.hasOwnProperty(l));t.forEach(l=>{const o=this.LOCATIONS.find(s=>s.name===l);this.ROSTER_TIMES.forEach(s=>{const e=o.needed;for(let a=roster[l][s].length;a<e;a++){const d=this.findAvailableStaff(staffAvailability,s,l);if(d)this.assignStaff(roster,d,s,l);else{shortfalls.push(`Shortfall: ${l} at ${s}.`);break}}})}) },
     
     // --- DISPLAY & EXPORT ---
-    displayComplianceReport(report) { const container = document.getElementById('complianceReport'); const compliance = report.totalAssignments === 0 ? 100 : ((report.totalAssignments - report.violations.length) / report.totalAssignments) * 100; let violationsHTML = ''; if (report.violations.length > 0) { violationsHTML = `<p class="text-xs text-red-600 mt-2">Validator removed ${report.violations.length} assignments that violated break times.</p>`; } container.innerHTML = ` <div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-bold text-lg text-gray-800">Break Time Compliance Report</h3> <div class="flex justify-around items-center mt-2 text-center"> <div><p class="text-2xl font-bold text-gray-700">${report.totalAssignments}</p><p class="text-sm text-gray-500">Total Assignments</p></div> <div><p class="text-2xl font-bold text-green-600">${compliance.toFixed(1)}%</p><p class="text-sm text-gray-500">Compliance</p></div> </div> ${violationsHTML} </div> `; container.classList.remove('hidden'); },
-    displayRoster(roster) { const container=document.getElementById("rosterContainer");let tableHTML=`<table id="editableRoster" class="min-w-full divide-y divide-gray-200 mt-4"><thead class="bg-gray-100"><tr><th class="sticky left-0 bg-gray-100 px-4 py-2 text-left text-sm font-semibold text-gray-700">Location</th>`;this.ROSTER_TIMES.forEach(e=>{tableHTML+=`<th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">${e}</th>`}),tableHTML+="</tr></thead><tbody class=\"bg-white\">";const isWeekend=["Saturday","Sunday"].includes(document.getElementById("rosterDay").value);this.OUTPUT_ORDER.forEach(locName=>{const location=this.LOCATIONS.find(e=>e.name===locName);tableHTML+=`<tr class="border-b"><td class="sticky left-0 bg-white px-4 py-2 font-medium text-gray-900">${locName}</td>`,this.ROSTER_TIMES.forEach(timeSlot=>{const assignedStaff=roster[locName][timeSlot];let cellText=assignedStaff.join(location.isMultiStaff?" | ":", ");let cellClass="";const isCriticalLocation=this.CRITICAL_DUTIES.hasOwnProperty(locName),isDesignatedTime=isCriticalLocation&&this.CRITICAL_DUTIES[locName].includes(timeSlot);isCriticalLocation?isDesignatedTime?cellClass=assignedStaff.length<location.needed?"bg-red-100":"bg-blue-100 font-bold":(cellClass="not-applicable",cellText=""):(cellClass=assignedStaff.length<location.needed?"bg-red-100":"bg-white"),"Report Room"===locName&&isWeekend&&(cellClass="not-applicable",cellText=""),tableHTML+=`<td class="text-center px-4 py-2 ${cellClass}">${cellText}</td>`}),tableHTML+="</tr>"}),tableHTML+="</tbody></table>",container.innerHTML=tableHTML},
-    addRosterActionButtons() { document.getElementById("rosterActions")&&document.getElementById("rosterActions").remove();let e=document.getElementById("rosterContainer"),t=`<div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"><button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700">Copy for Excel</button><button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700">Download PDF</button></div>`;e.insertAdjacentHTML("beforeend",t),document.getElementById("copyTSVBtn").addEventListener("click",()=>this.copyTSV()),document.getElementById("downloadPDFBtn").addEventListener("click",()=>this.downloadPDF())},
+    displayRoster(roster) {
+        const container = document.getElementById("rosterContainer");
+        let tableHTML = `<table id="editableRoster" class="min-w-full divide-y divide-gray-200 mt-4"><thead class="bg-gray-100"><tr><th class="sticky left-0 bg-gray-100 px-4 py-2 text-left text-sm font-semibold text-gray-700">Location</th>`;
+        this.ROSTER_TIMES.forEach(time => { tableHTML += `<th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">${time}</th>` });
+        tableHTML += "</tr></thead><tbody class=\"bg-white\">";
+        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
+        
+        // This robust display logic correctly handles the special multi-line row.
+        this.OUTPUT_ORDER.filter(loc => loc !== "Tango Papa").forEach(locName => {
+            let isCombinedRow = locName === "Vertical Patrol";
+            const location = this.LOCATIONS.find(l => l.name === locName);
+            let locationCellHTML = isCombinedRow ? `Vertical Patrol<br>Tango Papa` : locName;
+            
+            tableHTML += `<tr class="border-b"><td class="sticky left-0 bg-white px-4 py-2 font-medium text-gray-900 ${isCombinedRow ? 'location-cell-multiline' : ''}">${locationCellHTML}</td>`;
+            this.ROSTER_TIMES.forEach(timeSlot => {
+                let cellText = roster[locName][timeSlot].join(location.isMultiStaff ? " | " : ", ");
+                let cellClass = "";
+                const isCritical = this.CRITICAL_DUTIES.hasOwnProperty(locName) && this.CRITICAL_DUTIES[locName].includes(timeSlot);
+                if (isCritical) { cellClass = roster[locName][timeSlot].length < location.needed ? "bg-red-100" : "bg-blue-100 font-bold"; }
+                else if (this.CRITICAL_DUTIES.hasOwnProperty(locName)) { cellClass = "not-applicable"; cellText = ""; }
+                
+                if (isCombinedRow) {
+                    const tangoStaff = roster["Tango Papa"][timeSlot];
+                    const isTangoCritical = this.CRITICAL_DUTIES["Tango Papa"].includes(timeSlot);
+                    if (isTangoCritical) {
+                        cellText = tangoStaff.join(", ");
+                        cellClass = tangoStaff.length < 1 ? "bg-red-100" : "bg-blue-100 font-bold";
+                    }
+                }
+                 if (locName === "Report Room" && isWeekend) { cellClass = "not-applicable"; cellText = ""; }
+                tableHTML += `<td class="text-center px-4 py-2 ${cellClass}">${cellText}</td>`;
+            });
+            tableHTML += "</tr>";
+        });
+        tableHTML += "</tbody></table>";
+        container.innerHTML = tableHTML;
+    },
+    addRosterActionButtons() { document.getElementById("rosterActions")?.remove();let e=document.getElementById("rosterContainer"),t=`<div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"><button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700">Copy for Excel</button><button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700">Download PDF</button></div>`;e.insertAdjacentHTML("beforeend",t),document.getElementById("copyTSVBtn").addEventListener("click",()=>this.copyTSV()),document.getElementById("downloadPDFBtn").addEventListener("click",()=>this.downloadPDF())},
     copyTSV() { if(!this.generatedRoster)return void this.showNotification("No roster to copy.","error");let e="Location\t"+this.ROSTER_TIMES.join("\t")+"\n";this.OUTPUT_ORDER.forEach(t=>{const s=this.LOCATIONS.find(e=>e.name===t);e+=t+"\t"+this.ROSTER_TIMES.map(e=>this.generatedRoster[t][e].join(s.isMultiStaff?" | ":", ")).join("\t")+"\n"}),navigator.clipboard.writeText(e).then(()=>this.showNotification("Roster copied to clipboard!","success"),()=>this.showNotification("Failed to copy.","error"))},
-    
-    /**
-     * DEFINITIVE PDF FIX
-     */
     downloadPDF() {
         if (!this.generatedRoster) { this.showNotification('No roster to download.', 'error'); return; }
-        
         try {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
             const rosterDate = document.getElementById('rosterDate').value; 
             const rosterDay = document.getElementById('rosterDay').value;
-            
-            // --- PDF Content Generation ---
             doc.setFontSize(16); doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
+            
+            const pdfBody = this.OUTPUT_ORDER.filter(loc => loc !== 'Tango Papa').map(locName => {
+                let displayName = locName;
+                const rowData = this.ROSTER_TIMES.map(time => {
+                    let cellContent = this.generatedRoster[locName][time].join(this.LOCATIONS.find(l=>l.name===locName).isMultiStaff ? ' | ' : ', ');
+                    if (locName === 'Vertical Patrol') {
+                        displayName = 'Vertical Patrol\nTango Papa';
+                        const isVPCritical = this.CRITICAL_DUTIES['Vertical Patrol'].includes(time);
+                        const isTangoCritical = this.CRITICAL_DUTIES['Tango Papa'].includes(time);
+                         if (isTangoCritical) {
+                            cellContent = this.generatedRoster['Tango Papa'][time].join(', ');
+                        } else if (!isVPCritical) {
+                            cellContent = ''; // Blank if not a critical time for either
+                        }
+                    }
+                    return cellContent;
+                });
+                return [displayName, ...rowData];
+            });
+
             const rosterHead = [['Location', ...this.ROSTER_TIMES]];
-            const rosterBody = this.OUTPUT_ORDER.map(locName => { const location = this.LOCATIONS.find(l => l.name === locName); return [locName, ...this.ROSTER_TIMES.map(time => this.generatedRoster[locName][time].join(location.isMultiStaff ? ' | ' : ', '))]; });
-            doc.autoTable({ head: rosterHead, body: rosterBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1 }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 22 } } });
+            doc.autoTable({ head: rosterHead, body: pdfBody, startY: 22, theme: 'grid', styles: { fontSize: 6, cellPadding: 1, halign: 'center', valign: 'middle' }, headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7, halign: 'center' }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, halign: 'left' } } });
+            
             const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
             const staffHead = [['Staff ID', 'Name', 'Break Time']];
             const staffBody = presentStaff.map(staff => [ staff.id, staff.name, `${staff.breakStart} - ${staff.breakEnd}` ]);
             doc.autoTable({ head: staffHead, body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
             
-            // --- New Download Logic ---
-            doc.save(`roster_${rosterDate}.pdf`);
-            this.showNotification('PDF Download initiated.', 'success');
-
-        } catch (e) {
-            console.error("PDF Generation/Download Error:", e);
-            this.showNotification('An error occurred while creating the PDF.', 'error');
-        }
+            const pdfBlob = doc.output('blob');
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            document.getElementById('pdfDownloadLink').href = blobUrl;
+            document.getElementById('pdfDownloadLink').download = `roster_${rosterDate}.pdf`;
+            document.getElementById('pdfPreview').src = blobUrl;
+            document.getElementById('pdfModal').style.display = 'flex';
+            this.showNotification('PDF generated. Preview is ready.', 'success');
+        } catch (e) { console.error("PDF Generation/Download Error:", e); this.showNotification('An error occurred while creating the PDF.', 'error'); }
+    },
+    closePdfModal() {
+        const downloadLink = document.getElementById('pdfDownloadLink');
+        const previewFrame = document.getElementById('pdfPreview');
+        if (downloadLink.href.startsWith('blob:')) { URL.revokeObjectURL(downloadLink.href); }
+        downloadLink.href = '#';
+        previewFrame.src = 'about:blank';
+        document.getElementById('pdfModal').style.display = 'none';
     },
     clearNotifications() { document.getElementById("notification-container").innerHTML=""},
     showNotification(e,t="info") { const s=document.getElementById("notification-container"),o={success:"green",error:"red",warning:"yellow",info:"blue"},a=document.createElement("div");a.className=`border-l-4 p-4 bg-${o[t]}-100 border-${o[t]}-500 text-${o[t]}-700`,a.innerHTML=`<p class="font-bold">${t.charAt(0).toUpperCase()+t.slice(1)}</p><p>${e}</p>`,s.appendChild(a),setTimeout(()=>{a.style.transition="opacity 0.5s ease",a.style.opacity="0",setTimeout(()=>a.remove(),500)},5e3)}
