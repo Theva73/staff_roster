@@ -1,680 +1,321 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v8.0 - Final Fixed</title>
+    <title>Staff Roster System v7.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-
-```
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     
-    const firebaseConfig = {
-        apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
-        authDomain: "roster-4a997.firebaseapp.com",
-        projectId: "roster-4a997",
-        storageBucket: "roster-4a997.firebasestorage.app",
-        messagingSenderId: "901381868881",
-        appId: "1:901381868881:web:92930481d6c1c85fedd770"
-    };
-
-    try {
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        window.db = db;
-        window.firebase = { collection, getDocs, doc, setDoc, addDoc, deleteDoc, onSnapshot, query };
-        window.firebaseReady = true;
-        console.log("✅ Firebase ready");
-    } catch (error) {
-        console.error("❌ Firebase error:", error);
-        window.firebaseError = error;
-    }
-</script>
-
-<style>
-    body { font-family: system-ui, sans-serif; background: #f1f5f9; }
-    .card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .btn { transition: all 0.2s; }
-    .btn:hover:not(:disabled) { transform: translateY(-1px); }
-    .styled-table { border-collapse: collapse; width: 100%; }
-    .styled-table th, .styled-table td { border: 1px solid #e2e8f0; padding: 6px; text-align: center; }
-    .styled-table th { background: #f1f5f9; font-weight: 600; }
-    .conflict-cell { background: #fef2f2 !important; border-color: #ef4444 !important; }
-    .break-conflict { background: #fef3c7 !important; border-color: #f59e0b !important; }
-    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 50; }
-</style>
-```
-
-</head>
-<body>
-    <div class="max-w-6xl mx-auto p-4">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-purple-600 mb-2">Staff Roster System</h1>
-            <p class="text-gray-600">v8.0 - Conflict-Free Edition</p>
-            <div id="status" class="mt-4 p-3 rounded bg-blue-100 text-blue-800">🔄 Connecting...</div>
-        </header>
-
-```
-    <div class="card p-6 mb-6">
-        <div class="grid md:grid-cols-3 gap-4">
-            <div>
-                <label class="block font-medium mb-2">Date:</label>
-                <input type="date" id="rosterDate" class="w-full p-2 border rounded">
-            </div>
-            <div>
-                <label class="block font-medium mb-2">Day:</label>
-                <select id="rosterDay" class="w-full p-2 border rounded">
-                    <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
-                    <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
-                </select>
-            </div>
-            <div class="text-center">
-                <label class="block font-medium mb-2">Working Staff:</label>
-                <span id="staffCount" class="text-3xl font-bold text-blue-600">0</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="card p-6 mb-6">
-        <h2 class="text-xl font-bold mb-4">Staff Management</h2>
-        <div class="overflow-x-auto">
-            <table id="staffTable" class="styled-table">
-                <thead>
-                    <tr><th>ID</th><th>Name</th><th>Break Start</th><th>Break End</th><th>HHMD</th><th>Present</th><th>Actions</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="mt-4 flex gap-3 justify-center">
-            <button id="addBtn" class="btn bg-blue-600 text-white px-4 py-2 rounded" disabled>Add Staff</button>
-            <button id="shuffleBtn" class="btn bg-purple-600 text-white px-4 py-2 rounded" disabled>Shuffle Breaks</button>
-        </div>
-    </div>
-
-    <div class="card p-6">
-        <h2 class="text-xl font-bold text-center mb-4">Generate Roster</h2>
-        <div class="text-center mb-4">
-            <button id="generateBtn" class="btn bg-green-600 text-white px-8 py-3 rounded-lg text-lg" disabled>Generate</button>
-        </div>
-        <div id="messages"></div>
-        <div id="rosterWrapper" class="mt-6 opacity-0 transition-opacity">
-            <div id="rosterTable"></div>
-            <div id="actions" class="mt-4 flex gap-3 justify-center" style="display:none">
-                <button id="copyBtn" class="btn bg-blue-600 text-white px-4 py-2 rounded">Copy</button>
-                <button id="pdfBtn" class="btn bg-red-600 text-white px-4 py-2 rounded">PDF</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="pdfModal" class="modal">
-    <div class="bg-white p-6 rounded-lg max-w-4xl w-full mx-4">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-bold">PDF Preview</h3>
-            <button id="closeModal" class="text-2xl">&times;</button>
-        </div>
-        <iframe id="pdfFrame" class="w-full h-96 border"></iframe>
-        <div class="mt-4 text-center">
-            <a id="downloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white px-6 py-2 rounded">Download</a>
-        </div>
-    </div>
-</div>
-```
-
-<script>
-const roster = {
-    TIMES: ["20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"],
-    LOCATIONS: [
-        { name: "Pass Counter", slots: 2 },
-        { name: "HHMD", slots: 1 },
-        { name: "Guard House", slots: 1 },
-        { name: "Lobby", slots: 2 },
-        { name: "Report Room", slots: 1 },
-        { name: "Vertical Patrol", slots: 1 },
-        { name: "Tango Papa", slots: 1 }
-    ],
-    CRITICAL: {
-        "Vertical Patrol": ["20:00", "23:00", "01:00", "04:00", "06:00"],
-        "Report Room": ["20:00", "21:00"],
-        "Tango Papa": ["07:00"]
-    },
-    
-    staff: [],
-    schedule: null,
-    db: null,
-    firebase: null,
-
-    async init() {
-        try {
-            await this.waitForFirebase();
-            this.setupUI();
-            this.setupListeners();
-            this.listenToStaff();
-            this.updateStatus("✅ Ready", "bg-green-100 text-green-800");
-            this.enableButtons();
-        } catch (error) {
-            console.error("Init error:", error);
-            this.updateStatus("❌ Connection failed", "bg-red-100 text-red-800");
-        }
-    },
-
-    waitForFirebase() {
-        return new Promise((resolve, reject) => {
-            const check = () => {
-                if (window.firebaseReady && window.db) {
-                    this.db = window.db;
-                    this.firebase = window.firebase;
-                    resolve();
-                } else if (window.firebaseError) {
-                    reject(window.firebaseError);
-                } else {
-                    setTimeout(check, 100);
-                }
-            };
-            check();
-        });
-    },
-
-    updateStatus(text, classes) {
-        const el = document.getElementById('status');
-        el.textContent = text;
-        el.className = `mt-4 p-3 rounded ${classes}`;
-    },
-
-    setupUI() {
-        const today = new Date();
-        document.getElementById('rosterDate').value = today.toISOString().split('T')[0];
-        document.getElementById('rosterDay').value = today.toLocaleDateString('en-US', { weekday: 'long' });
-    },
-
-    enableButtons() {
-        ['addBtn', 'shuffleBtn', 'generateBtn'].forEach(id => {
-            document.getElementById(id).disabled = false;
-        });
-    },
-
-    setupListeners() {
-        document.getElementById('addBtn').onclick = () => this.addStaff();
-        document.getElementById('shuffleBtn').onclick = () => this.shuffle();
-        document.getElementById('generateBtn').onclick = () => this.generate();
-        document.getElementById('copyBtn').onclick = () => this.copy();
-        document.getElementById('pdfBtn').onclick = () => this.makePDF();
-        document.getElementById('closeModal').onclick = () => this.closeModal();
-    },
-
-    listenToStaff() {
-        const { collection, onSnapshot } = this.firebase;
-        onSnapshot(collection(this.db, "staff"), (snap) => {
-            this.staff = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-                .sort((a, b) => (a.staffId || "").localeCompare(b.staffId || ""));
-            this.renderStaff();
-            this.updateCount();
-        });
-    },
-
-    updateCount() {
-        // Check multiple possible field names for attendance
-        const count = this.staff.filter(s => 
-            s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
-        ).length;
-        document.getElementById('staffCount').textContent = count;
-    },
-
-    renderStaff() {
-        const tbody = document.querySelector('#staffTable tbody');
-        if (this.staff.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No staff found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = this.staff.map(s => `
-            <tr data-id="${s.id}">
-                <td><input data-field="staffId" value="${s.staffId || s.id || ''}" class="w-20 p-1 border rounded text-center"></td>
-                <td><input data-field="name" value="${s.name || ''}" class="w-24 p-1 border rounded"></td>
-                <td><input type="time" data-field="breakStart" value="${s.breakStart || '22:00'}" class="p-1 border rounded"></td>
-                <td><input type="time" data-field="breakEnd" value="${s.breakEnd || '00:00'}" class="p-1 border rounded"></td>
-                <td>
-                    <select data-field="hhmd" class="p-1 border rounded">
-                        <option value="Yes" ${(s.hhmd === 'Yes' || s.hhmd === true) ? 'selected' : ''}>Yes</option>
-                        <option value="No" ${(s.hhmd !== 'Yes' && s.hhmd !== true) ? 'selected' : ''}>No</option>
-                    </select>
-                </td>
-                <td>
-                    <select data-field="present" class="p-1 border rounded">
-                        <option value="Yes" ${(s.present !== 'No' && s.attendance !== 'No') ? 'selected' : ''}>Yes</option>
-                        <option value="No" ${(s.present === 'No' || s.attendance === 'No') ? 'selected' : ''}>No</option>
-                    </select>
-                </td>
-                <td><button class="remove-btn text-red-600 hover:text-red-800 px-2 py-1 rounded">Remove</button></td>
-            </tr>
-        `).join('');
-
-        tbody.querySelectorAll('tr').forEach(row => {
-            row.querySelectorAll('input, select').forEach(input => {
-                input.onchange = (e) => this.updateStaff(e);
-            });
-            row.querySelector('.remove-btn').onclick = (e) => this.removeStaff(e);
-        });
-    },
-
-    async addStaff() {
-        try {
-            await this.firebase.addDoc(this.firebase.collection(this.db, "staff"), {
-                staffId: `S${Date.now().toString().slice(-4)}`,
-                name: "New Staff",
-                breakStart: "22:00",
-                breakEnd: "00:00",
-                hhmd: "No",
-                present: "Yes",
-                created: new Date()
-            });
-            this.showMessage("Staff added", "success");
-        } catch (error) {
-            this.showMessage("Error adding staff", "error");
-        }
-    },
-
-    async updateStaff(event) {
-        const row = event.target.closest('tr');
-        const id = row.dataset.id;
-        const data = {};
-        row.querySelectorAll('[data-field]').forEach(input => {
-            data[input.dataset.field] = input.value;
-        });
-
-        try {
-            await this.firebase.setDoc(this.firebase.doc(this.db, "staff", id), data, { merge: true });
-        } catch (error) {
-            this.showMessage("Error updating staff", "error");
-        }
-    },
-
-    async removeStaff(event) {
-        const row = event.target.closest('tr');
-        const id = row.dataset.id;
-        const name = row.querySelector('[data-field="staffId"]').value || "staff";
-
-        if (confirm(`Remove ${name}?`)) {
-            try {
-                await this.firebase.deleteDoc(this.firebase.doc(this.db, "staff", id));
-                this.showMessage("Staff removed", "success");
-            } catch (error) {
-                this.showMessage("Error removing staff", "error");
-            }
-        }
-    },
-
-    async shuffle() {
-        const present = this.staff.filter(s => s.present === 'Yes');
-        if (present.length < 2) {
-            this.showMessage("Need at least 2 staff to shuffle", "warning");
-            return;
-        }
-
-        const breaks = present.map(s => ({ start: s.breakStart, end: s.breakEnd }));
-        for (let i = breaks.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [breaks[i], breaks[j]] = [breaks[j], breaks[i]];
-        }
-
-        try {
-            await Promise.all(present.map((staff, i) =>
-                this.firebase.setDoc(this.firebase.doc(this.db, "staff", staff.id), {
-                    breakStart: breaks[i].start,
-                    breakEnd: breaks[i].end
-                }, { merge: true })
-            ));
-            this.showMessage("Breaks shuffled", "success");
-        } catch (error) {
-            this.showMessage("Error shuffling", "error");
-        }
-    },
-
-    toMinutes(time) {
-        if (!time) return -1;
-        let [h, m] = time.split(':').map(Number);
-        if (h < 8) h += 24;
-        return h * 60 + m;
-    },
-
-    onBreak(staff, time) {
-        const start = this.toMinutes(staff.breakStart);
-        const end = this.toMinutes(staff.breakEnd);
-        const slot = this.toMinutes(time);
-        if (start === -1 || end === -1 || slot === -1) return false;
-        return start > end ? (slot >= start || slot < end) : (slot >= start && slot < end);
-    },
-
-    hasConflict(schedule, staffIdentifier, time, location, pos) {
-        // Find staff by multiple possible identifiers
-        const staff = this.staff.find(s => 
-            s.staffId === staffIdentifier || s.id === staffIdentifier || s.name === staffIdentifier
-        );
-        if (!staff) return null;
-
-        if (this.onBreak(staff, time)) {
-            return { type: 'break', msg: `${staffIdentifier} on break at ${time}` };
-        }
-
-        if (location === 'HHMD' && staff.hhmd !== 'Yes' && staff.hhmd !== true) {
-            return { type: 'qual', msg: `${staffIdentifier} not HHMD qualified` };
-        }
-
-        // Check double assignment
-        for (const loc of this.LOCATIONS.map(l => l.name)) {
-            if (schedule[loc] && schedule[loc][time]) {
-                for (let i = 0; i < schedule[loc][time].length; i++) {
-                    if (schedule[loc][time][i] === staffIdentifier && !(loc === location && i === pos)) {
-                        return { type: 'double', msg: `${staffIdentifier} already at ${loc}` };
-                    }
-                }
-            }
-        }
-        return null;
-    },
-
-    generate() {
-        // Check multiple field names for attendance
-        const present = this.staff.filter(s => 
-            s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
-        );
-        if (present.length === 0) {
-            this.showMessage("No staff present", "error");
-            return;
-        }
-
-        const schedule = {};
-        this.LOCATIONS.forEach(loc => {
-            schedule[loc.name] = {};
-            this.TIMES.forEach(time => {
-                schedule[loc.name][time] = new Array(loc.slots).fill('');
-            });
-        });
-
-        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
-        const issues = [];
-
-        const assign = (time, location, slot) => {
-            const shuffled = [...present].sort(() => Math.random() - 0.5);
-            for (const staff of shuffled) {
-                // Use staffId if available, otherwise use document id
-                const staffIdentifier = staff.staffId || staff.id || staff.name;
-                const conflict = this.hasConflict(schedule, staffIdentifier, time, location, slot);
-                if (!conflict) {
-                    schedule[location][time][slot] = staffIdentifier;
-                    return true;
-                }
-            }
-            issues.push(`${location} at ${time}`);
-            return false;
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // IMPORTANT: Replace with your actual Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+            authDomain: "roster-4a997.firebaseapp.com",
+            projectId: "roster-4a997",
+            storageBucket: "roster-4a997.appspot.com",
+            messagingSenderId: "901381868881",
+            appId: "1:901381868881:web:92930481d6c1c85fedd770"
         };
 
-        // Critical duties first
-        for (const [loc, times] of Object.entries(this.CRITICAL)) {
-            if (isWeekend && loc === "Report Room") continue;
-            const slots = this.LOCATIONS.find(l => l.name === loc).slots;
-            times.forEach(time => {
-                for (let i = 0; i < slots; i++) {
-                    assign(time, loc, i);
-                }
-            });
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make db and firebase utilities globally available for the main script
+        window.db = db;
+        window.firebase = {
+             collection, getDocs, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
+        };
+    </script>
+
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc;
         }
-
-        // Fill remaining
-        this.LOCATIONS.forEach(({ name, slots }) => {
-            this.TIMES.forEach(time => {
-                for (let i = 0; i < slots; i++) {
-                    if (schedule[name][time][i] === '') {
-                        assign(time, name, i);
-                    }
-                }
-            });
-        });
-
-        this.schedule = schedule;
-        this.displaySchedule();
+        .card { 
+            background-color: white; 
+            border-radius: 0.75rem; 
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid #e2e8f0;
+        }
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 7px 14px rgba(50,50,93,.1), 0 3px 6px rgba(0,0,0,.08);
+        }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #e5e7eb; width: 90%; max-width: 1000px; border-radius: 0.5rem; }
         
-        if (issues.length > 0) {
-            issues.forEach(issue => this.showMessage(`Shortfall: ${issue}`, "warning"));
-        } else {
-            this.showMessage("✅ Generated successfully!", "success");
+        .table-container {
+             overflow-x: auto;
+             -webkit-overflow-scrolling: touch;
+        }
+        .styled-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 100%;
+        }
+        .styled-table thead th {
+             background-color: #f1f5f9;
+             font-weight: 600;
+             color: #334155;
+             font-size: 0.8rem;
+        }
+        .styled-table th, .styled-table td {
+            white-space: nowrap;
+            padding: 0;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .styled-table thead th:first-child, .styled-table tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            text-align: left;
+        }
+        .styled-table tbody td:first-child {
+            background-color: #f8fafc;
+            font-weight: 500;
+            border-right: 1px solid #e2e8f0;
+        }
+        .styled-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .styled-table tbody tr:hover td, .styled-table tbody tr:hover td:first-child {
+             background-color: #f0f9ff;
+        }
+        
+        .location-cell-content { padding: 10px 12px; }
+        .location-cell-multiline { line-height: 1.3; font-size: 0.9rem; }
+
+        .roster-cell-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 4px;
+            min-height: 50px;
         }
 
-        this.saveSchedule();
-        document.getElementById('actions').style.display = 'flex';
-        document.getElementById('rosterWrapper').classList.remove('opacity-0');
-    },
-
-    displaySchedule() {
-        const staffOpts = '<option value="">--</option>' + 
-            present.map(s => {
-                const identifier = s.staffId || s.id || s.name;
-                return `<option value="${identifier}">${identifier}</option>`;
-            }).join('');
-
-        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
-
-        let html = `<table class="styled-table"><thead><tr><th class="text-left">Location</th>`;
-        this.TIMES.forEach(time => html += `<th>${time}</th>`);
-        html += '</tr></thead><tbody>';
-
-        this.LOCATIONS.filter(l => l.name !== "Tango Papa").forEach(({ name, slots }) => {
-            const isCombined = name === "Vertical Patrol";
-            html += `<tr><td class="font-medium text-left bg-gray-50">
-                ${isCombined ? 'Vertical Patrol<br><small>Tango Papa</small>' : name}
-            </td>`;
-
-            this.TIMES.forEach(time => {
-                let content = '';
-                let applicable = true;
-
-                if (this.CRITICAL[name] && !this.CRITICAL[name].includes(time)) applicable = false;
-                if (name === "Report Room" && isWeekend) applicable = false;
-
-                if (isCombined) {
-                    const vpActive = this.CRITICAL['Vertical Patrol'].includes(time);
-                    const tpActive = this.CRITICAL['Tango Papa'].includes(time);
-                    
-                    if (vpActive || tpActive) {
-                        if (vpActive) {
-                            const sel = this.schedule['Vertical Patrol'][time][0] || '';
-                            content += `<select data-loc="Vertical Patrol" data-time="${time}" data-slot="0" class="roster-sel w-full mb-1 text-xs">
-                                ${staffOpts.replace(`value="${sel}"`, `value="${sel}" selected`)}</select>`;
-                        }
-                        if (tpActive) {
-                            const sel = this.schedule['Tango Papa'][time][0] || '';
-                            content += `<select data-loc="Tango Papa" data-time="${time}" data-slot="0" class="roster-sel w-full text-xs">
-                                ${staffOpts.replace(`value="${sel}"`, `value="${sel}" selected`)}</select>`;
-                        }
-                    } else applicable = false;
-                } else if (applicable) {
-                    for (let i = 0; i < slots; i++) {
-                        const sel = this.schedule[name][time][i] || '';
-                        content += `<select data-loc="${name}" data-time="${time}" data-slot="${i}" class="roster-sel w-full text-xs ${i ? 'mt-1' : ''}">
-                            ${staffOpts.replace(`value="${sel}"`, `value="${sel}" selected`)}</select>`;
-                    }
-                }
-
-                html += `<td class="${applicable ? '' : 'bg-gray-100'} p-1">${content}</td>`;
-            });
-            html += '</tr>';
-        });
-
-        html += '</tbody></table>';
-        document.getElementById('rosterTable').innerHTML = html;
-
-        document.querySelectorAll('.roster-sel').forEach(sel => {
-            sel.onchange = (e) => this.changeAssignment(e);
-        });
-
-        this.validateSchedule();
-    },
-
-    changeAssignment(event) {
-        const { loc, time, slot } = event.target.dataset;
-        const newStaff = event.target.value;
-        const oldStaff = this.schedule[loc][time][parseInt(slot)];
-
-        if (newStaff) {
-            const conflict = this.hasConflict(this.schedule, newStaff, time, loc, parseInt(slot));
-            if (conflict) {
-                this.showMessage(conflict.msg, "error");
-                event.target.value = oldStaff;
-                return;
-            }
+        .roster-cell select { 
+            -webkit-appearance: none; -moz-appearance: none; appearance: none; 
+            background-color: transparent; border: none; width: 100%;
+            height: 24px; text-align: center; font-size: 0.8rem; font-weight: 500; color: #1e293b;
         }
-
-        this.schedule[loc][time][parseInt(slot)] = newStaff;
-        this.validateSchedule();
-        this.saveSchedule();
-    },
-
-    validateSchedule() {
-        document.querySelectorAll('.conflict-cell, .break-conflict').forEach(el => {
-            el.classList.remove('conflict-cell', 'break-conflict');
-        });
-
-        this.TIMES.forEach(time => {
-            const assignments = {};
-            
-            this.LOCATIONS.forEach(({ name }) => {
-                if (this.schedule[name] && this.schedule[name][time]) {
-                    this.schedule[name][time].forEach((staffId, slot) => {
-                        if (staffId) {
-                            if (!assignments[staffId]) assignments[staffId] = [];
-                            assignments[staffId].push({ name, slot });
-                        }
-                    });
-                }
-            });
-
-            Object.keys(assignments).forEach(staffIdentifier => {
-                // Find staff by identifier
-                const staff = this.staff.find(s => 
-                    s.staffId === staffIdentifier || s.id === staffIdentifier || s.name === staffIdentifier
-                );
-                const isOnBreak = staff && this.onBreak(staff, time);
-                const hasMultiple = assignments[staffIdentifier].length > 1;
-
-                assignments[staffIdentifier].forEach(({ name, slot }) => {
-                    const sel = document.querySelector(`select[data-loc="${name}"][data-time="${time}"][data-slot="${slot}"]`);
-                    if (sel) {
-                        const cell = sel.closest('td');
-                        if (isOnBreak) cell.classList.add('break-conflict');
-                        if (hasMultiple) cell.classList.add('conflict-cell');
-                    }
-                });
-            });
-        });
-    },
-
-    async saveSchedule() {
-        if (!this.schedule) return;
-        const date = document.getElementById('rosterDate').value;
-        try {
-            await this.firebase.setDoc(this.firebase.doc(this.db, "rosters", date), {
-                date,
-                day: document.getElementById('rosterDay').value,
-                schedule: this.schedule,
-                updated: new Date()
-            });
-        } catch (error) {
-            console.error("Save error:", error);
+        .roster-cell select:focus { outline: 2px solid #3b82f6; border-radius: 4px; }
+        
+        .not-applicable { background-color: #f1f5f9; }
+        .empty-assignable-cell { 
+            background-image: repeating-linear-gradient(-45deg, #fdfdff, #fdfdff 5px, #f1f5f9 5px, #f1f5f9 10px);
         }
+        .conflict-cell { 
+            background-color: #fef2f2 !important; 
+            box-shadow: inset 0 0 0 2px #ef4444; 
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
+        <header class="text-center my-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
+            <p class="text-lg text-slate-500 mt-2">v7.9</p>
+        </header>
+
+        <!-- UI sections (unchanged) -->
+        <div class="card p-4 md:p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
+                <div><label for="rosterDate" class="font-semibold text-slate-700 text-sm">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label for="rosterDay" class="font-semibold text-slate-700 text-sm">Day:</label><select id="rosterDay" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+                <div class="text-center md:text-right"><span class="text-base font-semibold">Working Staff:</span><span id="staffCount" class="text-2xl font-bold text-indigo-600 ml-2">0</span></div>
+            </div>
+        </div>
+        <div class="card p-4 md:p-6 mb-8">
+            <h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Staff Management (Live)</h2>
+            <div class="table-container">
+                <table id="staffTable" class="styled-table"><thead ><tr><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Break</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HHMD</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Present</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Lock</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white"></tbody></table>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-4 justify-center"><button id="addStaffBtn" class="btn bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-indigo-700">Add New Staff</button><button id="shuffleBreaksBtn" class="btn bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-purple-700">Shuffle Breaks</button></div>
+        </div>
+        <div class="card p-6">
+            <div class="flex flex-col items-center">
+                 <h2 class="text-2xl font-bold text-slate-800 mb-4">Generate Roster</h2>
+                 <button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate</button>
+            </div>
+            <div id="notification-container" class="mt-4 space-y-2"></div>
+            <div id="rosterContainerWrapper" class="mt-4 opacity-0 transition-opacity duration-500">
+                <div id="rosterContainer" class="table-container rounded-lg border border-slate-200 shadow-sm"></div>
+            </div>
+        </div>
+    </div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh] border border-slate-300 rounded"></iframe></div></div>
+
+<script type="module">
+const rosterSystem = {
+    // --- CONFIG & STATE ---
+    ROSTER_TIMES: ["20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"],
+    LOCATIONS: [ { name: "Pass Counter", needed: 2, isMultiStaff: true }, { name: "HHMD", needed: 1 }, { name: "Lobby", needed: 2, isMultiStaff: true }, { name: "Guard House", needed: 1 }, { name: "Vertical Patrol", needed: 1 }, { name: "Report Room", needed: 1 }, { name: "Tango Papa", needed: 1 } ],
+    OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
+    CRITICAL_DUTIES: { "Vertical Patrol": ["20:00", "23:00", "01:00", "04:00", "06:00"], "Report Room": ["20:00", "21:00"], "Tango Papa": ["07:00"] },
+    
+    generatedRoster: null, staffDataCache: [], db: null, firebase: null,
+
+    // --- INITIALIZATION ---
+    async init() {
+        await new Promise(resolve => { 
+            const interval = setInterval(() => { 
+                if (window.db && window.firebase) { 
+                    clearInterval(interval); 
+                    this.db = window.db; this.firebase = window.firebase; 
+                    console.log("Roster System v7.9 Initialized"); 
+                    resolve(); 
+                } 
+            }, 50); 
+        });
+        this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
 
-    copy() {
-        if (!this.schedule) return;
-        const rows = this.LOCATIONS.map(({ name }) => 
-            `${name}\t${this.TIMES.map(time => 
-                (this.schedule[name]?.[time] || []).filter(Boolean).join(' | ')
-            ).join('\t')}`
-        );
-        navigator.clipboard.writeText(`Location\t${this.TIMES.join('\t')}\n${rows.join('\n')}`)
-            .then(() => this.showMessage("Copied!", "success"))
-            .catch(() => this.showMessage("Copy failed", "error"));
+    initializeDate() { /* ... */ },
+    setupEventListeners() { /* ... */ },
+    
+    // --- FIREBASE DATA MANAGEMENT ---
+    listenForStaffUpdates() {
+        const { collection, query, onSnapshot } = this.firebase;
+        onSnapshot(query(collection(this.db, "staff")), (querySnapshot) => {
+            this.staffDataCache = querySnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })).sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+            this.renderStaffTable(this.staffDataCache);
+            this.updateStaffCount(); // This call now works correctly
+            if (this.generatedRoster) this.validateAllCells();
+        });
     },
 
-    makePDF() {
-        if (!this.schedule) return;
+    renderStaffTable(staffList) { /* ... */ },
+    async addStaffToFirestore() { /* ... */ },
+    async updateStaffInFirestore(event) { /* ... */ },
+    async deleteStaffFromFirestore(event) { /* ... */ },
+    async saveRosterToFirestore(rosterData) { /* ... */ },
+    
+    // FIXED: Changed to a regular function to correctly bind `this`.
+    updateStaffCount() {
+        document.getElementById("staffCount").textContent = this.staffDataCache.filter(s => s.attendance === 'Yes').length;
+    },
+
+    async shuffleBreaks() { /* ... */ },
+    timeToMinutes(timeStr) { /* ... */ },
+    isOnBreak(staff, timeSlot) { /* ... */ },
+    async runRosterGeneration() { /* ... */ },
+
+    // --- DISPLAY & EXPORT ---
+    displayRoster(roster) { /* ... */ },
+    handleCellChange(event) { /* ... */ },
+    validateAllCells() { /* ... */ },
+    addRosterActionButtons() { /* ... */ },
+    copyTSV() { /* ... */ },
+
+    // REFINED: Final PDF generation logic. This is the most reliable method.
+    downloadPDF() {
+        if (!this.generatedRoster) return this.showNotification('No roster to download.', 'error');
         try {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: "landscape" });
-            const date = document.getElementById('rosterDate').value;
-            const day = document.getElementById('rosterDay').value;
+            const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+            const rosterDate = document.getElementById('rosterDate').value, rosterDay = document.getElementById('rosterDay').value;
+            doc.setFontSize(16); doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
 
-            doc.setFontSize(16);
-            doc.text(`Staff Roster - ${date} (${day})`, 14, 15);
+            const specialNotes = { "20:00": "@ 20:30", "01:00": "@ 01:30", "06:00": "@ 06:30" };
 
-            const body = this.LOCATIONS.filter(l => l.name !== 'Tango Papa').map(({ name }) => {
-                const display = name === 'Vertical Patrol' ? 'Vertical Patrol\nTango Papa' : name;
-                const data = this.TIMES.map(time => {
-                    if (name === 'Vertical Patrol') {
-                        const vp = (this.schedule['Vertical Patrol'][time] || []).filter(Boolean).join(', ');
-                        const tp = (this.schedule['Tango Papa'][time] || []).filter(Boolean).join(', ');
-                        return `${vp}${vp && tp ? '\n' : ''}${tp}`;
+            // --- Main Roster Table ---
+            const mainRosterBody = this.OUTPUT_ORDER.filter(loc => loc !== 'Tango Papa').map(locName => {
+                let displayName = locName;
+                if (locName === 'Vertical Patrol') {
+                    displayName = 'Vertical Patrol\nTango Papa';
+                }
+                let rowData = this.ROSTER_TIMES.map(time => {
+                    let staffId = '';
+                    if (locName === 'Vertical Patrol') {
+                        const vp = (this.generatedRoster['Vertical Patrol'][time] || []).filter(Boolean).join(', ');
+                        const tp = (this.generatedRoster['Tango Papa'][time] || []).filter(Boolean).join(', ');
+                        staffId = `${this.CRITICAL_DUTIES['Vertical Patrol'].includes(time) ? vp : ''}${vp && tp ? '\n' : ''}${this.CRITICAL_DUTIES['Tango Papa'].includes(time) ? tp : ''}`;
+                    } else {
+                        staffId = (this.generatedRoster[locName][time] || []).filter(Boolean).join(' | ');
                     }
-                    return (this.schedule[name][time] || []).filter(Boolean).join(' | ');
+                    
+                    // Add special note with a newline for multi-line display
+                    if (locName === 'Vertical Patrol' && staffId && specialNotes[time]) {
+                        return `${staffId}\n${specialNotes[time]}`;
+                    }
+                    return staffId;
                 });
-                return [display, ...data];
+                return [displayName, ...rowData];
             });
 
             doc.autoTable({
-                head: [['Location', ...this.TIMES]],
-                body,
+                head: [['Location', ...this.ROSTER_TIMES]],
+                body: mainRosterBody,
                 startY: 22,
                 theme: 'grid',
-                styles: { fontSize: 6, cellPadding: 1 },
-                headStyles: { fillColor: [45, 55, 72] }
+                styles: { fontSize: 6, cellPadding: 1, halign: 'center', valign: 'middle' },
+                headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7 },
+                columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, halign: 'left' } },
+                didParseCell: function (data) {
+                    // Custom styling for the note part of the cell
+                    if (typeof data.cell.text[0] === 'string' && data.cell.text.length > 1) {
+                        if (data.row.raw[0].startsWith('Vertical Patrol') && data.cell.text[1].startsWith('@')) {
+                            // The library automatically handles alignment, we just style it
+                             data.cell.styles.fontSize = 4.5;
+                        }
+                    }
+                }
             });
 
-            const staffBody = this.staff.filter(s => 
-                s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
-            ).map(s => [
-                s.staffId || s.id || s.name, 
-                s.name, 
-                `${s.breakStart} - ${s.breakEnd}`
-            ]);
-
-            doc.autoTable({
-                head: [['Staff ID', 'Name', 'Break Time']],
-                body: staffBody,
-                startY: doc.autoTable.previous.finalY + 8,
-                theme: 'striped',
-                styles: { fontSize: 8 }
-            });
-
-            const url = doc.output('bloburl');
-            document.getElementById('downloadLink').href = url;
-            document.getElementById('pdfFrame').src = url;
+            // --- Staff Info Table (unchanged) ---
+            doc.setFontSize(10); 
+            const staffBody = this.staffDataCache.filter(s => s.attendance === 'Yes').map(s => [s.id, s.name, `${s.breakStart || 'N/A'} - ${s.breakEnd || 'N/A'}`]);
+            doc.autoTable({ head: [['Staff ID', 'Name', 'Break Time']], body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
+            
+            const blobUrl = doc.output('bloburl');
+            document.getElementById('pdfDownloadLink').href = blobUrl;
+            document.getElementById('pdfPreview').src = blobUrl;
             document.getElementById('pdfModal').style.display = 'flex';
-        } catch (error) {
-            this.showMessage("PDF error", "error");
+        } catch (e) { 
+            console.error("PDF Generation Error:", e); this.showNotification('Error creating PDF.', 'error'); 
         }
     },
-
-    closeModal() {
-        document.getElementById('pdfModal').style.display = 'none';
-    },
-
-    showMessage(text, type) {
-        const colors = { success: 'green', error: 'red', warning: 'yellow', info: 'blue' };
-        const div = document.createElement('div');
-        div.className = `p-3 rounded mb-2 bg-${colors[type]}-100 text-${colors[type]}-800 border border-${colors[type]}-200`;
-        div.textContent = text;
-        document.getElementById('messages').appendChild(div);
-        setTimeout(() => div.remove(), 5000);
-    }
+    
+    closePdfModal() { /* ... */ },
+    clearNotifications: () => { /* ... */ },
+    showNotification(message, type = "info") { /* ... */ }
 };
 
-// Start when page loads
-document.addEventListener('DOMContentLoaded', () => roster.init());
-</script>
+// --- Helper functions to keep the main block concise (unchanged and collapsed for brevity) ---
+rosterSystem.initializeDate = function() { const today = new Date(); const year = today.getFullYear(); const mm = String(today.getMonth() + 1).padStart(2, '0'); const dd = String(today.getDate()).padStart(2, '0'); document.getElementById("rosterDate").value = `${year}-${mm}-${dd}`; document.getElementById("rosterDay").value = today.toLocaleDateString('en-US', { weekday: 'long' }); };
+rosterSystem.setupEventListeners = function() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()); document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()); document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()); document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal()); };
+rosterSystem.renderStaffTable = function(staffList) { const tableBody = document.getElementById("staffTable").querySelector("tbody"); tableBody.innerHTML = staffList.map(staff => ` <tr data-doc-id="${staff.docId}"> <td class="bg-white"><div class="p-2"><input data-field="id" class="w-20 p-1 border rounded" type="text" value="${staff.id || ""}"></div></td> <td><div class="p-2"><input data-field="name" class="w-28 p-1 border rounded" type="text" value="${staff.name || ""}"></div></td> <td><div class="p-2 flex items-center gap-1"><input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="w-24 p-1 border rounded"><input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="w-24 p-1 border rounded"></div></td> <td><div class="p-2"><select data-field="hhmd" class="p-1 border rounded bg-white"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><select data-field="attendance" class="p-1 border rounded bg-white"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></div></td> <td><div class="p-2"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></div></td> </tr> `).join(''); tableBody.querySelectorAll("tr").forEach(row => { row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaffInFirestore(e))); row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaffFromFirestore(e)); }); };
+rosterSystem.addStaffToFirestore = async function() { try { await this.firebase.addDoc(this.firebase.collection(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: false, createdAt: new Date() }); this.showNotification("Added new staff member.", "success"); } catch (error) { console.error("Error adding staff:", error); this.showNotification("Error adding staff member.", "error"); } };
+rosterSystem.updateStaffInFirestore = async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const updatedData = { id: row.querySelector('[data-field="id"]').value, name: row.querySelector('[data-field="name"]').value, breakStart: row.querySelector('[data-field="breakStart"]').value, breakEnd: row.querySelector('[data-field="breakEnd"]').value, hhmd: row.querySelector('[data-field="hhmd"]').value, attendance: row.querySelector('[data-field="attendance"]').value, locked: row.querySelector('[data-field="locked"]').checked }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "staff", docId), updatedData, { merge: true }); } catch (error) { console.error("Error updating staff:", error); this.showNotification("Error updating staff member.", "error"); } };
+rosterSystem.deleteStaffFromFirestore = async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const staffId = row.querySelector("[data-field=id]").value || "this staff member"; this.showNotification(`Removing ${staffId}...`, "info"); try { await this.firebase.deleteDoc(this.firebase.doc(this.db, "staff", docId)); this.showNotification(`${staffId} has been removed.`, "success"); } catch(error) { console.error("Error deleting staff:", error); this.showNotification(`Could not remove ${staffId}.`, "error"); } };
+rosterSystem.saveRosterToFirestore = async function(rosterData) { const rosterDate = document.getElementById("rosterDate").value; if (!rosterDate) return this.showNotification("Please select a valid date before saving.", "error"); const dataToSave = { date: rosterDate, day: document.getElementById("rosterDay").value, roster: rosterData, updatedAt: new Date() }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "rosters", rosterDate), dataToSave); } catch (error) { console.error("Error saving roster:", error); this.showNotification("Could not save roster to the cloud.", "error"); } };
+rosterSystem.shuffleBreaks = async function() { const presentUnlocked = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked); if (presentUnlocked.length < 2) return this.showNotification("Not enough staff to shuffle breaks.", "warning"); let breakTimes = presentUnlocked.map(s => ({ start: s.breakStart, end: s.breakEnd })); for (let i = breakTimes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]]; } const updatePromises = presentUnlocked.map((staff, index) => this.firebase.setDoc(this.firebase.doc(this.db, "staff", staff.docId), { breakStart: breakTimes[index].start, breakEnd: breakTimes[index].end }, { merge: true }) ); try { await Promise.all(updatePromises); this.showNotification("Break times shuffled.", "success"); } catch (error) { console.error("Error shuffling breaks:", error); this.showNotification("Error shuffling breaks.", "error"); } };
+rosterSystem.timeToMinutes = function(timeStr) { if (typeof timeStr !== 'string' || !timeStr.includes(':')) return -1; let [hours, minutes] = timeStr.trim().split(':').map(Number); if (isNaN(hours) || isNaN(minutes)) return -1; if (hours < 12) hours += 24; return (hours * 60) + minutes; };
+rosterSystem.isOnBreak = function(staff, timeSlot) { if (!staff || !staff.breakStart || !staff.breakEnd) return false; const start = this.timeToMinutes(staff.breakStart); const end = this.timeToMinutes(staff.breakEnd); const slot = this.timeToMinutes(timeSlot); if (start === -1 || end === -1 || slot === -1 || start >= end) return false; return slot >= start && slot < end; };
+rosterSystem.runRosterGeneration = async function() { this.clearNotifications(); document.getElementById('rosterContainerWrapper').classList.add('opacity-0'); let currentStaffData; try { const staffSnapshot = await this.firebase.getDocs(this.firebase.collection(this.db, "staff")); currentStaffData = staffSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })); } catch (error) { console.error("Failed to fetch latest staff data:", error); this.showNotification("Could not fetch latest staff data. Roster may be incorrect.", "error"); return; } const presentStaff = currentStaffData.filter(s => s.attendance === 'Yes'); if (presentStaff.length === 0) return this.showNotification("No staff marked as present.", 'error'); const roster = Object.fromEntries(this.LOCATIONS.map(loc => [loc.name, Object.fromEntries(this.ROSTER_TIMES.map(t => [t, new Array(loc.needed).fill('')]))])); const assignmentsByStaff = Object.fromEntries(presentStaff.map(s => [s.id, []])); const staffMap = Object.fromEntries(presentStaff.map(s => [s.id, s])); const shortfalls = []; const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value); const verticalPatrolTracker = new Set(); const assignStaffToSlot = (time, locName, positionIndex) => { const staffPool = presentStaff.map(s => s.id).sort(() => Math.random() - 0.5); for (const staffId of staffPool) { const staffMember = staffMap[staffId]; if (locName === 'HHMD' && staffMember.hhmd !== 'Yes') continue; if (assignmentsByStaff[staffId].includes(time)) continue; if (this.isOnBreak(staffMember, time)) continue; if ((locName === 'Vertical Patrol' || locName === 'Tango Papa') && verticalPatrolTracker.has(staffId)) continue; roster[locName][time][positionIndex] = staffId; assignmentsByStaff[staffId].push(time); if (locName === 'Vertical Patrol' || locName === 'Tango Papa') { verticalPatrolTracker.add(staffId); } return; } shortfalls.push(`Shortfall: ${locName} at ${time}.`); }; for (const locName in this.CRITICAL_DUTIES) { if (isWeekend && locName === "Report Room") continue; const needed = this.LOCATIONS.find(l => l.name === locName).needed; this.CRITICAL_DUTIES[locName].forEach(time => { for (let i = 0; i < needed; i++) { assignStaffToSlot(time, locName, i); } }); } this.OUTPUT_ORDER.forEach(locName => { const needed = this.LOCATIONS.find(l => l.name === locName).needed; this.ROSTER_TIMES.forEach(time => { for (let i = 0; i < needed; i++) { if (roster[locName][time][i] === '') { assignStaffToSlot(time, locName, i); } } }); }); this.generatedRoster = roster; this.displayRoster(roster); if (shortfalls.length > 0) { [...new Set(shortfalls)].forEach(msg => this.showNotification(msg, 'warning')); } this.saveRosterToFirestore(roster); this.addRosterActionButtons(); };
+rosterSystem.displayRoster = function(roster) { const container = document.getElementById("rosterContainer"); const staffOpts = '<option value="">--</option>' + this.staffDataCache.filter(s => s.attendance === 'Yes').map(s => `<option value="${s.id}">${s.id}</option>`).join(''); const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value); const tableHead = `<thead><tr><th class="text-left"><div class="p-3">Location</div></th>${this.ROSTER_TIMES.map(t => `<th class="text-center p-3">${t}</th>`).join('')}</tr></thead>`; const tableBody = this.OUTPUT_ORDER.filter(loc => loc !== "Tango Papa").map(locName => { const locConfig = this.LOCATIONS.find(l => l.name === locName); const isCombined = locName === "Vertical Patrol"; let locationCell = `<td class="text-slate-700"><div class="location-cell-content ${isCombined ? 'location-cell-multiline' : ''}">${isCombined ? 'Vertical Patrol<br>Tango Papa' : locName}</div></td>`; const timeCells = this.ROSTER_TIMES.map(time => { let content = '', classes = [], isApplicable = true; if (this.CRITICAL_DUTIES[locName] && !this.CRITICAL_DUTIES[locName].includes(time)) isApplicable = false; if (locName === "Report Room" && isWeekend) isApplicable = false; if (isCombined) { const vpCrit = this.CRITICAL_DUTIES['Vertical Patrol'].includes(time), tpCrit = this.CRITICAL_DUTIES['Tango Papa'].includes(time); if(vpCrit || tpCrit) { if(vpCrit) content += `<select data-loc="Vertical Patrol" data-time="${time}" data-index="0" class="roster-select">${staffOpts.replace(`value="${roster['Vertical Patrol'][time][0] || ''}"`, `value="${roster['Vertical Patrol'][time][0] || ''}" selected`)}</select>`; if(tpCrit) content += `<select data-loc="Tango Papa" data-time="${time}" data-index="0" class="roster-select">${staffOpts.replace(`value="${roster['Tango Papa'][time][0] || ''}"`, `value="${roster['Tango Papa'][time][0] || ''}" selected`)}</select>`; } else isApplicable = false; } else if (isApplicable) { for (let i = 0; i < locConfig.needed; i++) content += `<select data-loc="${locName}" data-time="${time}" data-index="${i}" class="roster-select">${staffOpts.replace(`value="${roster[locName][time][i] || ''}"`, `value="${roster[locName][time][i] || ''}" selected`)}</select>`; } if (!isApplicable) classes.push('not-applicable'); else if (content.includes('value="" selected')) classes.push('empty-assignable-cell'); return `<td class="${classes.join(' ')}"><div class="roster-cell-wrapper">${content}</div></td>`; }).join(''); return `<tr>${locationCell}${timeCells}</tr>`; }).join(''); container.innerHTML = `<table id="editableRoster" class="styled-table">${tableHead}<tbody>${tableBody}</tbody></table>`; container.querySelectorAll('.roster-select').forEach(sel => sel.addEventListener('change', (e) => this.handleCellChange(e))); this.validateAllCells(); setTimeout(() => document.getElementById('rosterContainerWrapper').classList.remove('opacity-0'), 50); };
+rosterSystem.handleCellChange = function(event) { const { loc, time, index } = event.target.dataset; this.generatedRoster[loc][time][parseInt(index, 10)] = event.target.value; this.validateAllCells(); this.saveRosterToFirestore(this.generatedRoster); };
+rosterSystem.validateAllCells = function() { document.querySelectorAll('td.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell')); document.querySelectorAll('.roster-select').forEach(sel => { const staffId = sel.value; if (!staffId) return; const time = sel.dataset.time; const cell = sel.closest('td'); const staffMember = this.staffDataCache.find(s => s.id === staffId); if (staffMember && this.isOnBreak(staffMember, time)) cell.classList.add('conflict-cell'); const assignments = document.querySelectorAll(`.roster-select[data-time="${time}"][value="${staffId}"]`); if (assignments.length > 1) assignments.forEach(s => s.closest('td').classList.add('conflict-cell')); }); };
+rosterSystem.addRosterActionButtons = function() { document.getElementById("rosterActions")?.remove(); let buttonsHTML = ` <div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"> <button id="regenerateRosterBtn" class="btn bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-slate-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>Regenerate</button> <button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>Copy</button> <button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>Download PDF</button> </div>`; document.getElementById("rosterContainerWrapper").insertAdjacentHTML("beforeend", buttonsHTML); document.getElementById("regenerateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV()); document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF()); };
+rosterSystem.copyTSV = function() { if (!this.generatedRoster) return this.showNotification("No roster to copy.", "error"); const tsv = this.OUTPUT_ORDER.map(loc => `${loc}\t${this.ROSTER_TIMES.map(time => (this.generatedRoster[loc]?.[time] || []).join(" | ")).join("\t")}`).join("\n"); navigator.clipboard.writeText(`Location\t${this.ROSTER_TIMES.join("\t")}\n${tsv}`).then(() => this.showNotification("Roster copied!", "success"),() => this.showNotification("Failed to copy.", "error")); };
+rosterSystem.closePdfModal = function() { const preview = document.getElementById('pdfPreview'); if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src); preview.src = 'about:blank'; document.getElementById('pdfModal').style.display = 'none'; };
+rosterSystem.showNotification = function(message, type = "info") { const container = document.getElementById("notification-container"); const colors = {success: "green", error: "red", warning: "yellow", info: "blue"}; const alertDiv = document.createElement("div"); alertDiv.className = `border-l-4 p-4 rounded-r-lg bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700 shadow-md`; alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`; container.appendChild(alertDiv); setTimeout(() => { alertDiv.style.transition = "opacity 0.5s ease"; alertDiv.style.opacity = "0"; setTimeout(() => alertDiv.remove(), 500); }, 5000); };
 
+rosterSystem.init();
+
+</script>
 </body>
 </html>
