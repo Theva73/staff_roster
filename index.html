@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v9.1</title>
+    <title>Staff Roster System v9.2 (Standalone)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -115,7 +115,7 @@
 
         <header class="text-center my-8">
             <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
-            <p class="text-lg text-slate-500 mt-2">v9.1 (Flexible & Auto-Saving)</p>
+            <p class="text-lg text-slate-500 mt-2">v9.2 (Standalone)</p>
         </header>
 
         <div class="card p-4 md:p-6 mb-8">
@@ -148,7 +148,6 @@
 
 <script>
 // Main application object definition.
-// This is defined in a standard script tag to ensure it exists before the module script below runs.
 const rosterSystem = {
     // --- CONFIG & STATE ---
     ROSTER_TIMES: ["20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"],
@@ -162,7 +161,7 @@ const rosterSystem = {
     init() {
         this.db = window.db; 
         this.firebase = window.firebase; 
-        console.log("Roster System v9.1 Initialized");
+        console.log("Roster System v9.2 Initialized");
         this.setupEventListeners(); 
         this.initializeDate(); 
         this.listenForStaffUpdates();
@@ -418,15 +417,23 @@ const rosterSystem = {
 <script type="module">
     // Firebase Imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // This self-executing async function handles the entire Firebase setup and authentication process.
     (async () => {
         try {
-            // Strict initialization using the environment-provided Firebase config.
-            // This expects __firebase_config to be a valid JSON string.
-            const firebaseConfig = JSON.parse(__firebase_config);
+            // --- Your web app's Firebase configuration is now embedded here ---
+            const firebaseConfig = {
+              apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+              authDomain: "roster-4a997.firebaseapp.com",
+              projectId: "roster-4a997",
+              storageBucket: "roster-4a997.appspot.com", // Corrected storage bucket
+              messagingSenderId: "901381868881",
+              appId: "1:901381868881:web:92930481d6c1c85fedd770"
+            };
+
+            // Initialize Firebase
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
             const auth = getAuth(app);
@@ -437,23 +444,18 @@ const rosterSystem = {
                  collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
             };
 
-            // Authenticate the user. Use a custom token if available, otherwise sign in anonymously.
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-                console.log('Authentication successful with custom token.');
-            } else {
-                await signInAnonymously(auth);
-                console.log('Authentication successful via anonymous sign-in.');
-            }
+            // Authenticate the user anonymously. This is suitable for public web pages.
+            await signInAnonymously(auth);
+            console.log('Authentication successful via anonymous sign-in. UID:', auth.currentUser.uid);
             
             // Once authentication is successful, initialize the main application logic.
             rosterSystem.init();
 
         } catch (error) {
             // If any part of the setup or authentication fails, log the error and display a message to the user.
-            console.error("Firebase authentication or setup failed:", error);
+            console.error("Firebase initialization or authentication failed:", error);
             const container = document.querySelector('.container');
-            if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Authentication Error</h2><p>Could not connect to the services. Please refresh and try again. Check the console for more details.</p></div>`;
+            if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
         }
     })();
 </script>
