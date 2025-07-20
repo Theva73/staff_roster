@@ -218,7 +218,10 @@ const roster = {
     },
 
     updateCount() {
-        const count = this.staff.filter(s => s.present === 'Yes').length;
+        // Check multiple possible field names for attendance
+        const count = this.staff.filter(s => 
+            s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
+        ).length;
         document.getElementById('staffCount').textContent = count;
     },
 
@@ -231,20 +234,20 @@ const roster = {
 
         tbody.innerHTML = this.staff.map(s => `
             <tr data-id="${s.id}">
-                <td><input data-field="staffId" value="${s.staffId || ''}" class="w-20 p-1 border rounded text-center"></td>
+                <td><input data-field="staffId" value="${s.staffId || s.id || ''}" class="w-20 p-1 border rounded text-center"></td>
                 <td><input data-field="name" value="${s.name || ''}" class="w-24 p-1 border rounded"></td>
                 <td><input type="time" data-field="breakStart" value="${s.breakStart || '22:00'}" class="p-1 border rounded"></td>
                 <td><input type="time" data-field="breakEnd" value="${s.breakEnd || '00:00'}" class="p-1 border rounded"></td>
                 <td>
                     <select data-field="hhmd" class="p-1 border rounded">
-                        <option value="Yes" ${s.hhmd === 'Yes' ? 'selected' : ''}>Yes</option>
-                        <option value="No" ${s.hhmd !== 'Yes' ? 'selected' : ''}>No</option>
+                        <option value="Yes" ${(s.hhmd === 'Yes' || s.hhmd === true) ? 'selected' : ''}>Yes</option>
+                        <option value="No" ${(s.hhmd !== 'Yes' && s.hhmd !== true) ? 'selected' : ''}>No</option>
                     </select>
                 </td>
                 <td>
                     <select data-field="present" class="p-1 border rounded">
-                        <option value="Yes" ${s.present !== 'No' ? 'selected' : ''}>Yes</option>
-                        <option value="No" ${s.present === 'No' ? 'selected' : ''}>No</option>
+                        <option value="Yes" ${(s.present !== 'No' && s.attendance !== 'No') ? 'selected' : ''}>Yes</option>
+                        <option value="No" ${(s.present === 'No' || s.attendance === 'No') ? 'selected' : ''}>No</option>
                     </select>
                 </td>
                 <td><button class="remove-btn text-red-600 hover:text-red-800 px-2 py-1 rounded">Remove</button></td>
@@ -347,24 +350,27 @@ const roster = {
         return start > end ? (slot >= start || slot < end) : (slot >= start && slot < end);
     },
 
-    hasConflict(schedule, staffId, time, location, pos) {
-        const staff = this.staff.find(s => s.staffId === staffId);
+    hasConflict(schedule, staffIdentifier, time, location, pos) {
+        // Find staff by multiple possible identifiers
+        const staff = this.staff.find(s => 
+            s.staffId === staffIdentifier || s.id === staffIdentifier || s.name === staffIdentifier
+        );
         if (!staff) return null;
 
         if (this.onBreak(staff, time)) {
-            return { type: 'break', msg: `${staffId} on break at ${time}` };
+            return { type: 'break', msg: `${staffIdentifier} on break at ${time}` };
         }
 
-        if (location === 'HHMD' && staff.hhmd !== 'Yes') {
-            return { type: 'qual', msg: `${staffId} not HHMD qualified` };
+        if (location === 'HHMD' && staff.hhmd !== 'Yes' && staff.hhmd !== true) {
+            return { type: 'qual', msg: `${staffIdentifier} not HHMD qualified` };
         }
 
         // Check double assignment
         for (const loc of this.LOCATIONS.map(l => l.name)) {
             if (schedule[loc] && schedule[loc][time]) {
                 for (let i = 0; i < schedule[loc][time].length; i++) {
-                    if (schedule[loc][time][i] === staffId && !(loc === location && i === pos)) {
-                        return { type: 'double', msg: `${staffId} already at ${loc}` };
+                    if (schedule[loc][time][i] === staffIdentifier && !(loc === location && i === pos)) {
+                        return { type: 'double', msg: `${staffIdentifier} already at ${loc}` };
                     }
                 }
             }
@@ -373,7 +379,10 @@ const roster = {
     },
 
     generate() {
-        const present = this.staff.filter(s => s.present === 'Yes');
+        // Check multiple field names for attendance
+        const present = this.staff.filter(s => 
+            s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
+        );
         if (present.length === 0) {
             this.showMessage("No staff present", "error");
             return;
@@ -393,9 +402,11 @@ const roster = {
         const assign = (time, location, slot) => {
             const shuffled = [...present].sort(() => Math.random() - 0.5);
             for (const staff of shuffled) {
-                const conflict = this.hasConflict(schedule, staff.staffId, time, location, slot);
+                // Use staffId if available, otherwise use document id
+                const staffIdentifier = staff.staffId || staff.id || staff.name;
+                const conflict = this.hasConflict(schedule, staffIdentifier, time, location, slot);
                 if (!conflict) {
-                    schedule[location][time][slot] = staff.staffId;
+                    schedule[location][time][slot] = staffIdentifier;
                     return true;
                 }
             }
@@ -441,8 +452,10 @@ const roster = {
 
     displaySchedule() {
         const staffOpts = '<option value="">--</option>' + 
-            this.staff.filter(s => s.present === 'Yes')
-                .map(s => `<option value="${s.staffId}">${s.staffId}</option>`).join('');
+            present.map(s => {
+                const identifier = s.staffId || s.id || s.name;
+                return `<option value="${identifier}">${identifier}</option>`;
+            }).join('');
 
         const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
 
@@ -540,12 +553,15 @@ const roster = {
                 }
             });
 
-            Object.keys(assignments).forEach(staffId => {
-                const staff = this.staff.find(s => s.staffId === staffId);
+            Object.keys(assignments).forEach(staffIdentifier => {
+                // Find staff by identifier
+                const staff = this.staff.find(s => 
+                    s.staffId === staffIdentifier || s.id === staffIdentifier || s.name === staffIdentifier
+                );
                 const isOnBreak = staff && this.onBreak(staff, time);
-                const hasMultiple = assignments[staffId].length > 1;
+                const hasMultiple = assignments[staffIdentifier].length > 1;
 
-                assignments[staffId].forEach(({ name, slot }) => {
+                assignments[staffIdentifier].forEach(({ name, slot }) => {
                     const sel = document.querySelector(`select[data-loc="${name}"][data-time="${time}"][data-slot="${slot}"]`);
                     if (sel) {
                         const cell = sel.closest('td');
@@ -617,8 +633,12 @@ const roster = {
                 headStyles: { fillColor: [45, 55, 72] }
             });
 
-            const staffBody = this.staff.filter(s => s.present === 'Yes').map(s => [
-                s.staffId, s.name, `${s.breakStart} - ${s.breakEnd}`
+            const staffBody = this.staff.filter(s => 
+                s.present === 'Yes' || s.attendance === 'Yes' || (!s.present && !s.attendance)
+            ).map(s => [
+                s.staffId || s.id || s.name, 
+                s.name, 
+                `${s.breakStart} - ${s.breakEnd}`
             ]);
 
             doc.autoTable({
