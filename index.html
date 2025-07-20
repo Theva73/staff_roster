@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Roster System v7.9</title>
+    <title>Staff Roster System v8.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -125,7 +125,7 @@
     <div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
         <header class="text-center my-8">
             <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
-            <p class="text-lg text-slate-500 mt-2">v7.9 (Fixed)</p>
+            <p class="text-lg text-slate-500 mt-2">v8.0</p>
         </header>
 
         <div class="card p-4 md:p-6 mb-8">
@@ -173,16 +173,13 @@ const rosterSystem = {
                 if (window.db && window.firebase) { 
                     clearInterval(interval);
                     this.db = window.db; this.firebase = window.firebase; 
-                    console.log("Roster System v7.9 Initialized"); 
+                    console.log("Roster System v8.0 Initialized"); 
                     resolve();
                 } 
             }, 50); 
         });
         this.setupEventListeners(); this.initializeDate(); this.listenForStaffUpdates();
     },
-
-    initializeDate() { /* ... */ },
-    setupEventListeners() { /* ... */ },
     
     // --- FIREBASE DATA MANAGEMENT ---
     listenForStaffUpdates() {
@@ -195,30 +192,163 @@ const rosterSystem = {
         });
     },
 
-    renderStaffTable(staffList) { /* ... */ },
-    async addStaffToFirestore() { /* ... */ },
-    async updateStaffInFirestore(event) { /* ... */ },
-    async deleteStaffFromFirestore(event) { /* ... */ },
-    async saveRosterToFirestore(rosterData) { /* ... */ },
-    
     updateStaffCount() {
         document.getElementById("staffCount").textContent = this.staffDataCache.filter(s => s.attendance === 'Yes').length;
     },
+    
+    // --- MAIN SCHEDULING LOGIC ---
 
-    async shuffleBreaks() { /* ... */ },
-    timeToMinutes(timeStr) { /* ... */ },
-    isOnBreak(staff, timeSlot) { /* ... */ },
-    async runRosterGeneration() { /* ... */ },
+    // [CORRECTED] The main roster generation function.
+    // This version restructures the loops to prevent double-booking.
+    runRosterGeneration: async function() {
+        this.clearNotifications();
+        document.getElementById('rosterContainerWrapper').classList.add('opacity-0');
+        let currentStaffData;
+        try {
+            const staffSnapshot = await this.firebase.getDocs(this.firebase.collection(this.db, "staff"));
+            currentStaffData = staffSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+        } catch (error) {
+            console.error("Failed to fetch latest staff data:", error);
+            this.showNotification("Could not fetch latest staff data. Roster may be incorrect.", "error");
+            return;
+        }
+        const presentStaff = currentStaffData.filter(s => s.attendance === 'Yes');
+        if (presentStaff.length === 0) return this.showNotification("No staff marked as present.", 'error');
 
+        const roster = Object.fromEntries(this.LOCATIONS.map(loc => [loc.name, Object.fromEntries(this.ROSTER_TIMES.map(t => [t, new Array(loc.needed).fill('')]))]));
+        const assignmentsByStaff = Object.fromEntries(presentStaff.map(s => [s.id, []]));
+        const staffMap = Object.fromEntries(presentStaff.map(s => [s.id, s]));
+        const shortfalls = [];
+        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
+        const verticalPatrolTracker = new Set();
+
+        const assignStaffToSlot = (time, locName, positionIndex) => {
+            const staffPool = presentStaff.map(s => s.id).sort(() => Math.random() - 0.5);
+            for (const staffId of staffPool) {
+                const staffMember = staffMap[staffId];
+                if (locName === 'HHMD' && staffMember.hhmd !== 'Yes') continue;
+                // This is the crucial check that prevents double-booking
+                if (assignmentsByStaff[staffId].includes(time)) continue;
+                if (this.isOnBreak(staffMember, time)) continue;
+                if ((locName === 'Vertical Patrol' || locName === 'Tango Papa') && verticalPatrolTracker.has(staffId)) continue;
+                
+                roster[locName][time][positionIndex] = staffId;
+                assignmentsByStaff[staffId].push(time);
+                if (locName === 'Vertical Patrol' || locName === 'Tango Papa') {
+                    verticalPatrolTracker.add(staffId);
+                }
+                return;
+            }
+            shortfalls.push(`Shortfall: ${locName} at ${time}.`);
+        };
+
+        // 1. First, fill in all the critical, time-sensitive duties.
+        for (const locName in this.CRITICAL_DUTIES) {
+            if (isWeekend && locName === "Report Room") continue;
+            const needed = this.LOCATIONS.find(l => l.name === locName).needed;
+            this.CRITICAL_DUTIES[locName].forEach(time => {
+                for (let i = 0; i < needed; i++) {
+                    assignStaffToSlot(time, locName, i);
+                }
+            });
+        }
+
+        // 2. --- THIS IS THE CORRECTED LOOP STRUCTURE ---
+        // Instead of looping by location then time, we loop through each TIME slot first.
+        // This ensures all assignments for a single hour are decided before moving to the next hour.
+        this.ROSTER_TIMES.forEach(time => {
+            this.OUTPUT_ORDER.forEach(locName => {
+                const needed = this.LOCATIONS.find(l => l.name === locName).needed;
+                for (let i = 0; i < needed; i++) {
+                    // Only assign if the slot hasn't already been filled (e.g., by the critical duties loop)
+                    if (roster[locName][time][i] === '') {
+                        assignStaffToSlot(time, locName, i);
+                    }
+                }
+            });
+        });
+
+        this.generatedRoster = roster;
+        this.displayRoster(roster);
+        if (shortfalls.length > 0) {
+            [...new Set(shortfalls)].forEach(msg => this.showNotification(msg, 'warning'));
+        }
+        this.saveRosterToFirestore(roster);
+        this.addRosterActionButtons();
+    },
+    
+    // [CORRECTED] This function checks if a staff member is on break.
+    // It correctly handles the overnight time logic as discussed.
+    isOnBreak: function(staff, timeSlot) {
+        if (!staff || !staff.breakStart || !staff.breakEnd) {
+            return false;
+        }
+        const timeToContinuousMinutes = (timeStr) => {
+            if (typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
+            let [hours, minutes] = timeStr.trim().split(':').map(Number);
+            if (isNaN(hours) || isNaN(minutes)) return -1;
+            if (hours < 12) {
+                hours += 24;
+            }
+            return (hours * 60) + minutes;
+        };
+        const breakStartMins = timeToContinuousMinutes(staff.breakStart);
+        const breakEndMins = timeToContinuousMinutes(staff.breakEnd);
+        const timeSlotMins = timeToContinuousMinutes(timeSlot);
+        if (breakStartMins === -1 || breakEndMins === -1 || timeSlotMins === -1) {
+            return false;
+        }
+        if (breakStartMins >= breakEndMins) {
+            return false;
+        }
+        return timeSlotMins >= breakStartMins && timeSlotMins < breakEndMins;
+    },
+    
     // --- DISPLAY & EXPORT ---
-    displayRoster(roster) { /* ... */ },
-    handleCellChange(event) { /* ... */ },
-    validateAllCells() { /* ... */ },
-    addRosterActionButtons() { /* ... */ },
-    copyTSV() { /* ... */ },
 
-    // --- REVISED PDF Generation ---
-    downloadPDF() {
+    // [CORRECTED] Displays the roster on screen, with "Tango Papa" as a separate row.
+    displayRoster: function(roster) {
+        const container = document.getElementById("rosterContainer");
+        const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
+        const tableHead = `<thead><tr><th class="text-left"><div class="p-3">Location</div></th>${this.ROSTER_TIMES.map(t => `<th class="text-center p-3">${t}</th>`).join('')}</tr></thead>`;
+        const tableBody = this.OUTPUT_ORDER.map(locName => {
+            const locConfig = this.LOCATIONS.find(l => l.name === locName);
+            let locationCell = `<td class="text-slate-700"><div class="location-cell-content">${locName}</div></td>`;
+            const timeCells = this.ROSTER_TIMES.map(time => {
+                let content = '', classes = [], isApplicable = true;
+                if (this.CRITICAL_DUTIES[locName] && !this.CRITICAL_DUTIES[locName].includes(time)) {
+                    isApplicable = false;
+                }
+                if (locName === "Report Room" && isWeekend) {
+                    isApplicable = false;
+                }
+                if (isApplicable) {
+                    for (let i = 0; i < locConfig.needed; i++) {
+                        const assignedStaffId = roster[locName]?.[time]?.[i] || '';
+                        let optionsWithSelection = '<option value="">--</option>' + this.staffDataCache
+                            .filter(s => s.attendance === 'Yes')
+                            .map(s => `<option value="${s.id}" ${assignedStaffId === s.id ? 'selected' : ''}>${s.id}</option>`)
+                            .join('');
+                        content += `<select data-loc="${locName}" data-time="${time}" data-index="${i}" class="roster-select">${optionsWithSelection}</select>`;
+                    }
+                }
+                if (!isApplicable) {
+                    classes.push('not-applicable');
+                } else if (content.includes('value="" selected')) {
+                    classes.push('empty-assignable-cell');
+                }
+                return `<td class="${classes.join(' ')}"><div class="roster-cell-wrapper">${content}</div></td>`;
+            }).join('');
+            return `<tr>${locationCell}${timeCells}</tr>`;
+        }).join('');
+        container.innerHTML = `<table id="editableRoster" class="styled-table">${tableHead}<tbody>${tableBody}</tbody></table>`;
+        container.querySelectorAll('.roster-select').forEach(sel => sel.addEventListener('change', (e) => this.handleCellChange(e)));
+        this.validateAllCells();
+        setTimeout(() => document.getElementById('rosterContainerWrapper').classList.remove('opacity-0'), 50);
+    },
+
+    // [CORRECTED] Generates the PDF, with "Tango Papa" as a separate row.
+    downloadPDF: function() {
         if (!this.generatedRoster) return this.showNotification('No roster to download.', 'error');
         try {
             const { jsPDF } = window.jspdf;
@@ -226,31 +356,20 @@ const rosterSystem = {
             const rosterDate = document.getElementById('rosterDate').value, rosterDay = document.getElementById('rosterDay').value;
             doc.setFontSize(16);
             doc.text(`Staff Roster - ${rosterDate} (${rosterDay})`, 14, 15);
-
             const specialNotes = { "20:00": "@ 20:30", "01:00": "@ 01:30", "06:00": "@ 06:30" };
-            
-            // --- Main Roster Table ---
             const mainRosterBody = this.OUTPUT_ORDER.map(locName => {
                 const rowData = this.ROSTER_TIMES.map(time => {
-                    // Get staff for the current location and time
                     let staffId = (this.generatedRoster[locName]?.[time] || []).filter(Boolean).join(' | ');
-
-                    // Add special time notes only to Vertical Patrol
                     if (locName === 'Vertical Patrol' && staffId && specialNotes[time]) {
                         return `${staffId}\n${specialNotes[time]}`;
                     }
-                    
-                    // For Tango Papa, only show the staff ID if it's in a critical duty slot (e.g., 07:00)
                     if (locName === 'Tango Papa' && !this.CRITICAL_DUTIES['Tango Papa'].includes(time)) {
-                        return ''; // Return empty string for non-applicable times
+                        return '';
                     }
-
                     return staffId;
                 });
-                // Return the display name (Location) and the rest of the row data
                 return [locName, ...rowData];
             });
-
             doc.autoTable({
                 head: [['Location', ...this.ROSTER_TIMES]],
                 body: mainRosterBody,
@@ -260,7 +379,6 @@ const rosterSystem = {
                 headStyles: { fillColor: [45, 55, 72], textColor: 255, fontSize: 7 },
                 columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, halign: 'left' } },
                 didParseCell: function (data) {
-                    // Custom styling for the special note text
                     if (typeof data.cell.text[0] === 'string' && data.cell.text.length > 1) {
                         if (data.row.raw[0] === 'Vertical Patrol' && data.cell.text[1].startsWith('@')) {
                              data.cell.styles.fontSize = 4.5;
@@ -268,12 +386,9 @@ const rosterSystem = {
                     }
                 }
             });
-
-            // --- Staff Info Table (Unchanged) ---
             doc.setFontSize(10);
             const staffBody = this.staffDataCache.filter(s => s.attendance === 'Yes').map(s => [s.id, s.name, `${s.breakStart || 'N/A'} - ${s.breakEnd || 'N/A'}`]);
             doc.autoTable({ head: [['Staff ID', 'Name', 'Break Time']], body: staffBody, startY: doc.autoTable.previous.finalY + 8, theme: 'striped', styles: { fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [124, 58, 237], textColor: 255 }, columnStyles: { 1: { cellWidth: 40 } }, margin: { left: 14 } });
-            
             const blobUrl = doc.output('bloburl');
             document.getElementById('pdfDownloadLink').href = blobUrl;
             document.getElementById('pdfPreview').src = blobUrl;
@@ -284,128 +399,23 @@ const rosterSystem = {
         }
     },
     
-    closePdfModal() { /* ... */ },
-    clearNotifications: () => { /* ... */ },
-    showNotification(message, type = "info") { /* ... */ }
+    // --- Unchanged Helper Functions ---
+    initializeDate: function() { const today = new Date(); const year = today.getFullYear(); const mm = String(today.getMonth() + 1).padStart(2, '0'); const dd = String(today.getDate()).padStart(2, '0'); document.getElementById("rosterDate").value = `${year}-${mm}-${dd}`; document.getElementById("rosterDay").value = today.toLocaleDateString('en-US', { weekday: 'long' }); },
+    setupEventListeners: function() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()); document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()); document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()); document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal()); },
+    renderStaffTable: function(staffList) { const tableBody = document.getElementById("staffTable").querySelector("tbody"); tableBody.innerHTML = staffList.map(staff => ` <tr data-doc-id="${staff.docId}"> <td class="bg-white"><div class="p-2"><input data-field="id" class="w-20 p-1 border rounded" type="text" value="${staff.id || ""}"></div></td> <td><div class="p-2"><input data-field="name" class="w-28 p-1 border rounded" type="text" value="${staff.name || ""}"></div></td> <td><div class="p-2 flex items-center gap-1"><input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="w-24 p-1 border rounded"><input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="w-24 p-1 border rounded"></div></td> <td><div class="p-2"><select data-field="hhmd" class="p-1 border rounded bg-white"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><select data-field="attendance" class="p-1 border rounded bg-white"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></div></td> <td><div class="p-2"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></div></td> </tr> `).join(''); tableBody.querySelectorAll("tr").forEach(row => { row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaffInFirestore(e))); row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaffFromFirestore(e)); }); },
+    addStaffToFirestore: async function() { try { await this.firebase.addDoc(this.firebase.collection(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: false, createdAt: new Date() }); this.showNotification("Added new staff member.", "success"); } catch (error) { console.error("Error adding staff:", error); this.showNotification("Error adding staff member.", "error"); } },
+    updateStaffInFirestore: async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const updatedData = { id: row.querySelector('[data-field="id"]').value, name: row.querySelector('[data-field="name"]').value, breakStart: row.querySelector('[data-field="breakStart"]').value, breakEnd: row.querySelector('[data-field="breakEnd"]').value, hhmd: row.querySelector('[data-field="hhmd"]').value, attendance: row.querySelector('[data-field="attendance"]').value, locked: row.querySelector('[data-field="locked"]').checked }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "staff", docId), updatedData, { merge: true }); } catch (error) { console.error("Error updating staff:", error); this.showNotification("Error updating staff member.", "error"); } },
+    deleteStaffFromFirestore: async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const staffId = row.querySelector("[data-field=id]").value || "this staff member"; this.showNotification(`Removing ${staffId}...`, "info"); try { await this.firebase.deleteDoc(this.firebase.doc(this.db, "staff", docId)); this.showNotification(`${staffId} has been removed.`, "success"); } catch(error) { console.error("Error deleting staff:", error); this.showNotification(`Could not remove ${staffId}.`, "error"); } },
+    saveRosterToFirestore: async function(rosterData) { const rosterDate = document.getElementById("rosterDate").value; if (!rosterDate) return this.showNotification("Please select a valid date before saving.", "error"); const dataToSave = { date: rosterDate, day: document.getElementById("rosterDay").value, roster: rosterData, updatedAt: new Date() }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "rosters", rosterDate), dataToSave); } catch (error) { console.error("Error saving roster:", error); this.showNotification("Could not save roster to the cloud.", "error"); } },
+    shuffleBreaks: async function() { const presentUnlocked = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked); if (presentUnlocked.length < 2) return this.showNotification("Not enough staff to shuffle breaks.", "warning"); let breakTimes = presentUnlocked.map(s => ({ start: s.breakStart, end: s.breakEnd })); for (let i = breakTimes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]]; } const updatePromises = presentUnlocked.map((staff, index) => this.firebase.setDoc(this.firebase.doc(this.db, "staff", staff.docId), { breakStart: breakTimes[index].start, breakEnd: breakTimes[index].end }, { merge: true }) ); try { await Promise.all(updatePromises); this.showNotification("Break times shuffled.", "success"); } catch (error) { console.error("Error shuffling breaks:", error); this.showNotification("Error shuffling breaks.", "error"); } },
+    handleCellChange: function(event) { const { loc, time, index } = event.target.dataset; this.generatedRoster[loc][time][parseInt(index, 10)] = event.target.value; this.validateAllCells(); this.saveRosterToFirestore(this.generatedRoster); },
+    validateAllCells: function() { document.querySelectorAll('td.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell')); document.querySelectorAll('.roster-select').forEach(sel => { const staffId = sel.value; if (!staffId) return; const time = sel.dataset.time; const cell = sel.closest('td'); const staffMember = this.staffDataCache.find(s => s.id === staffId); if (staffMember && this.isOnBreak(staffMember, time)) cell.classList.add('conflict-cell'); const assignments = document.querySelectorAll(`.roster-select[data-time="${time}"][value="${staffId}"]`); if (assignments.length > 1) assignments.forEach(s => s.closest('td').classList.add('conflict-cell')); }); },
+    addRosterActionButtons: function() { document.getElementById("rosterActions")?.remove(); let buttonsHTML = ` <div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"> <button id="regenerateRosterBtn" class="btn bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-slate-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>Regenerate</button> <button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>Copy</button> <button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>Download PDF</button> </div>`; document.getElementById("rosterContainerWrapper").insertAdjacentHTML("beforeend", buttonsHTML); document.getElementById("regenerateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV()); document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF()); },
+    copyTSV: function() { if (!this.generatedRoster) return this.showNotification("No roster to copy.", "error"); const tsv = this.OUTPUT_ORDER.map(loc => `${loc}\t${this.ROSTER_TIMES.map(time => (this.generatedRoster[loc]?.[time] || []).join(" | ")).join("\t")}`).join("\n"); navigator.clipboard.writeText(`Location\t${this.ROSTER_TIMES.join("\t")}\n${tsv}`).then(() => this.showNotification("Roster copied!", "success"),() => this.showNotification("Failed to copy.", "error")); },
+    closePdfModal: function() { const preview = document.getElementById('pdfPreview'); if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src); preview.src = 'about:blank'; document.getElementById('pdfModal').style.display = 'none'; },
+    showNotification: function(message, type = "info") { const container = document.getElementById("notification-container"); const colors = {success: "green", error: "red", warning: "yellow", info: "blue"}; const alertDiv = document.createElement("div"); alertDiv.className = `border-l-4 p-4 rounded-r-lg bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700 shadow-md`; alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`; container.appendChild(alertDiv); setTimeout(() => { alertDiv.style.transition = "opacity 0.5s ease"; alertDiv.style.opacity = "0"; setTimeout(() => alertDiv.remove(), 500); }, 5000); },
+    clearNotifications: function() { document.getElementById('notification-container').innerHTML = ''; }
 };
-
-// --- Helper functions ---
-rosterSystem.initializeDate = function() { const today = new Date(); const year = today.getFullYear(); const mm = String(today.getMonth() + 1).padStart(2, '0'); const dd = String(today.getDate()).padStart(2, '0'); document.getElementById("rosterDate").value = `${year}-${mm}-${dd}`; document.getElementById("rosterDay").value = today.toLocaleDateString('en-US', { weekday: 'long' }); };
-rosterSystem.setupEventListeners = function() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()); document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()); document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()); document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal()); };
-rosterSystem.renderStaffTable = function(staffList) { const tableBody = document.getElementById("staffTable").querySelector("tbody"); tableBody.innerHTML = staffList.map(staff => ` <tr data-doc-id="${staff.docId}"> <td class="bg-white"><div class="p-2"><input data-field="id" class="w-20 p-1 border rounded" type="text" value="${staff.id || ""}"></div></td> <td><div class="p-2"><input data-field="name" class="w-28 p-1 border rounded" type="text" value="${staff.name || ""}"></div></td> <td><div class="p-2 flex items-center gap-1"><input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="w-24 p-1 border rounded"><input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="w-24 p-1 border rounded"></div></td> <td><div class="p-2"><select data-field="hhmd" class="p-1 border rounded bg-white"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><select data-field="attendance" class="p-1 border rounded bg-white"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></div></td> <td><div class="p-2"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></div></td> </tr> `).join(''); tableBody.querySelectorAll("tr").forEach(row => { row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaffInFirestore(e))); row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaffFromFirestore(e)); }); };
-rosterSystem.addStaffToFirestore = async function() { try { await this.firebase.addDoc(this.firebase.collection(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: false, createdAt: new Date() }); this.showNotification("Added new staff member.", "success"); } catch (error) { console.error("Error adding staff:", error); this.showNotification("Error adding staff member.", "error"); } };
-rosterSystem.updateStaffInFirestore = async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const updatedData = { id: row.querySelector('[data-field="id"]').value, name: row.querySelector('[data-field="name"]').value, breakStart: row.querySelector('[data-field="breakStart"]').value, breakEnd: row.querySelector('[data-field="breakEnd"]').value, hhmd: row.querySelector('[data-field="hhmd"]').value, attendance: row.querySelector('[data-field="attendance"]').value, locked: row.querySelector('[data-field="locked"]').checked }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "staff", docId), updatedData, { merge: true }); } catch (error) { console.error("Error updating staff:", error); this.showNotification("Error updating staff member.", "error"); } };
-rosterSystem.deleteStaffFromFirestore = async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const staffId = row.querySelector("[data-field=id]").value || "this staff member"; this.showNotification(`Removing ${staffId}...`, "info"); try { await this.firebase.deleteDoc(this.firebase.doc(this.db, "staff", docId)); this.showNotification(`${staffId} has been removed.`, "success"); } catch(error) { console.error("Error deleting staff:", error); this.showNotification(`Could not remove ${staffId}.`, "error"); } };
-rosterSystem.saveRosterToFirestore = async function(rosterData) { const rosterDate = document.getElementById("rosterDate").value; if (!rosterDate) return this.showNotification("Please select a valid date before saving.", "error"); const dataToSave = { date: rosterDate, day: document.getElementById("rosterDay").value, roster: rosterData, updatedAt: new Date() }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "rosters", rosterDate), dataToSave); } catch (error) { console.error("Error saving roster:", error); this.showNotification("Could not save roster to the cloud.", "error"); } };
-rosterSystem.shuffleBreaks = async function() { const presentUnlocked = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked); if (presentUnlocked.length < 2) return this.showNotification("Not enough staff to shuffle breaks.", "warning"); let breakTimes = presentUnlocked.map(s => ({ start: s.breakStart, end: s.breakEnd })); for (let i = breakTimes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]]; } const updatePromises = presentUnlocked.map((staff, index) => this.firebase.setDoc(this.firebase.doc(this.db, "staff", staff.docId), { breakStart: breakTimes[index].start, breakEnd: breakTimes[index].end }, { merge: true }) ); try { await Promise.all(updatePromises); this.showNotification("Break times shuffled.", "success"); } catch (error) { console.error("Error shuffling breaks:", error); this.showNotification("Error shuffling breaks.", "error"); } };
-rosterSystem.timeToMinutes = function(timeStr) { if (typeof timeStr !== 'string' || !timeStr.includes(':')) return -1; let [hours, minutes] = timeStr.trim().split(':').map(Number); if (isNaN(hours) || isNaN(minutes)) return -1; return (hours * 60) + minutes; };
-
-// --- REVISED Break Time Logic ---
-rosterSystem.isOnBreak = function(staff, timeSlot) {
-    // 1. Ensure we have a valid staff member with defined break times.
-    if (!staff || !staff.breakStart || !staff.breakEnd) {
-        return false;
-    }
-
-    // 2. This helper function converts a time like "01:00" to a "25:00" equivalent
-    //    to create a continuous timeline from the previous evening into the next morning.
-    const timeToContinuousMinutes = (timeStr) => {
-        if (typeof timeStr !== 'string' || !timeStr.includes(':')) return -1;
-        let [hours, minutes] = timeStr.trim().split(':').map(Number);
-        if (isNaN(hours) || isNaN(minutes)) return -1;
-        
-        // This is the key: treat hours before noon (e.g., 00:00 to 11:59) as part of the "next day" numerically.
-        if (hours < 12) {
-            hours += 24;
-        }
-        return (hours * 60) + minutes;
-    };
-
-    const breakStartMins = timeToContinuousMinutes(staff.breakStart);
-    const breakEndMins = timeToContinuousMinutes(staff.breakEnd);
-    const timeSlotMins = timeToContinuousMinutes(timeSlot);
-
-    // 3. If any time string is malformed or invalid, we can't make a comparison.
-    if (breakStartMins === -1 || breakEndMins === -1 || timeSlotMins === -1) {
-        return false;
-    }
-
-    // 4. A break period is invalid if it has no duration or is defined backwards
-    //    (e.g., break starts at 02:00 and ends at 01:00). On our continuous timeline,
-    //    the start must always be numerically less than the end.
-    if (breakStartMins >= breakEndMins) {
-        return false;
-    }
-
-    // 5. The actual check: Does the time slot fall within the break?
-    //    (inclusive of the start time, exclusive of the end time).
-    return timeSlotMins >= breakStartMins && timeSlotMins < breakEndMins;
-};
-
-rosterSystem.runRosterGeneration = async function() { this.clearNotifications(); document.getElementById('rosterContainerWrapper').classList.add('opacity-0'); let currentStaffData; try { const staffSnapshot = await this.firebase.getDocs(this.firebase.collection(this.db, "staff")); currentStaffData = staffSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })); } catch (error) { console.error("Failed to fetch latest staff data:", error); this.showNotification("Could not fetch latest staff data. Roster may be incorrect.", "error"); return; } const presentStaff = currentStaffData.filter(s => s.attendance === 'Yes'); if (presentStaff.length === 0) return this.showNotification("No staff marked as present.", 'error'); const roster = Object.fromEntries(this.LOCATIONS.map(loc => [loc.name, Object.fromEntries(this.ROSTER_TIMES.map(t => [t, new Array(loc.needed).fill('')]))])); const assignmentsByStaff = Object.fromEntries(presentStaff.map(s => [s.id, []])); const staffMap = Object.fromEntries(presentStaff.map(s => [s.id, s])); const shortfalls = []; const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value); const verticalPatrolTracker = new Set(); const assignStaffToSlot = (time, locName, positionIndex) => { const staffPool = presentStaff.map(s => s.id).sort(() => Math.random() - 0.5); for (const staffId of staffPool) { const staffMember = staffMap[staffId]; if (locName === 'HHMD' && staffMember.hhmd !== 'Yes') continue; if (assignmentsByStaff[staffId].includes(time)) continue; if (this.isOnBreak(staffMember, time)) continue; if ((locName === 'Vertical Patrol' || locName === 'Tango Papa') && verticalPatrolTracker.has(staffId)) continue; roster[locName][time][positionIndex] = staffId; assignmentsByStaff[staffId].push(time); if (locName === 'Vertical Patrol' || locName === 'Tango Papa') { verticalPatrolTracker.add(staffId); } return; } shortfalls.push(`Shortfall: ${locName} at ${time}.`); }; for (const locName in this.CRITICAL_DUTIES) { if (isWeekend && locName === "Report Room") continue; const needed = this.LOCATIONS.find(l => l.name === locName).needed; this.CRITICAL_DUTIES[locName].forEach(time => { for (let i = 0; i < needed; i++) { assignStaffToSlot(time, locName, i); } }); } this.OUTPUT_ORDER.forEach(locName => { const needed = this.LOCATIONS.find(l => l.name === locName).needed; this.ROSTER_TIMES.forEach(time => { for (let i = 0; i < needed; i++) { if (roster[locName][time][i] === '') { assignStaffToSlot(time, locName, i); } } }); }); this.generatedRoster = roster; this.displayRoster(roster); if (shortfalls.length > 0) { [...new Set(shortfalls)].forEach(msg => this.showNotification(msg, 'warning')); } this.saveRosterToFirestore(roster); this.addRosterActionButtons(); };
-
-// --- REVISED Display Logic ---
-rosterSystem.displayRoster = function(roster) {
-    const container = document.getElementById("rosterContainer");
-    const isWeekend = ['Saturday', 'Sunday'].includes(document.getElementById('rosterDay').value);
-    
-    const tableHead = `<thead><tr><th class="text-left"><div class="p-3">Location</div></th>${this.ROSTER_TIMES.map(t => `<th class="text-center p-3">${t}</th>`).join('')}</tr></thead>`;
-    
-    const tableBody = this.OUTPUT_ORDER.map(locName => {
-        const locConfig = this.LOCATIONS.find(l => l.name === locName);
-        let locationCell = `<td class="text-slate-700"><div class="location-cell-content">${locName}</div></td>`;
-
-        const timeCells = this.ROSTER_TIMES.map(time => {
-            let content = '', classes = [], isApplicable = true;
-
-            // Check against critical duties if they exist for the location.
-            // This makes a slot non-applicable if it's not a specified critical time.
-            if (this.CRITICAL_DUTIES[locName] && !this.CRITICAL_DUTIES[locName].includes(time)) {
-                isApplicable = false;
-            }
-
-            // Also check for the weekend Report Room exception.
-            if (locName === "Report Room" && isWeekend) {
-                isApplicable = false;
-            }
-
-            if (isApplicable) {
-                for (let i = 0; i < locConfig.needed; i++) {
-                    const assignedStaffId = roster[locName]?.[time]?.[i] || '';
-                    // Rebuild the options for each select to correctly mark the selected staff
-                    let optionsWithSelection = '<option value="">--</option>' + this.staffDataCache
-                        .filter(s => s.attendance === 'Yes')
-                        .map(s => `<option value="${s.id}" ${assignedStaffId === s.id ? 'selected' : ''}>${s.id}</option>`)
-                        .join('');
-                    content += `<select data-loc="${locName}" data-time="${time}" data-index="${i}" class="roster-select">${optionsWithSelection}</select>`;
-                }
-            }
-            
-            if (!isApplicable) {
-                classes.push('not-applicable');
-            } else if (content.includes('value="" selected')) {
-                classes.push('empty-assignable-cell');
-            }
-
-            return `<td class="${classes.join(' ')}"><div class="roster-cell-wrapper">${content}</div></td>`;
-        }).join('');
-
-        return `<tr>${locationCell}${timeCells}</tr>`;
-    }).join('');
-
-    container.innerHTML = `<table id="editableRoster" class="styled-table">${tableHead}<tbody>${tableBody}</tbody></table>`;
-    
-    container.querySelectorAll('.roster-select').forEach(sel => sel.addEventListener('change', (e) => this.handleCellChange(e)));
-    this.validateAllCells();
-    setTimeout(() => document.getElementById('rosterContainerWrapper').classList.remove('opacity-0'), 50);
-};
-
-rosterSystem.handleCellChange = function(event) { const { loc, time, index } = event.target.dataset; this.generatedRoster[loc][time][parseInt(index, 10)] = event.target.value; this.validateAllCells(); this.saveRosterToFirestore(this.generatedRoster); };
-rosterSystem.validateAllCells = function() { document.querySelectorAll('td.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell')); document.querySelectorAll('.roster-select').forEach(sel => { const staffId = sel.value; if (!staffId) return; const time = sel.dataset.time; const cell = sel.closest('td'); const staffMember = this.staffDataCache.find(s => s.id === staffId); if (staffMember && this.isOnBreak(staffMember, time)) cell.classList.add('conflict-cell'); const assignments = document.querySelectorAll(`.roster-select[data-time="${time}"][value="${staffId}"]`); if (assignments.length > 1) assignments.forEach(s => s.closest('td').classList.add('conflict-cell')); }); };
-rosterSystem.addRosterActionButtons = function() { document.getElementById("rosterActions")?.remove(); let buttonsHTML = ` <div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"> <button id="regenerateRosterBtn" class="btn bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-slate-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>Regenerate</button> <button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>Copy</button> <button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>Download PDF</button> </div>`; document.getElementById("rosterContainerWrapper").insertAdjacentHTML("beforeend", buttonsHTML); document.getElementById("regenerateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV()); document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF()); };
-rosterSystem.copyTSV = function() { if (!this.generatedRoster) return this.showNotification("No roster to copy.", "error"); const tsv = this.OUTPUT_ORDER.map(loc => `${loc}\t${this.ROSTER_TIMES.map(time => (this.generatedRoster[loc]?.[time] || []).join(" | ")).join("\t")}`).join("\n"); navigator.clipboard.writeText(`Location\t${this.ROSTER_TIMES.join("\t")}\n${tsv}`).then(() => this.showNotification("Roster copied!", "success"),() => this.showNotification("Failed to copy.", "error")); };
-rosterSystem.closePdfModal = function() { const preview = document.getElementById('pdfPreview'); if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src); preview.src = 'about:blank'; document.getElementById('pdfModal').style.display = 'none'; };
-rosterSystem.showNotification = function(message, type = "info") { const container = document.getElementById("notification-container"); const colors = {success: "green", error: "red", warning: "yellow", info: "blue"}; const alertDiv = document.createElement("div"); alertDiv.className = `border-l-4 p-4 rounded-r-lg bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700 shadow-md`; alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`; container.appendChild(alertDiv); setTimeout(() => { alertDiv.style.transition = "opacity 0.5s ease"; alertDiv.style.opacity = "0"; setTimeout(() => alertDiv.remove(), 500); }, 5000); };
 
 rosterSystem.init();
 
