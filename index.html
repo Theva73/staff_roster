@@ -155,7 +155,14 @@ const rosterSystem = {
     OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
     CRITICAL_DUTIES: { "Vertical Patrol": ["20:00", "23:00", "01:00", "04:00", "06:00"], "Report Room": ["20:00", "21:00"], "Tango Papa": ["07:00"] },
     
-    generatedRoster: null, staffDataCache: [], db: null, firebase: null,
+    generatedRoster: null,
+
+    lockedCells: {},
+
+    isLocked: function(loc, time, index) {
+        return this.lockedCells?.[loc]?.[time]?.[index] === true;
+    },
+ staffDataCache: [], db: null, firebase: null,
 
     // --- INITIALIZATION ---
     init() {
@@ -232,7 +239,9 @@ const rosterSystem = {
 
                 const needed = this.LOCATIONS.find(l => l.name === locName).needed;
                 for (let i = 0; i < needed; i++) {
-                    if (roster[locName][time][i] === '') assignStaffToSlot(time, locName, i);
+                    
+if (!this.isLocked(locName, time, i) && roster[locName][time][i] === '') assignStaffToSlot(time, locName, i);
+
                 }
             });
         });
@@ -270,7 +279,17 @@ const rosterSystem = {
                 if (isApplicable) {
                     for (let i = 0; i < locConfig.needed; i++) {
                         const assignedStaffId = roster[locName]?.[time]?.[i] || '';
-                        content += `<input type="text" list="staff-id-list" value="${assignedStaffId}" data-loc="${locName}" data-time="${time}" data-index="${i}" class="roster-input" placeholder="--">`;
+                        
+if (locName === 'Vertical Patrol' && ["20:00", "23:00", "01:00", "04:00", "06:00"].includes(time)) {
+    const lockKey = `${locName}_${time}_${i}`;
+    const isLocked = this.lockedCells?.[locName]?.[time]?.[i];
+    content += `
+      <div style='display:flex;flex-direction:column;align-items:center;'>
+        <input type='text' list='staff-id-list' value='${assignedStaffId}' data-loc='${locName}' data-time='${time}' data-index='${i}' class='roster-input' placeholder='--'>
+        <label style='font-size:0.65rem'><input type='checkbox' data-lock='${lockKey}' ${isLocked ? "checked" : ""}>🔒</label>
+      </div>`;
+} else {
+content += `<input type="text" list="staff-id-list" value="${assignedStaffId}" data-loc="${locName}" data-time="${time}" data-index="${i}" class="roster-input" placeholder="--">`;
                     }
                 }
                 
@@ -372,7 +391,14 @@ const rosterSystem = {
     
     handleCellChange: function(event) {
         const { loc, time, index } = event.target.dataset;
-        this.generatedRoster[loc][time][parseInt(index, 10)] = event.target.value;
+        const parsedIndex = parseInt(index, 10);
+    this.generatedRoster[loc][time][parsedIndex] = event.target.value;
+    const lockKey = `${loc}_${time}_${parsedIndex}`;
+    const lockCheckbox = document.querySelector(`input[data-lock="${lockKey}"]`);
+    const isLocked = lockCheckbox?.checked;
+    if (!this.lockedCells[loc]) this.lockedCells[loc] = {};
+    if (!this.lockedCells[loc][time]) this.lockedCells[loc][time] = {};
+    this.lockedCells[loc][time][parsedIndex] = isLocked;
         this.validateAllCells();
         this.saveRosterToFirestore(this.generatedRoster);
     },
@@ -414,50 +440,39 @@ const rosterSystem = {
 };
 </script>
 
+
+
 <script type="module">
-    // Firebase Imports
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // This self-executing async function handles the entire Firebase setup and authentication process.
-    (async () => {
-        try {
-            // --- Your web app's Firebase configuration is now embedded here ---
-            const firebaseConfig = {
-              apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
-              authDomain: "roster-4a997.firebaseapp.com",
-              projectId: "roster-4a997",
-              storageBucket: "roster-4a997.appspot.com", // Corrected storage bucket
-              messagingSenderId: "901381868881",
-              appId: "1:901381868881:web:92930481d6c1c85fedd770"
-            };
-
-            // Initialize Firebase
-            const app = initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-            const auth = getAuth(app);
-
-            // Make db and Firebase utilities globally available for the rosterSystem object.
-            window.db = db;
-            window.firebase = {
-                 collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
-            };
-
-            // Authenticate the user anonymously. This is suitable for public web pages.
-            await signInAnonymously(auth);
-            console.log('Authentication successful via anonymous sign-in. UID:', auth.currentUser.uid);
-            
-            // Once authentication is successful, initialize the main application logic.
-            rosterSystem.init();
-
-        } catch (error) {
-            // If any part of the setup or authentication fails, log the error and display a message to the user.
-            console.error("Firebase initialization or authentication failed:", error);
-            const container = document.querySelector('.container');
-            if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
-        }
-    })();
+(async () => {
+    try {
+        const firebaseConfig = {
+            apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+            authDomain: "roster-4a997.firebaseapp.com",
+            projectId: "roster-4a997",
+            storageBucket: "roster-4a997.firebasestorage.app",
+            messagingSenderId: "901381868881",
+            appId: "1:901381868881:web:92930481d6c1c85fedd770"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        window.db = db;
+        window.firebase = {
+            collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
+        };
+        await signInAnonymously(auth);
+        console.log('Authentication successful via anonymous sign-in. UID:', auth.currentUser.uid);
+        rosterSystem.init();
+    } catch (error) {
+        console.error("Firebase initialization or authentication failed:", error);
+        const container = document.querySelector('.container');
+        if (container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
+    }
+})();
 </script>
 
 </body>
