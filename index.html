@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Staff Roster System v9.2 (Standalone)</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-<style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Roster System v9.2 (Standalone)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
         body { 
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
@@ -107,40 +107,123 @@
             box-shadow: inset 0 0 0 2px #ef4444; 
         }
     </style>
+
+<style>
+  .padlock {
+    font-size: 14px;
+    cursor: pointer;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .locked {
+    color: red;
+  }
+  .unlocked {
+    color: green;
+  }
+</style>
+
+
+<script>
+  const lockedCells = JSON.parse(localStorage.getItem("lockedCells") || "{}");
+
+  function toggleLock(cellKey, iconEl) {
+    const isLocked = !!lockedCells[cellKey];
+    if (isLocked) {
+      delete lockedCells[cellKey];
+    } else {
+      lockedCells[cellKey] = true;
+    }
+    localStorage.setItem("lockedCells", JSON.stringify(lockedCells));
+    updatePadlockIcon(iconEl, !isLocked);
+  }
+
+  function updatePadlockIcon(iconEl, locked) {
+    iconEl.textContent = locked ? "🔒" : "🔓";
+    iconEl.className = "padlock " + (locked ? "locked" : "unlocked");
+  }
+
+  function applyPadlocks() {
+    const padlockSlots = ["20:00", "23:00", "01:00", "04:00", "06:00"];
+    document.querySelectorAll("td[data-location='Vertical Patrol']").forEach(td => {
+      const time = td.getAttribute("data-time");
+      const key = `Vertical Patrol-${time}`;
+      if (!padlockSlots.includes(time)) return;
+      let icon = document.createElement("span");
+      icon.className = "padlock";
+      icon.onclick = () => toggleLock(key, icon);
+      td.appendChild(icon);
+      updatePadlockIcon(icon, !!lockedCells[key]);
+    });
+  }
+
+  // Preserve values of locked cells during regen
+  const originalRegenerate = window.regenerateRoster;
+  window.regenerateRoster = function() {
+    const locked = JSON.parse(localStorage.getItem("lockedCells") || "{}");
+    const valuesToPreserve = {};
+    document.querySelectorAll("td[data-location='Vertical Patrol']").forEach(td => {
+      const time = td.getAttribute("data-time");
+      const key = `Vertical Patrol-${time}`;
+      if (locked[key]) {
+        valuesToPreserve[key] = td.textContent.trim();
+      }
+    });
+    originalRegenerate();
+    setTimeout(() => {
+      document.querySelectorAll("td[data-location='Vertical Patrol']").forEach(td => {
+        const time = td.getAttribute("data-time");
+        const key = `Vertical Patrol-${time}`;
+        if (locked[key] && valuesToPreserve[key]) {
+          td.childNodes[0].nodeValue = valuesToPreserve[key];
+        }
+      });
+      applyPadlocks();
+    }, 100);
+  }
+
+  window.addEventListener("DOMContentLoaded", applyPadlocks);
+</script>
+
 </head>
 <body class="bg-slate-100 text-slate-800">
-<div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
-<datalist id="staff-id-list"></datalist>
-<header class="text-center my-8">
-<h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
-<p class="text-lg text-slate-500 mt-2">v9.2 (Standalone)</p>
-</header>
-<div class="card p-4 md:p-6 mb-8">
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
-<div><label class="font-semibold text-slate-700 text-sm" for="rosterDate">Roster Date:</label><input class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" id="rosterDate" type="date"/></div>
-<div><label class="font-semibold text-slate-700 text-sm" for="rosterDay">Day:</label><select class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" id="rosterDay"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
-<div class="text-center md:text-right"><span class="text-base font-semibold">Working Staff:</span><span class="text-2xl font-bold text-indigo-600 ml-2" id="staffCount">0</span></div>
-</div>
-</div>
-<div class="card p-4 md:p-6 mb-8">
-<h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Staff Management (Live)</h2>
-<div class="table-container">
-<table class="styled-table" id="staffTable"><thead><tr><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Break</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HHMD</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Present</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Lock</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white"></tbody></table>
-</div>
-<div class="mt-6 flex flex-wrap gap-4 justify-center"><button class="btn bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-indigo-700" id="addStaffBtn">Add New Staff</button><button class="btn bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-purple-700" id="shuffleBreaksBtn">Shuffle Breaks</button></div>
-</div>
-<div class="card p-6">
-<div class="flex flex-col items-center">
-<h2 class="text-2xl font-bold text-slate-800 mb-4">Generate Roster</h2>
-<button class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg" id="generateRosterBtn">Generate</button>
-</div>
-<div class="mt-4 space-y-2" id="notification-container"></div>
-<div class="mt-4 opacity-0 transition-opacity duration-500" id="rosterContainerWrapper">
-<div class="table-container rounded-lg border border-slate-200 shadow-sm" id="rosterContainer"></div>
-</div>
-</div>
-</div>
-<div class="modal" id="pdfModal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4" download="roster.pdf" href="#" id="pdfDownloadLink">Download Now</a><button class="text-slate-500 hover:text-slate-800 text-3xl font-bold" id="closePdfBtn">×</button></div></div><iframe class="w-full h-[75vh] border border-slate-300 rounded" id="pdfPreview"></iframe></div></div>
+
+    <div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
+        <datalist id="staff-id-list"></datalist>
+
+        <header class="text-center my-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
+            <p class="text-lg text-slate-500 mt-2">v9.2 (Standalone)</p>
+        </header>
+
+        <div class="card p-4 md:p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
+                <div><label for="rosterDate" class="font-semibold text-slate-700 text-sm">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
+                <div><label for="rosterDay" class="font-semibold text-slate-700 text-sm">Day:</label><select id="rosterDay" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+                <div class="text-center md:text-right"><span class="text-base font-semibold">Working Staff:</span><span id="staffCount" class="text-2xl font-bold text-indigo-600 ml-2">0</span></div>
+            </div>
+        </div>
+        <div class="card p-4 md:p-6 mb-8">
+            <h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Staff Management (Live)</h2>
+            <div class="table-container">
+                <table id="staffTable" class="styled-table"><thead><tr><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Break</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HHMD</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Present</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Lock</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white"></tbody></table>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-4 justify-center"><button id="addStaffBtn" class="btn bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-indigo-700">Add New Staff</button><button id="shuffleBreaksBtn" class="btn bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-purple-700">Shuffle Breaks</button></div>
+        </div>
+        <div class="card p-6">
+            <div class="flex flex-col items-center">
+                 <h2 class="text-2xl font-bold text-slate-800 mb-4">Generate Roster</h2>
+                 <button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate</button>
+            </div>
+  
+            <div id="notification-container" class="mt-4 space-y-2"></div>
+            <div id="rosterContainerWrapper" class="mt-4 opacity-0 transition-opacity duration-500">
+                <div id="rosterContainer" class="table-container rounded-lg border border-slate-200 shadow-sm"></div>
+            </div>
+        </div>
+    </div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh] border border-slate-300 rounded"></iframe></div></div>
+
 <script>
 // Main application object definition.
 const rosterSystem = {
@@ -408,6 +491,7 @@ const rosterSystem = {
     clearNotifications: function() { document.getElementById('notification-container').innerHTML = ''; }
 };
 </script>
+
 <script type="module">
     // Firebase Imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -454,88 +538,5 @@ const rosterSystem = {
     })();
 </script>
 
-<script>
-  const lockedCells = new Set();
-
-  function isLockable(time) {
-    return ["20:30", "23:00", "01:30", "04:00", "06:30"].includes(time);
-  }
-
-  function toggleLock(cell, time, rowIndex) {
-    const cellId = `${time}_${rowIndex}`;
-    if (lockedCells.has(cellId)) {
-      lockedCells.delete(cellId);
-      cell.classList.remove("locked-cell");
-    } else {
-      lockedCells.add(cellId);
-      cell.classList.add("locked-cell");
-    }
-  }
-
-  function applyLockingUI() {
-    const rows = document.querySelectorAll("table tbody tr");
-    rows.forEach((row, rowIndex) => {
-      row.querySelectorAll("td").forEach((cell, colIndex) => {
-        const timeCell = document.querySelector("table thead tr").children[colIndex];
-        if (!timeCell) return;
-        const time = timeCell.textContent.trim();
-        if (isLockable(time)) {
-          cell.style.cursor = "pointer";
-          cell.addEventListener("click", () => toggleLock(cell, time, rowIndex));
-        }
-      });
-    });
-  }
-
-  function preserveLockedCellsOnRegenerate() {
-    const rows = document.querySelectorAll("table tbody tr");
-    const lockedData = {};
-    rows.forEach((row, rowIndex) => {
-      row.querySelectorAll("td").forEach((cell, colIndex) => {
-        const timeCell = document.querySelector("table thead tr").children[colIndex];
-        if (!timeCell) return;
-        const time = timeCell.textContent.trim();
-        const cellId = `${time}_${rowIndex}`;
-        if (lockedCells.has(cellId)) {
-          lockedData[cellId] = cell.textContent.trim();
-        }
-      });
-    });
-    return lockedData;
-  }
-
-  function restoreLockedCells(lockedData) {
-    const rows = document.querySelectorAll("table tbody tr");
-    rows.forEach((row, rowIndex) => {
-      row.querySelectorAll("td").forEach((cell, colIndex) => {
-        const timeCell = document.querySelector("table thead tr").children[colIndex];
-        if (!timeCell) return;
-        const time = timeCell.textContent.trim();
-        const cellId = `${time}_${rowIndex}`;
-        if (lockedData[cellId]) {
-          cell.textContent = lockedData[cellId];
-          lockedCells.add(cellId);
-          cell.classList.add("locked-cell");
-        }
-      });
-    });
-  }
-
-  // Intercept regenerateRoster to apply locking
-  const originalGenerateRoster = window.generateRoster;
-  window.generateRoster = function () {
-    const lockedData = preserveLockedCellsOnRegenerate();
-    originalGenerateRoster();
-    setTimeout(() => restoreLockedCells(lockedData), 50);
-  };
-
-  document.addEventListener("DOMContentLoaded", applyLockingUI);
-</script>
-<style>
-  .locked-cell {
-    background-color: #fde68a !important;
-    border: 2px solid #f59e0b !important;
-  }
-</style>
 </body>
 </html>
