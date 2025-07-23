@@ -246,14 +246,10 @@ const rosterSystem = {
     init() {
         console.log("Roster System v9.2 Initialized");
         this.setupEventListeners(); 
-        this.initializeDate(); 
-        this.loadSampleStaff();
-    },
+        this.initializeDate();
+        this.listenForStaffUpdates();},
     
-    loadSampleStaff() {
-        // Sample staff data for demonstration
-        this.staffDataCache = [
-            { id: "4270", name: "John Doe", breakStart: "22:00", breakEnd: "00:00", hhmd: "Yes", attendance: "Yes", locked: false },
+    ,
             { id: "8421", name: "Jane Smith", breakStart: "23:00", breakEnd: "01:00", hhmd: "No", attendance: "Yes", locked: false },
             { id: "6347", name: "Mike Johnson", breakStart: "00:00", breakEnd: "02:00", hhmd: "Yes", attendance: "Yes", locked: false },
             { id: "8244", name: "Sarah Wilson", breakStart: "01:00", breakEnd: "03:00", hhmd: "No", attendance: "Yes", locked: false },
