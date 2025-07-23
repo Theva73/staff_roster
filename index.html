@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,176 +9,260 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-    
-    <style>
-        body { 
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-        }
-        .card { 
-            background-color: white;
-            border-radius: 0.75rem; 
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            border: 1px solid #e2e8f0;
-        }
-        .btn:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 7px 14px rgba(50,50,93,.1), 0 3px 6px rgba(0,0,0,.08);
-        }
-        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #e5e7eb; width: 90%; max-width: 1000px; border-radius: 0.5rem; }
-        
-        .table-container {
-             overflow-x: auto;
-             -webkit-overflow-scrolling: touch;
-        }
-        .styled-table {
-            border-collapse: separate;
-            border-spacing: 0;
-            min-width: 100%;
-        }
-        .styled-table thead th {
-             background-color: #f1f5f9;
-             font-weight: 600;
-             color: #334155;
-             font-size: 0.8rem;
-        }
-        .styled-table th, .styled-table td {
-            white-space: nowrap;
-            padding: 0;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: middle;
-            text-align: center;
-        }
-        .styled-table thead th:first-child, .styled-table tbody td:first-child {
-            position: sticky;
-            left: 0;
-            z-index: 10;
-            text-align: left;
-        }
-        .styled-table tbody td:first-child {
-            background-color: #f8fafc;
-            font-weight: 500;
-            border-right: 1px solid #e2e8f0;
-        }
-        .styled-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-        .styled-table tbody tr:hover td, .styled-table tbody tr:hover td:first-child {
-             background-color: #f0f9ff;
-        }
-        
-        .location-cell-content { padding: 10px 12px; }
-        
-        .roster-cell-wrapper {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 4px;
-            min-height: 50px;
-        }
 
-        .roster-input { 
-            background-color: transparent;
-            border: none;
-            width: 100%;
-            min-width: 60px;
-            height: 24px;
-            text-align: center;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: #1e293b;
-            padding: 0 4px;
-        }
-        .roster-input::placeholder { color: #94a3b8; }
-        .roster-input:focus {
-            outline: 2px solid #3b82f6;
-            border-radius: 4px;
-            background-color: #eff6ff;
-        }
-        
-        .not-applicable { background-color: #f1f5f9; }
-        .empty-assignable-cell { 
-            background-image: repeating-linear-gradient(-45deg, #fdfdff, #fdfdff 5px, #f1f5f9 5px, #f1f5f9 10px);
-        }
-        .conflict-cell { 
-            background-color: #fef2f2 !important;
-            box-shadow: inset 0 0 0 2px #ef4444; 
-        }
-    </style>
+```
+<style>
+    body { 
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+    }
+    .card { 
+        background-color: white;
+        border-radius: 0.75rem; 
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        border: 1px solid #e2e8f0;
+    }
+    .btn:hover { 
+        transform: translateY(-2px);
+        box-shadow: 0 7px 14px rgba(50,50,93,.1), 0 3px 6px rgba(0,0,0,.08);
+    }
+    .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 24px; border: 1px solid #e5e7eb; width: 90%; max-width: 1000px; border-radius: 0.5rem; }
+    
+    .table-container {
+         overflow-x: auto;
+         -webkit-overflow-scrolling: touch;
+    }
+    .styled-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 100%;
+    }
+    .styled-table thead th {
+         background-color: #f1f5f9;
+         font-weight: 600;
+         color: #334155;
+         font-size: 0.8rem;
+    }
+    .styled-table th, .styled-table td {
+        white-space: nowrap;
+        padding: 0;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .styled-table thead th:first-child, .styled-table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        text-align: left;
+    }
+    .styled-table tbody td:first-child {
+        background-color: #f8fafc;
+        font-weight: 500;
+        border-right: 1px solid #e2e8f0;
+    }
+    .styled-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .styled-table tbody tr:hover td, .styled-table tbody tr:hover td:first-child {
+         background-color: #f0f9ff;
+    }
+    
+    .location-cell-content { padding: 10px 12px; }
+    
+    .roster-cell-wrapper {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 4px;
+        min-height: 50px;
+    }
+
+    .roster-input { 
+        background-color: transparent;
+        border: none;
+        width: 100%;
+        min-width: 60px;
+        height: 24px;
+        text-align: center;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #1e293b;
+        padding: 0 4px;
+    }
+    .roster-input::placeholder { color: #94a3b8; }
+    .roster-input:focus {
+        outline: 2px solid #3b82f6;
+        border-radius: 4px;
+        background-color: #eff6ff;
+    }
+    
+    .not-applicable { background-color: #f1f5f9; }
+    .empty-assignable-cell { 
+        background-image: repeating-linear-gradient(-45deg, #fdfdff, #fdfdff 5px, #f1f5f9 5px, #f1f5f9 10px);
+    }
+    .conflict-cell { 
+        background-color: #fef2f2 !important;
+        box-shadow: inset 0 0 0 2px #ef4444; 
+    }
+
+    .padlock {
+        font-size: 16px;
+        cursor: pointer;
+        margin-left: 4px;
+        vertical-align: middle;
+        user-select: none;
+    }
+    .locked {
+        color: #dc2626;
+    }
+    .unlocked {
+        color: #16a34a;
+    }
+</style>
+```
+
 </head>
 <body class="bg-slate-100 text-slate-800">
 
-    <div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
-        <datalist id="staff-id-list"></datalist>
+```
+<div class="container mx-auto p-2 sm:p-4 md:p-6 lg:p-8">
+    <datalist id="staff-id-list"></datalist>
 
-        <header class="text-center my-8">
-            <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
-            <p class="text-lg text-slate-500 mt-2">v9.2 (Standalone)</p>
-        </header>
+    <header class="text-center my-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">Staff Roster System</h1>
+        <p class="text-lg text-slate-500 mt-2">v9.2 (Standalone)</p>
+    </header>
 
-        <div class="card p-4 md:p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
-                <div><label for="rosterDate" class="font-semibold text-slate-700 text-sm">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
-                <div><label for="rosterDay" class="font-semibold text-slate-700 text-sm">Day:</label><select id="rosterDay" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
-                <div class="text-center md:text-right"><span class="text-base font-semibold">Working Staff:</span><span id="staffCount" class="text-2xl font-bold text-indigo-600 ml-2">0</span></div>
-            </div>
-        </div>
-        <div class="card p-4 md:p-6 mb-8">
-            <h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Staff Management (Live)</h2>
-            <div class="table-container">
-                <table id="staffTable" class="styled-table"><thead><tr><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Break</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HHMD</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Present</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Lock</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white"></tbody></table>
-            </div>
-            <div class="mt-6 flex flex-wrap gap-4 justify-center"><button id="addStaffBtn" class="btn bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-indigo-700">Add New Staff</button><button id="shuffleBreaksBtn" class="btn bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-purple-700">Shuffle Breaks</button></div>
-        </div>
-        <div class="card p-6">
-            <div class="flex flex-col items-center">
-                 <h2 class="text-2xl font-bold text-slate-800 mb-4">Generate Roster</h2>
-                 <button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate</button>
-            </div>
-  
-            <div id="notification-container" class="mt-4 space-y-2"></div>
-            <div id="rosterContainerWrapper" class="mt-4 opacity-0 transition-opacity duration-500">
-                <div id="rosterContainer" class="table-container rounded-lg border border-slate-200 shadow-sm"></div>
-            </div>
+    <div class="card p-4 md:p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
+            <div><label for="rosterDate" class="font-semibold text-slate-700 text-sm">Roster Date:</label><input type="date" id="rosterDate" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></div>
+            <div><label for="rosterDay" class="font-semibold text-slate-700 text-sm">Day:</label><select id="rosterDay" class="mt-1 w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+            <div class="text-center md:text-right"><span class="text-base font-semibold">Working Staff:</span><span id="staffCount" class="text-2xl font-bold text-indigo-600 ml-2">0</span></div>
         </div>
     </div>
-    <div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh] border border-slate-300 rounded"></iframe></div></div>
+    <div class="card p-4 md:p-6 mb-8">
+        <h2 class="text-xl md:text-2xl font-bold text-slate-800 mb-4 border-b border-slate-200 pb-3">Staff Management</h2>
+        <div class="table-container">
+            <table id="staffTable" class="styled-table"><thead><tr><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Break</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HHMD</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Present</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Lock</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white"></tbody></table>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-4 justify-center"><button id="addStaffBtn" class="btn bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-indigo-700">Add New Staff</button><button id="shuffleBreaksBtn" class="btn bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-purple-700">Shuffle Breaks</button></div>
+    </div>
+    <div class="card p-6">
+        <div class="flex flex-col items-center">
+             <h2 class="text-2xl font-bold text-slate-800 mb-4">Generate Roster</h2>
+             <button id="generateRosterBtn" class="btn bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-green-700 text-lg">Generate</button>
+        </div>
+
+        <div id="notification-container" class="mt-4 space-y-2"></div>
+        <div id="rosterContainerWrapper" class="mt-4 opacity-0 transition-opacity duration-500">
+            <div id="rosterContainer" class="table-container rounded-lg border border-slate-200 shadow-sm"></div>
+        </div>
+    </div>
+</div>
+<div id="pdfModal" class="modal"><div class="modal-content"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">PDF Preview</h3><div><a id="pdfDownloadLink" href="#" download="roster.pdf" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 mr-4">Download Now</a><button id="closePdfBtn" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button></div></div><iframe id="pdfPreview" class="w-full h-[75vh] border border-slate-300 rounded"></iframe></div></div>
+```
 
 <script>
+// Lock management
+const lockedCells = JSON.parse(localStorage.getItem("lockedCells") || "{}");
+
+function toggleLock(cellKey, iconEl) {
+    const isLocked = !!lockedCells[cellKey];
+    if (isLocked) {
+        delete lockedCells[cellKey];
+    } else {
+        lockedCells[cellKey] = true;
+    }
+    localStorage.setItem("lockedCells", JSON.stringify(lockedCells));
+    updatePadlockIcon(iconEl, !isLocked);
+}
+
+function updatePadlockIcon(iconEl, locked) {
+    iconEl.textContent = locked ? "🔒" : "🔓";
+    iconEl.className = "padlock " + (locked ? "locked" : "unlocked");
+}
+
+function applyPadlocks() {
+    const padlockSlots = ["20:00", "23:00", "01:00", "04:00", "06:00"];
+    
+    // Find all Vertical Patrol cells
+    document.querySelectorAll("td[data-location='Vertical Patrol']").forEach(td => {
+        const time = td.getAttribute("data-time");
+        if (!padlockSlots.includes(time)) return;
+        
+        const key = `Vertical Patrol-${time}`;
+        
+        // Remove existing padlock if any
+        const existingPadlock = td.querySelector('.padlock');
+        if (existingPadlock) {
+            existingPadlock.remove();
+        }
+        
+        // Create new padlock
+        const icon = document.createElement("span");
+        icon.className = "padlock";
+        icon.onclick = () => toggleLock(key, icon);
+        
+        // Add padlock to the cell wrapper
+        const wrapper = td.querySelector('.roster-cell-wrapper');
+        if (wrapper) {
+            wrapper.appendChild(icon);
+        } else {
+            td.appendChild(icon);
+        }
+        
+        updatePadlockIcon(icon, !!lockedCells[key]);
+    });
+}
+
 // Main application object definition.
 const rosterSystem = {
     // --- CONFIG & STATE ---
     ROSTER_TIMES: ["20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"],
-    LOCATIONS: [ { name: "Pass Counter", needed: 2, isMultiStaff: true }, { name: "HHMD", needed: 1 }, { name: "Lobby", needed: 2, isMultiStaff: true }, { name: "Guard House", needed: 1 }, { name: "Vertical Patrol", needed: 1 }, { name: "Report Room", needed: 1 }, { name: "Tango Papa", needed: 1 } ],
+    LOCATIONS: [ 
+        { name: "Pass Counter", needed: 2, isMultiStaff: true }, 
+        { name: "HHMD", needed: 1 }, 
+        { name: "Lobby", needed: 2, isMultiStaff: true }, 
+        { name: "Guard House", needed: 1 }, 
+        { name: "Vertical Patrol", needed: 1 }, 
+        { name: "Report Room", needed: 1 }, 
+        { name: "Tango Papa", needed: 1 } 
+    ],
     OUTPUT_ORDER: ["Pass Counter", "HHMD", "Guard House", "Lobby", "Report Room", "Vertical Patrol", "Tango Papa"],
-    CRITICAL_DUTIES: { "Vertical Patrol": ["20:00", "23:00", "01:00", "04:00", "06:00"], "Report Room": ["20:00", "21:00"], "Tango Papa": ["07:00"] },
+    CRITICAL_DUTIES: { 
+        "Vertical Patrol": ["20:00", "23:00", "01:00", "04:00", "06:00"], 
+        "Report Room": ["20:00", "21:00"], 
+        "Tango Papa": ["07:00"] 
+    },
     
-    generatedRoster: null, staffDataCache: [], db: null, firebase: null,
-
+    generatedRoster: null, 
+    staffDataCache: [],
+    
     // --- INITIALIZATION ---
     init() {
-        this.db = window.db; 
-        this.firebase = window.firebase; 
         console.log("Roster System v9.2 Initialized");
         this.setupEventListeners(); 
         this.initializeDate(); 
-        this.listenForStaffUpdates();
-        this.loadRosterFromFirestore();
+        this.loadSampleStaff();
     },
     
-    // --- FIREBASE DATA MANAGEMENT ---
-    listenForStaffUpdates() {
-        const { collection, query, onSnapshot } = this.firebase;
-        onSnapshot(query(collection(this.db, "staff")), (querySnapshot) => {
-            this.staffDataCache = querySnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })).sort((a, b) => (a.id || "").localeCompare(b.id || ""));
-            this.renderStaffTable(this.staffDataCache);
-            this.updateStaffCount();
-            this.updateStaffDatalist();
-            if (this.generatedRoster) this.validateAllCells();
-        });
+    loadSampleStaff() {
+        // Sample staff data for demonstration
+        this.staffDataCache = [
+            { id: "4270", name: "John Doe", breakStart: "22:00", breakEnd: "00:00", hhmd: "Yes", attendance: "Yes", locked: false },
+            { id: "8421", name: "Jane Smith", breakStart: "23:00", breakEnd: "01:00", hhmd: "No", attendance: "Yes", locked: false },
+            { id: "6347", name: "Mike Johnson", breakStart: "00:00", breakEnd: "02:00", hhmd: "Yes", attendance: "Yes", locked: false },
+            { id: "8244", name: "Sarah Wilson", breakStart: "01:00", breakEnd: "03:00", hhmd: "No", attendance: "Yes", locked: false },
+            { id: "8494", name: "David Brown", breakStart: "02:00", breakEnd: "04:00", hhmd: "Yes", attendance: "Yes", locked: false },
+            { id: "6399", name: "Lisa Davis", breakStart: "03:00", breakEnd: "05:00", hhmd: "No", attendance: "Yes", locked: false }
+        ];
+        this.renderStaffTable(this.staffDataCache);
+        this.updateStaffCount();
+        this.updateStaffDatalist();
     },
 
     updateStaffCount() {
@@ -192,12 +277,15 @@ const rosterSystem = {
     },
     
     // --- MAIN SCHEDULING LOGIC ---
-    runRosterGeneration: async function() {
+    runRosterGeneration: function() {
         this.clearNotifications();
         document.getElementById('rosterContainerWrapper').classList.add('opacity-0');
         
         const presentStaff = this.staffDataCache.filter(s => s.attendance === 'Yes');
         if (presentStaff.length === 0) return this.showNotification("No staff marked as present. Cannot generate roster.", 'error');
+
+        // Store locked values before regenerating
+        const lockedValues = this.preserveLockedValues();
 
         const roster = Object.fromEntries(this.LOCATIONS.map(loc => [loc.name, Object.fromEntries(this.ROSTER_TIMES.map(t => [t, new Array(loc.needed).fill('')]))]));
         const assignmentsByStaff = Object.fromEntries(presentStaff.map(s => [s.id, []]));
@@ -207,6 +295,18 @@ const rosterSystem = {
         const verticalPatrolTracker = new Set();
 
         const assignStaffToSlot = (time, locName, positionIndex) => {
+            // Check if this slot is locked
+            const lockKey = `${locName}-${time}`;
+            if (lockedValues[lockKey]) {
+                roster[locName][time][positionIndex] = lockedValues[lockKey];
+                const staffId = lockedValues[lockKey];
+                if (staffId && assignmentsByStaff[staffId]) {
+                    assignmentsByStaff[staffId].push(time);
+                    if (locName === 'Vertical Patrol' || locName === 'Tango Papa') verticalPatrolTracker.add(staffId);
+                }
+                return;
+            }
+
             const staffPool = presentStaff.map(s => s.id).sort(() => Math.random() - 0.5);
             for (const staffId of staffPool) {
                 const staffMember = staffMap[staffId];
@@ -239,10 +339,33 @@ const rosterSystem = {
 
         this.generatedRoster = roster;
         this.displayRoster(roster);
+        
+        // Apply padlocks after roster is displayed
+        setTimeout(() => {
+            applyPadlocks();
+        }, 100);
+        
         if (shortfalls.length > 0) [...new Set(shortfalls)].forEach(msg => this.showNotification(msg, 'warning'));
         
-        this.saveRosterToFirestore(roster, true); 
         this.addRosterActionButtons();
+    },
+
+    preserveLockedValues() {
+        const lockedValues = {};
+        const locked = JSON.parse(localStorage.getItem("lockedCells") || "{}");
+        
+        document.querySelectorAll("td[data-location='Vertical Patrol']").forEach(td => {
+            const time = td.getAttribute("data-time");
+            const key = `Vertical Patrol-${time}`;
+            if (locked[key]) {
+                const input = td.querySelector('.roster-input');
+                if (input && input.value.trim()) {
+                    lockedValues[key] = input.value.trim();
+                }
+            }
+        });
+        
+        return lockedValues;
     },
     
     isOnBreak: (staff, timeSlot) => {
@@ -278,7 +401,7 @@ const rosterSystem = {
                 else if (!content.includes('value=""') && content.includes('value="')) {}
                 else classes.push('empty-assignable-cell');
 
-                return `<td class="${classes.join(' ')}"><div class="roster-cell-wrapper">${content}</div></td>`;
+                return `<td class="${classes.join(' ')}" data-location="${locName}" data-time="${time}"><div class="roster-cell-wrapper">${content}</div></td>`;
             }).join('');
             return `<tr>${locationCell}${timeCells}</tr>`;
         }).join('');
@@ -327,59 +450,110 @@ const rosterSystem = {
     },
     
     // --- Helper & Event Functions ---
-    initializeDate: function() { const today = new Date(); document.getElementById("rosterDate").valueAsDate = today; document.getElementById("rosterDay").value = today.toLocaleDateString('en-US', { weekday: 'long' }); },
-    setupEventListeners: function() { document.getElementById("addStaffBtn").addEventListener("click",()=>this.addStaffToFirestore()); document.getElementById("generateRosterBtn").addEventListener("click",()=>this.runRosterGeneration()); document.getElementById("shuffleBreaksBtn").addEventListener("click",()=>this.shuffleBreaks()); document.getElementById("closePdfBtn").addEventListener("click",()=>this.closePdfModal()); document.getElementById("rosterDate").addEventListener("change", () => this.loadRosterFromFirestore()); },
-    renderStaffTable: function(staffList) { const tableBody = document.getElementById("staffTable").querySelector("tbody"); tableBody.innerHTML = staffList.map(staff => ` <tr data-doc-id="${staff.docId}"> <td class="bg-white"><div class="p-2"><input data-field="id" class="w-20 p-1 border rounded" type="text" value="${staff.id || ""}"></div></td> <td><div class="p-2"><input data-field="name" class="w-28 p-1 border rounded" type="text" value="${staff.name || ""}"></div></td> <td><div class="p-2 flex items-center gap-1"><input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="w-24 p-1 border rounded"><input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="w-24 p-1 border rounded"></div></td> <td><div class="p-2"><select data-field="hhmd" class="p-1 border rounded bg-white"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><select data-field="attendance" class="p-1 border rounded bg-white"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></div></td> <td><div class="p-2"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></div></td> <td><div class="p-2"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove</button></div></td> </tr> `).join(''); tableBody.querySelectorAll("tr").forEach(row => { row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaffInFirestore(e))); row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaffFromFirestore(e)); }); },
-    addStaffToFirestore: async function() { try { await this.firebase.addDoc(this.firebase.collection(this.db, "staff"), { id: `S${Date.now().toString().slice(-4)}`, name: "New Staff", breakStart: "22:00", breakEnd: "00:00", hhmd: "No", attendance: "Yes", locked: false, createdAt: new Date() }); this.showNotification("Added new staff member.", "success"); } catch (error) { console.error("Error adding staff:", error); this.showNotification("Error adding staff member.", "error"); } },
-    updateStaffInFirestore: async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const updatedData = { id: row.querySelector('[data-field="id"]').value, name: row.querySelector('[data-field="name"]').value, breakStart: row.querySelector('[data-field="breakStart"]').value, breakEnd: row.querySelector('[data-field="breakEnd"]').value, hhmd: row.querySelector('[data-field="hhmd"]').value, attendance: row.querySelector('[data-field="attendance"]').value, locked: row.querySelector('[data-field="locked"]').checked }; try { await this.firebase.setDoc(this.firebase.doc(this.db, "staff", docId), updatedData, { merge: true }); } catch (error) { console.error("Error updating staff:", error); this.showNotification("Error updating staff member.", "error"); } },
-    deleteStaffFromFirestore: async function(event) { const row = event.target.closest("tr"); const docId = row.dataset.docId; const staffId = row.querySelector("[data-field=id]").value || "this staff member"; this.showNotification(`Removing ${staffId}...`, "info"); try { await this.firebase.deleteDoc(this.firebase.doc(this.db, "staff", docId)); this.showNotification(`${staffId} has been removed.`, "success"); } catch(error) { console.error("Error deleting staff:", error); this.showNotification(`Could not remove ${staffId}.`, "error"); } },
+    initializeDate: function() { 
+        const today = new Date(); 
+        document.getElementById("rosterDate").valueAsDate = today; 
+        document.getElementById("rosterDay").value = today.toLocaleDateString('en-US', { weekday: 'long' }); 
+    },
     
-    saveRosterToFirestore: async function(rosterData, showSuccessNotification = false) {
-        const rosterDate = document.getElementById("rosterDate").value;
-        if (!rosterDate) return this.showNotification("Please select a valid date before saving.", "error");
-        const dataToSave = { date: rosterDate, day: document.getElementById("rosterDay").value, roster: rosterData, updatedAt: new Date() };
-        try {
-            await this.firebase.setDoc(this.firebase.doc(this.db, "rosters", rosterDate), dataToSave);
-            if (showSuccessNotification) this.showNotification(`Roster for ${rosterDate} saved successfully.`, "success");
-        } catch (error) { console.error("Error saving roster:", error); this.showNotification("Could not save roster to the cloud.", "error"); } 
+    setupEventListeners: function() { 
+        document.getElementById("addStaffBtn").addEventListener("click", () => this.addStaff()); 
+        document.getElementById("generateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); 
+        document.getElementById("shuffleBreaksBtn").addEventListener("click", () => this.shuffleBreaks()); 
+        document.getElementById("closePdfBtn").addEventListener("click", () => this.closePdfModal()); 
     },
-
-    loadRosterFromFirestore: async function() {
-        const rosterDate = document.getElementById("rosterDate").value;
-        if (!rosterDate) return;
-        this.showNotification(`Checking for saved roster on ${rosterDate}...`, 'info');
-        try {
-            const docRef = this.firebase.doc(this.db, "rosters", rosterDate);
-            const docSnap = await this.firebase.getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                this.generatedRoster = data.roster;
-                document.getElementById('rosterDay').value = data.day;
-                this.displayRoster(this.generatedRoster);
-                this.addRosterActionButtons();
-                this.showNotification(`Successfully loaded roster for ${rosterDate}.`, 'success');
-            } else {
-                this.showNotification(`No saved roster found for ${rosterDate}. You can generate a new one.`, 'info');
-                document.getElementById('rosterContainer').innerHTML = '';
-                document.getElementById('rosterContainerWrapper').classList.add('opacity-0');
-                document.getElementById("rosterActions")?.remove();
-                this.generatedRoster = null;
-            }
-        } catch (error) { console.error("Error loading roster:", error); this.showNotification("Failed to load roster from the cloud.", "error"); }
+    
+    renderStaffTable: function(staffList) { 
+        const tableBody = document.getElementById("staffTable").querySelector("tbody"); 
+        tableBody.innerHTML = staffList.map((staff, index) => ` 
+            <tr data-index="${index}"> 
+                <td class="bg-white"><div class="p-2"><input data-field="id" class="w-20 p-1 border rounded" type="text" value="${staff.id || ""}"></div></td> 
+                <td><div class="p-2"><input data-field="name" class="w-28 p-1 border rounded" type="text" value="${staff.name || ""}"></div></td> 
+                <td><div class="p-2 flex items-center gap-1"><input type="time" data-field="breakStart" value="${staff.breakStart || "22:00"}" step="1800" class="w-24 p-1 border rounded"><input type="time" data-field="breakEnd" value="${staff.breakEnd || "00:00"}" step="1800" class="w-24 p-1 border rounded"></div></td> 
+                <td><div class="p-2"><select data-field="hhmd" class="p-1 border rounded bg-white"><option value="Yes" ${"Yes" === staff.hhmd ? "selected" : ""}>Yes</option><option value="No" ${"Yes" !== staff.hhmd ? "selected" : ""}>No</option></select></div></td> 
+                <td><div class="p-2"><select data-field="attendance" class="p-1 border rounded bg-white"><option value="Yes" ${"No" !== staff.attendance ? "selected" : ""}>Yes</option><option value="No" ${"No" === staff.attendance ? "selected" : ""}>No</option></select></div></td> 
+                <td><div class="p-2"><input type="checkbox" data-field="locked" ${staff.locked ? "checked" : ""} class="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500"></div></td> 
+                <td><div class="p-2"><button class="remove-btn text-red-600 hover:text-red-800 font-semibold">Remove
+								</button></div></td> 
+            </tr> 
+        `).join(''); 
+        
+        tableBody.querySelectorAll("tr").forEach(row => { 
+            row.querySelectorAll("input, select").forEach(input => input.addEventListener("change", (e) => this.updateStaff(e))); 
+            row.querySelector(".remove-btn").addEventListener("click", (e) => this.deleteStaff(e)); 
+        }); 
     },
-
-    shuffleBreaks: async function() { const presentUnlocked = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked); if (presentUnlocked.length < 2) return this.showNotification("Not enough staff to shuffle breaks.", "warning"); let breakTimes = presentUnlocked.map(s => ({ start: s.breakStart, end: s.breakEnd })); for (let i = breakTimes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]]; } const updatePromises = presentUnlocked.map((staff, index) => this.firebase.setDoc(this.firebase.doc(this.db, "staff", staff.docId), { breakStart: breakTimes[index].start, breakEnd: breakTimes[index].end }, { merge: true }) ); try { await Promise.all(updatePromises); this.showNotification("Break times shuffled.", "success"); } catch (error) { console.error("Error shuffling breaks:", error); this.showNotification("Error shuffling breaks.", "error"); } },
+    
+    addStaff: function() { 
+        const newStaff = { 
+            id: `S${Date.now().toString().slice(-4)}`, 
+            name: "New Staff", 
+            breakStart: "22:00", 
+            breakEnd: "00:00", 
+            hhmd: "No", 
+            attendance: "Yes", 
+            locked: false 
+        };
+        this.staffDataCache.push(newStaff);
+        this.renderStaffTable(this.staffDataCache);
+        this.updateStaffCount();
+        this.updateStaffDatalist();
+        this.showNotification("Added new staff member.", "success"); 
+    },
+    
+    updateStaff: function(event) { 
+        const row = event.target.closest("tr"); 
+        const index = parseInt(row.dataset.index);
+        const field = event.target.dataset.field;
+        const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+        
+        this.staffDataCache[index][field] = value;
+        this.updateStaffCount();
+        this.updateStaffDatalist();
+        if (this.generatedRoster) this.validateAllCells();
+    },
+    
+    deleteStaff: function(event) { 
+        const row = event.target.closest("tr"); 
+        const index = parseInt(row.dataset.index);
+        const staffId = this.staffDataCache[index].id || "this staff member"; 
+        
+        this.staffDataCache.splice(index, 1);
+        this.renderStaffTable(this.staffDataCache);
+        this.updateStaffCount();
+        this.updateStaffDatalist();
+        this.showNotification(`${staffId} has been removed.`, "success"); 
+    },
+    
+    shuffleBreaks: function() { 
+        const presentUnlocked = this.staffDataCache.filter(s => s.attendance === 'Yes' && !s.locked); 
+        if (presentUnlocked.length < 2) return this.showNotification("Not enough staff to shuffle breaks.", "warning"); 
+        
+        let breakTimes = presentUnlocked.map(s => ({ start: s.breakStart, end: s.breakEnd })); 
+        for (let i = breakTimes.length - 1; i > 0; i--) { 
+            const j = Math.floor(Math.random() * (i + 1)); 
+            [breakTimes[i], breakTimes[j]] = [breakTimes[j], breakTimes[i]]; 
+        } 
+        
+        presentUnlocked.forEach((staff, index) => {
+            staff.breakStart = breakTimes[index].start;
+            staff.breakEnd = breakTimes[index].end;
+        });
+        
+        this.renderStaffTable(this.staffDataCache);
+        this.showNotification("Break times shuffled.", "success"); 
+    },
     
     handleCellChange: function(event) {
         const { loc, time, index } = event.target.dataset;
         this.generatedRoster[loc][time][parseInt(index, 10)] = event.target.value;
         this.validateAllCells();
-        this.saveRosterToFirestore(this.generatedRoster);
     },
 
     validateAllCells: function() {
         document.querySelectorAll('td.conflict-cell').forEach(cell => cell.classList.remove('conflict-cell'));
         const timeSlotUsage = {};
+        
         document.querySelectorAll('.roster-input').forEach(input => {
             const time = input.dataset.time;
             const cell = input.closest('td');
@@ -406,13 +580,68 @@ const rosterSystem = {
         }
     },
 
-    addRosterActionButtons: function() { document.getElementById("rosterActions")?.remove(); let buttonsHTML = ` <div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"> <button id="regenerateRosterBtn" class="btn bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-slate-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>Regenerate</button> <button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>Copy</button> <button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700 flex items-center gap-2"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>Download PDF</button> </div>`; document.getElementById("rosterContainerWrapper").insertAdjacentHTML("beforeend", buttonsHTML); document.getElementById("regenerateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV()); document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF()); },
-    copyTSV: function() { if (!this.generatedRoster) return this.showNotification("No roster to copy.", "error"); const tsv = this.OUTPUT_ORDER.map(loc => `${loc}\t${this.ROSTER_TIMES.map(time => (this.generatedRoster[loc]?.[time] || []).join(" | ")).join("\t")}`).join("\n"); navigator.clipboard.writeText(`Location\t${this.ROSTER_TIMES.join("\t")}\n${tsv}`).then(() => this.showNotification("Roster copied!", "success"),() => this.showNotification("Failed to copy.", "error")); },
-    closePdfModal: function() { const preview = document.getElementById('pdfPreview'); if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src); preview.src = 'about:blank'; document.getElementById('pdfModal').style.display = 'none'; },
-    showNotification: function(message, type = "info") { const container = document.getElementById("notification-container"); const colors = {success: "green", error: "red", warning: "yellow", info: "blue"}; const alertDiv = document.createElement("div"); alertDiv.className = `border-l-4 p-4 rounded-r-lg bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700 shadow-md`; alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`; container.appendChild(alertDiv); setTimeout(() => { alertDiv.style.transition = "opacity 0.5s ease"; alertDiv.style.opacity = "0"; setTimeout(() => alertDiv.remove(), 500); }, 5000); },
-    clearNotifications: function() { document.getElementById('notification-container').innerHTML = ''; }
+    addRosterActionButtons: function() { 
+        document.getElementById("rosterActions")?.remove(); 
+        let buttonsHTML = ` 
+            <div id="rosterActions" class="mt-6 flex flex-wrap gap-4 justify-center"> 
+                <button id="regenerateRosterBtn" class="btn bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-slate-700 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>
+                    Regenerate
+                </button> 
+                <button id="copyTSVBtn" class="btn bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>
+                    Copy
+                </button> 
+                <button id="downloadPDFBtn" class="btn bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:bg-red-700 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>
+                    Download PDF
+                </button> 
+            </div>
+        `; 
+        document.getElementById("rosterContainerWrapper").insertAdjacentHTML("beforeend", buttonsHTML); 
+        document.getElementById("regenerateRosterBtn").addEventListener("click", () => this.runRosterGeneration()); 
+        document.getElementById("copyTSVBtn").addEventListener("click", () => this.copyTSV()); 
+        document.getElementById("downloadPDFBtn").addEventListener("click", () => this.downloadPDF()); 
+    },
+    
+    copyTSV: function() { 
+        if (!this.generatedRoster) return this.showNotification("No roster to copy.", "error"); 
+        const tsv = this.OUTPUT_ORDER.map(loc => `${loc}\t${this.ROSTER_TIMES.map(time => (this.generatedRoster[loc]?.[time] || []).join(" | ")).join("\t")}`).join("\n"); 
+        navigator.clipboard.writeText(`Location\t${this.ROSTER_TIMES.join("\t")}\n${tsv}`).then(() => this.showNotification("Roster copied!", "success"),() => this.showNotification("Failed to copy.", "error")); 
+    },
+    
+    closePdfModal: function() { 
+        const preview = document.getElementById('pdfPreview'); 
+        if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src); 
+        preview.src = 'about:blank'; 
+        document.getElementById('pdfModal').style.display = 'none'; 
+    },
+    
+    showNotification: function(message, type = "info") { 
+        const container = document.getElementById("notification-container"); 
+        const colors = {success: "green", error: "red", warning: "yellow", info: "blue"}; 
+        const alertDiv = document.createElement("div"); 
+        alertDiv.className = `border-l-4 p-4 rounded-r-lg bg-${colors[type]}-100 border-${colors[type]}-500 text-${colors[type]}-700 shadow-md`; 
+        alertDiv.innerHTML = `<p class="font-bold">${type.charAt(0).toUpperCase() + type.slice(1)}</p><p>${message}</p>`; 
+        container.appendChild(alertDiv); 
+        setTimeout(() => { 
+            alertDiv.style.transition = "opacity 0.5s ease"; 
+            alertDiv.style.opacity = "0"; 
+            setTimeout(() => alertDiv.remove(), 500); 
+        }, 5000); 
+    },
+    
+    clearNotifications: function() { 
+        document.getElementById('notification-container').innerHTML = ''; 
+    }
 };
+
+// Initialize the system when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    rosterSystem.init();
+});
 </script>
+
 
 <script type="module">
     // Firebase Imports
@@ -420,39 +649,32 @@ const rosterSystem = {
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // This self-executing async function handles the entire Firebase setup and authentication process.
     (async () => {
         try {
-            // --- Your web app's Firebase configuration is now embedded here ---
             const firebaseConfig = {
               apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
               authDomain: "roster-4a997.firebaseapp.com",
               projectId: "roster-4a997",
-              storageBucket: "roster-4a997.appspot.com", // Corrected storage bucket
+              storageBucket: "roster-4a997.appspot.com",
               messagingSenderId: "901381868881",
               appId: "1:901381868881:web:92930481d6c1c85fedd770"
             };
 
-            // Initialize Firebase
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
             const auth = getAuth(app);
 
-            // Make db and Firebase utilities globally available for the rosterSystem object.
             window.db = db;
             window.firebase = {
                  collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
             };
 
-            // Authenticate the user anonymously. This is suitable for public web pages.
             await signInAnonymously(auth);
             console.log('Authentication successful via anonymous sign-in. UID:', auth.currentUser.uid);
-            
-            // Once authentication is successful, initialize the main application logic.
+
             rosterSystem.init();
 
         } catch (error) {
-            // If any part of the setup or authentication fails, log the error and display a message to the user.
             console.error("Firebase initialization or authentication failed:", error);
             const container = document.querySelector('.container');
             if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
