@@ -442,37 +442,140 @@ content += `<input type="text" list="staff-id-list" value="${assignedStaffId}" d
 
 
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-(async () => {
-    try {
-        const firebaseConfig = {
-            apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
-            authDomain: "roster-4a997.firebaseapp.com",
-            projectId: "roster-4a997",
-            storageBucket: "roster-4a997.firebasestorage.app",
-            messagingSenderId: "901381868881",
-            appId: "1:901381868881:web:92930481d6c1c85fedd770"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        window.db = db;
-        window.firebase = {
-            collection, getDocs, getDoc, doc, setDoc, addDoc, deleteDoc, onSnapshot, query
-        };
-        await signInAnonymously(auth);
-        console.log('Authentication successful via anonymous sign-in. UID:', auth.currentUser.uid);
-        rosterSystem.init();
-    } catch (error) {
-        console.error("Firebase initialization or authentication failed:", error);
-        const container = document.querySelector('.container');
-        if (container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
+
+
+
+
+<!-- Firebase SDK (Fully Restored Version) -->
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+    authDomain: "roster-4a997.firebaseapp.com",
+    projectId: "roster-4a997",
+    storageBucket: "roster-4a997.firebasestorage.app",
+    messagingSenderId: "901381868881",
+    appId: "1:901381868881:web:92930481d6c1c85fedd770"
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  firebase.auth().signInAnonymously().then(() => {
+    debugLog('🔐 Anonymous sign-in successful');
+    debugLog('✅ Authenticated via Firebase');
+    window.db = db;
+    window.firebase = {
+      collection: firebase.firestore().collection,
+      getDocs: firebase.firestore().getDocs,
+      getDoc: firebase.firestore().getDoc,
+      doc: firebase.firestore().doc,
+      setDoc: firebase.firestore().setDoc,
+      addDoc: firebase.firestore().addDoc,
+      deleteDoc: firebase.firestore().deleteDoc,
+      onSnapshot: firebase.firestore().onSnapshot,
+      query: firebase.firestore().query
+    };
+    debugLog('🚀 Initializing rosterSystem');
+    rosterSystem.init();
+  }).catch(err => {
+    debugLog('❌ Firebase auth failed: ' + err.message);
+    const container = document.querySelector('.container');
+    if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
+  });
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+    authDomain: "roster-4a997.firebaseapp.com",
+    projectId: "roster-4a997",
+    storageBucket: "roster-4a997.firebasestorage.app",
+    messagingSenderId: "901381868881",
+    appId: "1:901381868881:web:92930481d6c1c85fedd770"
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  firebase.auth().signInAnonymously().then(() => {
+    debugLog('🔐 Anonymous sign-in successful');
+    console.log('Authenticated via legacy Firebase SDK');
+    window.db = db;
+    window.firebase = {
+      collection: (...args) => db.collection(...args),
+      getDocs: (...args) => db.getDocs(...args),
+      getDoc: (...args) => db.getDoc(...args),
+      doc: (...args) => db.doc(...args),
+      setDoc: (...args) => db.setDoc(...args),
+      addDoc: (...args) => db.addDoc(...args),
+      deleteDoc: (...args) => db.deleteDoc(...args),
+      onSnapshot: (...args) => db.onSnapshot(...args),
+      query: (...args) => db.query(...args)
+    };
+    debugLog('🚀 Initializing rosterSystem');
+    rosterSystem.init();
+  }).catch(err => {
+    debugLog('❌ Firebase auth failed: ' + err.message);
+    const container = document.querySelector('.container');
+    if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
+  });
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAP7b4KcwRYPMZjNc2TWsNqMvC3ywImhOM",
+    authDomain: "roster-4a997.firebaseapp.com",
+    projectId: "roster-4a997",
+    storageBucket: "roster-4a997.firebasestorage.app",
+    messagingSenderId: "901381868881",
+    appId: "1:901381868881:web:92930481d6c1c85fedd770"
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  firebase.auth().signInAnonymously().then(() => {
+    debugLog('🔐 Anonymous sign-in successful');
+    console.log('Authenticated via legacy Firebase SDK');
+    window.db = db;
+    window.firebase = {
+      collection: firebase.firestore().collection,
+      getDocs: (...args) => firebase.firestore().getDocs(...args),
+      getDoc: (...args) => firebase.firestore().getDoc(...args),
+      doc: (...args) => firebase.firestore().doc(...args),
+      setDoc: (...args) => firebase.firestore().setDoc(...args),
+      addDoc: (...args) => firebase.firestore().addDoc(...args),
+      deleteDoc: (...args) => firebase.firestore().deleteDoc(...args),
+      onSnapshot: (...args) => firebase.firestore().onSnapshot(...args),
+      query: (...args) => firebase.firestore().query(...args)
+    };
+    debugLog('🚀 Initializing rosterSystem');
+    rosterSystem.init();
+  }).catch(err => {
+    debugLog('❌ Firebase auth failed: ' + err.message);
+    const container = document.querySelector('.container');
+    if(container) container.innerHTML = `<div class="text-center p-8 bg-red-100 border-l-4 border-red-500 text-red-700"><h2 class="font-bold text-xl">Connection Error</h2><p>Could not connect to the database services. Please check your internet connection and the Firebase configuration in the script.</p></div>`;
+  });
+</script>
+
+
+<!-- Developer Console (Debug Panel) -->
+<div id="debugConsole" style="background:#0f172a;color:#cbd5e1;font-family:monospace;font-size:12px;padding:10px;max-height:200px;overflow:auto;margin-top:40px;display:none;">
+  <div style="margin-bottom:6px;"><strong>Debug Console:</strong> <button onclick="document.getElementById('debugConsole').style.display='none'" style="float:right;background:#1e293b;color:white;border:none;padding:2px 6px;">Close</button></div>
+  <pre id="debugOutput" style="white-space:pre-wrap;"></pre>
+</div>
+<script>
+  const showDebug = () => document.getElementById('debugConsole').style.display = 'block';
+  const debugLog = (msg) => {
+    const out = document.getElementById('debugOutput');
+    if (out) {
+      out.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      showDebug();
     }
-})();
+    console.log(msg);
+  };
 </script>
 
 </body>
